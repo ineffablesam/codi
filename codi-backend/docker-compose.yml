@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      target: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    environment:
+      - APP_ENV=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://codi:codi_password@db:5432/codi_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - codi-network
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=codi
+      - POSTGRES_PASSWORD=codi_password
+      - POSTGRES_DB=codi_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codi -d codi_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codi-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codi-network
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: .
+      target: development
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - APP_ENV=development
+      - DATABASE_URL=postgresql+asyncpg://codi:codi_password@db:5432/codi_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - db
+      - redis
+    networks:
+      - codi-network
+    restart: unless-stopped
+
+  celery-beat:
+    build:
+      context: .
+      target: development
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - APP_ENV=development
+      - DATABASE_URL=postgresql+asyncpg://codi:codi_password@db:5432/codi_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - db
+      - redis
+    networks:
+      - codi-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  codi-network:
+    driver: bridge
