@@ -14,24 +14,22 @@ from app.utils.security import TokenPayload
 security = HTTPBearer()
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_db_session),
+async def get_current_user_from_token(
+    token: str,
+    session: AsyncSession,
 ) -> User:
-    """Get the current authenticated user from JWT token.
-
+    """Get user from raw JWT token string.
+    
     Args:
-        credentials: HTTP Bearer credentials
+        token: JWT token string
         session: Database session
-
+        
     Returns:
-        Authenticated User object
-
+        User object
+        
     Raises:
         HTTPException: If token is invalid or user not found
     """
-    token = credentials.credentials
-
     # Decode and validate token
     payload = TokenPayload.from_token(token)
 
@@ -81,6 +79,25 @@ async def get_current_user(
         )
 
     return user
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    session: AsyncSession = Depends(get_db_session),
+) -> User:
+    """Get the current authenticated user from JWT token.
+
+    Args:
+        credentials: HTTP Bearer credentials
+        session: Database session
+
+    Returns:
+        Authenticated User object
+
+    Raises:
+        HTTPException: If token is invalid or user not found
+    """
+    return await get_current_user_from_token(credentials.credentials, session)
 
 
 async def get_current_user_optional(

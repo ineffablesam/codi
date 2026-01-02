@@ -67,11 +67,15 @@ class Settings(BaseSettings):
     ws_heartbeat_interval: int = 30
 
     # Deployment Settings
-    vercel_token: str = ""
     github_pages_enabled: bool = True
     
     # GitHub Webhook
     github_webhook_secret: str = ""  # Optional secret for webhook signature verification
+
+    # Vercel OAuth
+    vercel_client_id: str = ""
+    vercel_client_secret: str = ""
+    vercel_integration_slug: str = "codi"
 
     # Flutter Starter Template
     flutter_starter_template_repo: str = "https://github.com/codi-app/flutter-starter-template.git"

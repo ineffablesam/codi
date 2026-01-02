@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 from github import Github, GithubException, InputGitTreeElement
 from github.Repository import Repository
+import nacl.encoding
+import nacl.public
 
 from app.config import settings
 from app.services.encryption import encryption_service
@@ -916,4 +918,65 @@ class GitHubService:
         slug = slug.strip("-")
         # Limit length
         return slug[:100] if slug else "project"
+
+    def create_repo_secret(
+        self,
+        repo_full_name: str,
+        secret_name: str,
+        secret_value: str,
+    ) -> Dict[str, Any]:
+        """Create or update a repository secret.
+
+        Args:
+            repo_full_name: Full repository name (owner/repo)
+            secret_name: Name of the secret
+            secret_value: Value of the secret
+
+        Returns:
+            Dictionary with result information
+        """
+        try:
+            # Fetch public key
+            url = f"{self.GITHUB_API_URL}/repos/{repo_full_name}/actions/secrets/public-key"
+            headers = {
+                "Authorization": f"token {self._access_token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            }
+            
+            import httpx
+            with httpx.Client() as client:
+                resp = client.get(url, headers=headers)
+                if resp.status_code != 200:
+                    raise ValueError(f"Failed to get repo public key: {resp.text}")
+                key_data = resp.json()
+                public_key_id = key_data["key_id"]
+                public_key_str = key_data["key"]
+
+            # Encrypt the secret
+            public_key = nacl.public.PublicKey(public_key_str.encode("utf-8"), nacl.encoding.Base64Encoder)
+            sealed_box = nacl.public.SealedBox(public_key)
+            encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
+            encrypted_b64 = nacl.encoding.Base64Encoder.encode(encrypted).decode("utf-8")
+
+            # Create/Update secret
+            secret_url = f"{self.GITHUB_API_URL}/repos/{repo_full_name}/actions/secrets/{secret_name}"
+            data = {
+                "encrypted_value": encrypted_b64,
+                "key_id": public_key_id,
+            }
+            
+            with httpx.Client() as client:
+                put_resp = client.put(secret_url, headers=headers, json=data)
+                
+                if put_resp.status_code not in (201, 204):
+                    raise ValueError(f"Failed to create secret: {put_resp.text}")
+                    
+            logger.info(f"Created secret {secret_name} for {repo_full_name}")
+            return {"name": secret_name, "status": "created"}
+
+        except Exception as e:
+            logger.error(f"Failed to create repo secret: {e}")
+            raise ValueError(f"Failed to create repo secret: {str(e)}")
+
 

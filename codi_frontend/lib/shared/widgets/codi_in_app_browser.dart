@@ -98,6 +98,17 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
     _currentUrl = widget.url;
   }
 
+  bool _isSuccessUrl(String url) {
+    if (widget.successUrlPattern == null) return false;
+    try {
+      final uri = Uri.parse(url);
+      // Check path only to avoid matching query parameters (like redirect_uri in the auth URL)
+      return uri.path.contains(widget.successUrlPattern!);
+    } catch (e) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -128,18 +139,33 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
                 _controller = controller;
               },
               onLoadStart: (controller, url) {
+                print('DEBUG: Browser onLoadStart: $url');
+                final urlString = url?.toString() ?? '';
+                
+                if (!mounted) return;
                 setState(() {
                   _isLoading = true;
-                  _currentUrl = url?.toString() ?? '';
+                  _currentUrl = urlString;
                 });
                 
                 // Check for OAuth success pattern
-                if (widget.successUrlPattern != null &&
-                    _currentUrl.contains(widget.successUrlPattern!)) {
-                  widget.onSuccess?.call(_currentUrl);
+                if (_isSuccessUrl(urlString)) {
+                  print('DEBUG: OAuth success pattern match in onLoadStart');
+                  widget.onSuccess?.call(urlString);
                 }
               },
               onLoadStop: (controller, url) async {
+                final urlString = url?.toString() ?? '';
+                print('DEBUG: Browser onLoadStop: $urlString');
+                
+                // Check for OAuth success pattern (fallback)
+                if (_isSuccessUrl(urlString)) {
+                  print('DEBUG: OAuth success pattern match in onLoadStop');
+                  widget.onSuccess?.call(urlString);
+                  return;
+                }
+
+                if (!mounted) return;
                 setState(() {
                   _isLoading = false;
                 });
@@ -148,6 +174,7 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
                 final canGoBack = await controller.canGoBack();
                 final canGoForward = await controller.canGoForward();
                 
+                if (!mounted) return;
                 setState(() {
                   _pageTitle = title ?? '';
                   _canGoBack = canGoBack;
@@ -155,25 +182,28 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
                 });
               },
               onProgressChanged: (controller, progress) {
+                if (!mounted) return;
                 setState(() {
                   _progress = progress / 100;
                 });
               },
               onLoadError: (controller, url, code, message) {
-                widget.onError?.call(code.toString());
+                print('DEBUG: Browser onLoadError: $code, $message');
               },
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 final url = navigationAction.request.url?.toString() ?? '';
+                print('DEBUG: Browser shouldOverrideUrlLoading: $url');
                 
                 // Check for OAuth success pattern
-                if (widget.successUrlPattern != null &&
-                    url.contains(widget.successUrlPattern!)) {
+                if (_isSuccessUrl(url)) {
+                  print('DEBUG: OAuth success pattern match in shouldOverrideUrlLoading');
                   widget.onSuccess?.call(url);
                   return NavigationActionPolicy.CANCEL;
                 }
                 
                 // Check for error patterns in OAuth
                 if (url.contains('error=')) {
+                  print('DEBUG: OAuth error pattern match: $url');
                   final uri = Uri.parse(url);
                   widget.onError?.call(uri.queryParameters['error']);
                   return NavigationActionPolicy.CANCEL;

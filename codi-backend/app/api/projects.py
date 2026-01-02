@@ -122,8 +122,38 @@ async def create_project(
     # Determine framework - default to flutter for backward compatibility
     framework = getattr(project_data, 'framework', 'flutter') or 'flutter'
     platform_type = getattr(project_data, 'platform_type', 'mobile') or 'mobile'
-    backend_type = getattr(project_data, 'backend_type', None)
     deployment_platform = getattr(project_data, 'deployment_platform', None)
+    backend_type = getattr(project_data, 'backend_type', None)
+    vercel_config = {}
+
+    # If Vercel is selected, try to get stored OAuth token
+    if deployment_platform == "vercel":
+        try:
+            from app.models.backend_connection import BackendConnection
+            result = await session.execute(
+                select(BackendConnection).where(
+                    BackendConnection.user_id == current_user.id,
+                    BackendConnection.provider == "vercel"
+                )
+            )
+            connection = result.scalar_one_or_none()
+            if connection:
+                token = connection.get_access_token()
+                if token:
+                    vercel_config["VERCEL_TOKEN"] = token
+                    if connection.organization_id:
+                        vercel_config["VERCEL_ORG_ID"] = connection.organization_id
+                    if connection.provider_user_id:
+                        vercel_config["VERCEL_PROJECT_ID"] = connection.provider_user_id # Using user ID as project owner ID context if needed
+                    logger.info("Using stored Vercel OAuth token")
+        except Exception as e:
+            logger.warning(f"Failed to fetch Vercel connection: {e}")
+            
+        if not vercel_config.get("VERCEL_TOKEN"):
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Vercel account not connected. Please connect your Vercel account in settings before deploying.",
+            )
 
     try:
         repo_name = GitHubService.slugify(project_data.name)
@@ -161,12 +191,14 @@ async def create_project(
         template_service = StarterTemplateService(
             github_service=github_service,
             framework=framework,
+            deployment_platform=deployment_platform or "github_pages",
         )
         await template_service.push_template_to_repo(
             repo_full_name=repo_full_name,
             project_name=repo_name,
             project_title=project_data.name,
             branch=default_branch,
+            vercel_config=vercel_config,
         )
         
         # Enable GitHub Pages (required for the deployment workflow)
@@ -206,7 +238,7 @@ async def create_project(
         # Status
         status=ProjectStatus.ACTIVE,
         deployment_url=deployment_url,
-        deployment_provider="github_pages" if deployment_url else None,
+        deployment_provider=deployment_platform or ("github_pages" if deployment_url else None),
     )
 
     session.add(project)

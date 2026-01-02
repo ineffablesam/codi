@@ -114,6 +114,8 @@ class BackendConnectionService extends GetxService {
         return 'Supabase';
       case 'firebase':
         return 'Firebase';
+      case 'vercel':
+        return 'Vercel';
       default:
         return provider;
     }

@@ -16,7 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.database import Base
-from app.services.encryption import EncryptionService
+from app.services.encryption import encryption_service
 
 
 class BackendConnection(Base):
@@ -52,22 +52,22 @@ class BackendConnection(Base):
 
     def set_access_token(self, token: str) -> None:
         """Encrypt and store access token."""
-        self.access_token = EncryptionService.encrypt(token)
+        self.access_token = encryption_service.encrypt(token).encode("utf-8")
 
     def get_access_token(self) -> Optional[str]:
         """Decrypt and return access token."""
         if self.access_token:
-            return EncryptionService.decrypt(self.access_token)
+            return encryption_service.decrypt(self.access_token.decode("utf-8"))
         return None
 
     def set_refresh_token(self, token: str) -> None:
         """Encrypt and store refresh token."""
-        self.refresh_token = EncryptionService.encrypt(token)
+        self.refresh_token = encryption_service.encrypt(token).encode("utf-8")
 
     def get_refresh_token(self) -> Optional[str]:
         """Decrypt and return refresh token."""
         if self.refresh_token:
-            return EncryptionService.decrypt(self.refresh_token)
+            return encryption_service.decrypt(self.refresh_token.decode("utf-8"))
         return None
 
     @property
@@ -125,34 +125,34 @@ class ProjectBackendConfig(Base):
 
     def set_api_key_anon(self, key: str) -> None:
         """Encrypt and store anon key."""
-        self.api_key_anon = EncryptionService.encrypt(key)
+        self.api_key_anon = encryption_service.encrypt(key).encode("utf-8")
 
     def get_api_key_anon(self) -> Optional[str]:
         """Decrypt and return anon key."""
         if self.api_key_anon:
-            return EncryptionService.decrypt(self.api_key_anon)
+            return encryption_service.decrypt(self.api_key_anon.decode("utf-8"))
         return None
 
     def set_api_key_service(self, key: str) -> None:
         """Encrypt and store service key."""
-        self.api_key_service = EncryptionService.encrypt(key)
+        self.api_key_service = encryption_service.encrypt(key).encode("utf-8")
 
     def get_api_key_service(self) -> Optional[str]:
         """Decrypt and return service key."""
         if self.api_key_service:
-            return EncryptionService.decrypt(self.api_key_service)
+            return encryption_service.decrypt(self.api_key_service.decode("utf-8"))
         return None
 
     def set_config_data(self, data: dict) -> None:
         """Encrypt and store config JSON."""
         import json
-        self.config_data = EncryptionService.encrypt(json.dumps(data))
+        self.config_data = encryption_service.encrypt(json.dumps(data)).encode("utf-8")
 
     def get_config_data(self) -> Optional[dict]:
         """Decrypt and return config JSON."""
         if self.config_data:
             import json
-            return json.loads(EncryptionService.decrypt(self.config_data))
+            return json.loads(encryption_service.decrypt(self.config_data.decode("utf-8")))
         return None
 
     def to_dict(self) -> dict:

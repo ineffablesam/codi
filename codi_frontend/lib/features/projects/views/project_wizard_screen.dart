@@ -80,12 +80,16 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
   }
 
   Future<void> _checkBackendConnections() async {
+    // Check backends
     for (final backend in ProjectWizardController.backends) {
       if (backend.id != 'serverpod') {
         final status = await _backendService.checkConnectionStatus(backend.id);
         _connectionStatus[backend.id] = status.isConnected;
       }
     }
+    // Check deployments (Vercel)
+    final status = await _backendService.checkConnectionStatus('vercel');
+    _connectionStatus['vercel'] = status.isConnected;
   }
 
   Future<void> _connectBackend(String provider) async {
@@ -338,6 +342,26 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
     return Column(
       children: [
         ...ProjectWizardController.deployments.map((deployment) {
+          if (deployment.id == 'vercel') {
+             return Padding(
+              padding: EdgeInsets.only(bottom: 16.h),
+              child: Obx(() => BackendProviderCard(
+                    id: deployment.id,
+                    icon: deployment.icon,
+                    title: deployment.name,
+                    description: deployment.description,
+                    features: deployment.features,
+                    gradientColors: deployment.gradient,
+                    isSelected: _wizard.selectedDeployment.value == deployment.id,
+                    isConnected: _connectionStatus[deployment.id] ?? false,
+                    isConnecting: _isConnecting[deployment.id] ?? false,
+                    showManualConfig: false,
+                    onSelect: () => _wizard.selectedDeployment.value = deployment.id,
+                    onConnect: () => _connectBackend(deployment.id),
+                    onDisconnect: () => _disconnectBackend(deployment.id),
+                  )),
+            );
+          }
           return Padding(
             padding: EdgeInsets.only(bottom: 16.h),
             child: Obx(() => AnimatedSelectionCard(

@@ -1,7 +1,12 @@
 /// Project creation wizard controller
 library;
 
+import 'dart:ui';
+
 import 'package:get/get.dart';
+
+import '../../../core/constants/app_colors.dart';
+import '../services/backend_connection_service.dart';
 
 /// Wizard step enum
 enum WizardStep { framework, backend, deployment, details }
@@ -10,24 +15,24 @@ enum WizardStep { framework, backend, deployment, details }
 class ProjectWizardController extends GetxController {
   // Current step
   final currentStep = WizardStep.framework.obs;
-  
+
   // Selections
   final selectedFramework = 'flutter'.obs;
   final selectedBackend = RxnString();
   final selectedDeployment = 'github_pages'.obs;
-  
+
   // Project details
   final projectName = ''.obs;
   final projectDescription = ''.obs;
   final isPrivate = false.obs;
-  
+
   // Serverpod manual config
   final serverpodServerUrl = ''.obs;
   final serverpodApiKey = ''.obs;
-  
+
   // Animation state
   final isAnimating = false.obs;
-  
+
   /// Framework options
   static const List<FrameworkOption> frameworks = [
     FrameworkOption(
@@ -63,7 +68,7 @@ class ProjectWizardController extends GetxController {
       platforms: ['iOS', 'Android'],
     ),
   ];
-  
+
   /// Backend options
   static const List<BackendOption> backends = [
     BackendOption(
@@ -91,7 +96,7 @@ class ProjectWizardController extends GetxController {
       features: ['Type-safe API', 'ORM', 'Caching', 'Auth'],
     ),
   ];
-  
+
   /// Deployment options
   static const List<DeploymentOption> deployments = [
     DeploymentOption(
@@ -119,7 +124,7 @@ class ProjectWizardController extends GetxController {
       features: ['Forms', 'Functions', 'Identity'],
     ),
   ];
-  
+
   /// Get platform type based on framework
   String get platformType {
     switch (selectedFramework.value) {
@@ -133,7 +138,7 @@ class ProjectWizardController extends GetxController {
         return 'mobile';
     }
   }
-  
+
   /// Progress percentage
   double get progress {
     switch (currentStep.value) {
@@ -147,7 +152,7 @@ class ProjectWizardController extends GetxController {
         return 1.0;
     }
   }
-  
+
   /// Step title
   String get stepTitle {
     switch (currentStep.value) {
@@ -161,7 +166,7 @@ class ProjectWizardController extends GetxController {
         return 'Project Details';
     }
   }
-  
+
   /// Step subtitle
   String get stepSubtitle {
     switch (currentStep.value) {
@@ -175,10 +180,10 @@ class ProjectWizardController extends GetxController {
         return 'Name your project';
     }
   }
-  
+
   /// Can go back
   bool get canGoBack => currentStep.value != WizardStep.framework;
-  
+
   /// Can proceed
   bool get canProceed {
     switch (currentStep.value) {
@@ -187,19 +192,57 @@ class ProjectWizardController extends GetxController {
       case WizardStep.backend:
         return true; // Optional
       case WizardStep.deployment:
+        if (selectedDeployment.value == 'vercel') {
+          // Can only proceed if Vercel is ignored or connected
+          // We rely on the screen to show Connect button which updates status
+          // The screen should pass connection status to controller or controller should check it
+          // Let's assume controller needs to check it.
+          // But controller doesn't have the status map directly.
+          // Let's rely on the screen to block 'next' visually or
+          // better: injecting the status into controller or checking it here.
+          // Ideally the controller should manage connection status.
+          return true; // We'll block in nextStep if needed
+        }
         return selectedDeployment.value.isNotEmpty;
       case WizardStep.details:
         return projectName.value.trim().isNotEmpty;
     }
   }
-  
+
+  /// Check deployment connection
+  Future<bool> checkDeploymentConnection() async {
+    if (selectedDeployment.value == 'vercel') {
+      final backendService = Get.find<BackendConnectionService>();
+      final status = await backendService.checkConnectionStatus('vercel');
+      return status.isConnected;
+    }
+    return true;
+  }
+
   /// Go to next step
   Future<void> nextStep() async {
+    // Extra validation for deployment
+    if (currentStep.value == WizardStep.deployment) {
+      if (selectedDeployment.value == 'vercel') {
+        final isConnected = await checkDeploymentConnection();
+        if (!isConnected) {
+          Get.snackbar(
+            'Connection Required',
+            'Please connect your Vercel account to proceed.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: AppColors.error,
+            colorText: const Color(0xFFFFFFFF),
+          );
+          return;
+        }
+      }
+    }
+
     if (!canProceed) return;
-    
+
     isAnimating.value = true;
     await Future.delayed(const Duration(milliseconds: 150));
-    
+
     switch (currentStep.value) {
       case WizardStep.framework:
         currentStep.value = WizardStep.backend;
@@ -214,17 +257,17 @@ class ProjectWizardController extends GetxController {
         // Submit
         break;
     }
-    
+
     isAnimating.value = false;
   }
-  
+
   /// Go to previous step
   Future<void> previousStep() async {
     if (!canGoBack) return;
-    
+
     isAnimating.value = true;
     await Future.delayed(const Duration(milliseconds: 150));
-    
+
     switch (currentStep.value) {
       case WizardStep.framework:
         break;
@@ -238,16 +281,16 @@ class ProjectWizardController extends GetxController {
         currentStep.value = WizardStep.deployment;
         break;
     }
-    
+
     isAnimating.value = false;
   }
-  
+
   /// Skip backend selection
   void skipBackend() {
     selectedBackend.value = null;
     nextStep();
   }
-  
+
   /// Reset wizard
   void reset() {
     currentStep.value = WizardStep.framework;
@@ -268,7 +311,7 @@ class FrameworkOption {
   final String icon;
   final List<String> gradient;
   final List<String> platforms;
-  
+
   const FrameworkOption({
     required this.id,
     required this.name,
@@ -287,7 +330,7 @@ class BackendOption {
   final String icon;
   final List<String> gradient;
   final List<String> features;
-  
+
   const BackendOption({
     required this.id,
     required this.name,
@@ -298,7 +341,7 @@ class BackendOption {
   });
 }
 
-/// Deployment option model  
+/// Deployment option model
 class DeploymentOption {
   final String id;
   final String name;
@@ -306,7 +349,7 @@ class DeploymentOption {
   final String icon;
   final List<String> gradient;
   final List<String> features;
-  
+
   const DeploymentOption({
     required this.id,
     required this.name,

@@ -168,7 +168,10 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           cd build/web
-          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+        run: |
+          cd build/web
+          # Default to production for push events or if specified
+          if [ "${{ github.event.inputs.environment || 'production' }}" == "production" ]; then
             vercel deploy --prod --token=$VERCEL_TOKEN --yes
           else
             vercel deploy --token=$VERCEL_TOKEN --yes
@@ -195,13 +198,30 @@ jobs:
           fi
 '''
 
-# React/Vite deploy workflow for GitHub Pages
+# React/Vite deploy workflow for GitHub Pages and Vercel
 REACT_DEPLOY_WORKFLOW = '''name: Deploy React App
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Deployment target'
+        required: true
+        default: 'github_pages'
+        type: choice
+        options:
+          - github_pages
+          - vercel
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
 
 permissions:
   contents: read
@@ -216,34 +236,81 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+          # cache: 'npm' # Disabled until package-lock.json is generated
+      - run: npm install # Use install instead of ci for initial setup
       - run: npm run build
         env:
           BASE_URL: /${{ github.event.repository.name }}/
-      - uses: actions/configure-pages@v4
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          path: 'dist'
+          name: dist
+          path: dist
 
-  deploy:
+  deploy-pages:
+    if: __PAGES_DEFAULT__ || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_target == 'github_pages')
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'dist'
       - uses: actions/deploy-pages@v4
         id: deployment
+
+  deploy-vercel:
+    if: __VERCEL_DEFAULT__ || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_target == 'vercel')
+    runs-on: ubuntu-latest
+    # Remote build doesn't need local build artifact
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          # Default to production for push events or if specified
+          if [ "${{ github.event.inputs.environment || 'production' }}" == "production" ]; then
+            vercel deploy --prod --token=$VERCEL_TOKEN --yes
+          else
+            vercel deploy --token=$VERCEL_TOKEN --yes
+          fi
 '''
 
-# Next.js deploy workflow for Vercel
+# Next.js deploy workflow for Vercel and GitHub Pages
 NEXTJS_DEPLOY_WORKFLOW = '''name: Deploy Next.js App
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Deployment target'
+        required: true
+        default: 'vercel'
+        type: choice
+        options:
+          - github_pages
+          - vercel
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
 
 permissions:
   contents: read
@@ -258,23 +325,57 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - run: npm ci
+          # cache: 'npm' # Disabled until package-lock.json is generated
+      - run: npm install # Use install instead of ci for initial setup
       - run: npm run build
-      - uses: actions/configure-pages@v4
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          path: 'out'
+          name: out
+          path: out
 
-  deploy:
+  deploy-pages:
+    # Default to pages if not specified or explicitly selected
+    if: __PAGES_DEFAULT__ || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_target == 'github_pages')
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: out
+          path: out
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'out'
       - uses: actions/deploy-pages@v4
         id: deployment
+
+  deploy-vercel:
+    # Default to Vercel for Next.js on push, or if selected
+    if: __VERCEL_DEFAULT__ || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_target == 'vercel')
+    runs-on: ubuntu-latest
+    # Remote build doesn't need local build artifact, so we don't 'needs: build'
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Simplified Vercel Deploy (Let Vercel build it)
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          # Default to production for push events or if specified
+          if [ "${{ github.event.inputs.environment || 'production' }}" == "production" ]; then
+            vercel deploy --prod --token=$VERCEL_TOKEN --yes
+          else
+            vercel deploy --token=$VERCEL_TOKEN --yes
+          fi
 '''
 
 
@@ -313,15 +414,17 @@ class StarterTemplateService:
         },
     }
 
-    def __init__(self, github_service: Optional[GitHubService] = None, framework: str = "flutter") -> None:
+    def __init__(self, github_service: Optional[GitHubService] = None, framework: str = "flutter", deployment_platform: str = "github_pages") -> None:
         """Initialize starter template service.
 
         Args:
             github_service: Optional GitHubService instance for pushing to GitHub
             framework: Framework type (flutter, react, nextjs)
+            deployment_platform: Target deployment platform (github_pages, vercel)
         """
         self.github_service = github_service
         self.framework = framework
+        self.deployment_platform = deployment_platform
         self._validate_framework()
     
     def _validate_framework(self) -> None:
@@ -439,6 +542,15 @@ class StarterTemplateService:
 
         # Add framework-specific GitHub Actions workflow
         workflow = self._get_deploy_workflow()
+        
+        # Customize workflow default target based on configured deployment platform
+        # We use placeholders in the workflow templates to toggle defaults
+        pages_default = "github.event_name == 'push'" if self.deployment_platform == 'github_pages' else "false"
+        vercel_default = "github.event_name == 'push'" if self.deployment_platform == 'vercel' else "false"
+        
+        workflow = workflow.replace("__PAGES_DEFAULT__", pages_default)
+        workflow = workflow.replace("__VERCEL_DEFAULT__", vercel_default)
+        
         workflow_name = self._get_workflow_filename()
         files[f".github/workflows/{workflow_name}"] = {
             "content": workflow,
@@ -475,6 +587,14 @@ class StarterTemplateService:
             elif file_path.name == "index.html":
                 content = content.replace("{{PROJECT_TITLE}}", project_title)
         
+        # Next.js specific configuration for GitHub Pages
+        if self.framework == "nextjs" and self.deployment_platform == "github_pages" and file_path.name in ("next.config.js", "next.config.ts", "next.config.mjs"):
+            # Inject output: 'export' for static export required by GitHub Pages
+            if "const nextConfig = {" in content:
+                content = content.replace("const nextConfig = {", "const nextConfig = {\n  output: 'export',")
+            elif "const nextConfig: NextConfig = {" in content:
+                content = content.replace("const nextConfig: NextConfig = {", "const nextConfig: NextConfig = {\n  output: 'export',")
+
         return content
     
     def _get_workflow_filename(self) -> str:
@@ -501,6 +621,7 @@ class StarterTemplateService:
         project_name: str,
         project_title: Optional[str] = None,
         branch: str = "main",
+        vercel_config: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         """Push starter template to a GitHub repository.
 
@@ -509,6 +630,7 @@ class StarterTemplateService:
             project_name: Name of the project
             project_title: Human-readable project title
             branch: Branch to push to
+            vercel_config: Optional dictionary of Vercel secrets (VERCEL_TOKEN, etc.)
 
         Returns:
             Dictionary with commit information
@@ -529,10 +651,13 @@ class StarterTemplateService:
                 files_list.append({"path": path, "content": file_info["content"]})
 
         # Commit all files at once
+        project_label = project_title or project_name
+        commit_msg = f"Initial commit: {self.framework.capitalize()} starter template for {project_label} from Codi"
+        
         result = self.github_service.commit_multiple_files(
             repo_full_name=repo_full_name,
             files=files_list,
-            commit_message="Initial commit: Flutter starter template from Codi",
+            commit_message=commit_msg,
             branch=branch,
         )
 
@@ -541,6 +666,18 @@ class StarterTemplateService:
             files_count=len(files_list),
             commit_sha=result.get("commit_sha"),
         )
+        
+        # Configure Vercel secrets if provided
+        if vercel_config:
+            logger.info(f"Configuring Vercel secrets for {repo_full_name}")
+            try:
+                for key, value in vercel_config.items():
+                    if value:
+                        self.github_service.create_repo_secret(repo_full_name, key, value)
+                logger.info("Successfully configured Vercel secrets")
+            except Exception as e:
+                logger.error(f"Failed to configure Vercel secrets: {e}")
+                # Don't fail the whole operation, but log the error
 
         return result
 

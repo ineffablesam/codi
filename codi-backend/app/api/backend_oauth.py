@@ -81,28 +81,36 @@ async def start_oauth_flow(
     Args:
         provider: 'supabase' or 'firebase'
     """
-    if provider not in ("supabase", "firebase"):
+    args_provider = provider # Rename to avoid conflict if needed, though python scoping handles it.
+    
+    if provider not in ("supabase", "firebase", "vercel"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported provider: {provider}",
         )
 
-    # Callback URL
+    # Callback URL - crucial that this matches what is set in Vercel Dashboard
     redirect_uri = f"{settings.api_base_url}/api/v1/backend/callback/{provider}"
+    
+    # State handling (simplified)
+    import secrets
+    state = secrets.token_urlsafe(16)
 
     if provider == "supabase":
         service = SupabaseOAuthService()
         result = service.get_authorization_url(redirect_uri)
-    else:  # firebase
+    elif provider == "firebase":
         service = FirebaseOAuthService()
         result = service.get_authorization_url(redirect_uri)
-
-    # Store state in session/cache (simplified - in production use Redis)
-    # For now, we'll pass state back and verify on callback
-
+    elif provider == "vercel":
+        from app.services.vercel import VercelService
+        # Pass the calculated redirect_uri
+        auth_url = VercelService.get_oauth_url(redirect_uri=redirect_uri, state=state)
+        result = {"authorization_url": auth_url, "state": state}
+    
     return OAuthStartResponse(
         authorization_url=result["authorization_url"],
-        state=result["state"],
+        state=result.get("state", state),
         provider=provider,
     )
 
@@ -119,10 +127,12 @@ async def oauth_callback(
     Exchanges code for tokens and saves connection.
 
     Args:
-        provider: 'supabase' or 'firebase'
+        provider: 'supabase', 'firebase', or 'vercel'
         callback_data: Authorization code and state
     """
     redirect_uri = f"{settings.api_base_url}/api/v1/backend/callback/{provider}"
+    
+    tokens = {}
 
     try:
         if provider == "supabase":
@@ -141,6 +151,19 @@ async def oauth_callback(
                     client_id=settings.google_client_id or "",
                     client_secret=settings.google_client_secret or "",
                 )
+        elif provider == "vercel":
+            from app.services.vercel import VercelService
+            # Vercel exchange returns dict with access_token, team_id, etc.
+            data = await VercelService.exchange_code_for_token(code=callback_data.code, redirect_uri=redirect_uri)
+            tokens = {
+                "access_token": data["access_token"],
+                "refresh_token": None, # Vercel tokens don't expire/refresh in standard way usually
+                "expires_at": None,
+                "token_type": data.get("token_type"),
+                # Extra data we might want to store?
+                "user_id": data.get("user_id"),
+                "team_id": data.get("team_id")
+            }
         else:
             raise HTTPException(status_code=400, detail="Unsupported provider")
 
@@ -162,6 +185,12 @@ async def oauth_callback(
             connection.is_connected = "connected"
             connection.last_error = None
             connection.updated_at = datetime.now(timezone.utc)
+            
+            # Update extra fields if present
+            if tokens.get("team_id"):
+                connection.organization_id = tokens["team_id"]
+            if tokens.get("user_id"):
+                connection.provider_user_id = tokens["user_id"]
         else:
             # Create new
             connection = BackendConnection(
@@ -173,6 +202,13 @@ async def oauth_callback(
             if tokens.get("refresh_token"):
                 connection.set_refresh_token(tokens["refresh_token"])
             connection.token_expires_at = tokens["expires_at"]
+            
+            # Set extra fields if present
+            if tokens.get("team_id"):
+                connection.organization_id = tokens["team_id"]
+            if tokens.get("user_id"):
+                connection.provider_user_id = tokens["user_id"]
+
             session.add(connection)
 
         await session.commit()

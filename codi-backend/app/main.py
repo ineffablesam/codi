@@ -136,6 +136,7 @@ from app.api.webhooks import router as webhooks_router
 app.include_router(webhooks_router, prefix="/api/v1")
 
 
+
 @app.get("/")
 async def root() -> dict:
     """Root endpoint with API information.
