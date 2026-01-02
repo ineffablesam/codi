@@ -18,6 +18,11 @@ class ProjectCreate(ProjectBase):
     """Schema for creating a new project."""
 
     is_private: bool = False
+    # Multi-platform configuration
+    platform_type: Optional[str] = Field("mobile", description="Target platform: mobile, web")
+    framework: Optional[str] = Field("flutter", description="Framework: flutter, react, nextjs, react_native")
+    backend_type: Optional[str] = Field(None, description="Backend: supabase, firebase, serverpod")
+    deployment_platform: Optional[str] = Field(None, description="Deployment: github_pages, vercel, netlify")
 
 
 class ProjectUpdate(BaseModel):
@@ -26,6 +31,11 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=2000)
     status: Optional[ProjectStatus] = None
+    # Multi-platform configuration
+    platform_type: Optional[str] = None
+    framework: Optional[str] = None
+    backend_type: Optional[str] = None
+    deployment_platform: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
@@ -46,6 +56,12 @@ class ProjectResponse(BaseModel):
     is_private: bool = False
     framework_version: Optional[str] = None
     dart_version: Optional[str] = None
+    # Multi-platform configuration
+    platform_type: Optional[str] = None
+    framework: Optional[str] = None
+    backend_type: Optional[str] = None
+    deployment_platform: Optional[str] = None
+    # Deployment info
     deployment_url: Optional[str] = None
     deployment_provider: Optional[str] = None
     last_deployment_at: Optional[datetime] = None

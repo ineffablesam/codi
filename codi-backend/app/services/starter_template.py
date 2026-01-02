@@ -195,20 +195,144 @@ jobs:
           fi
 '''
 
+# React/Vite deploy workflow for GitHub Pages
+REACT_DEPLOY_WORKFLOW = '''name: Deploy React App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+        env:
+          BASE_URL: /${{ github.event.repository.name }}/
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'dist'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
+'''
+
+# Next.js deploy workflow for Vercel
+NEXTJS_DEPLOY_WORKFLOW = '''name: Deploy Next.js App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'out'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
+'''
+
 
 class StarterTemplateService:
-    """Service for managing Flutter starter templates from the codiexample directory."""
+    """Service for managing multi-framework starter templates.
+    
+    Supported frameworks:
+    - flutter: Flutter web/mobile (Dart)
+    - react: React + Vite + TypeScript
+    - nextjs: Next.js 15 + App Router + TypeScript + Tailwind
+    """
 
-    # Path to the codiexample template directory
-    TEMPLATE_DIR = Path(__file__).parent.parent.parent / "codiexample"
+    # Base path to the templates directory
+    TEMPLATES_BASE = Path(__file__).parent.parent.parent / "codi-starter-templates"
+    
+    # Framework to template directory mapping
+    FRAMEWORK_DIRS = {
+        "flutter": "flutter-starter",
+        "react": "react-starter",
+        "nextjs": "nextjs-starter",
+    }
+    
+    # Framework-specific exclusion patterns
+    FRAMEWORK_EXCLUDES = {
+        "flutter": {
+            "dirs": {".dart_tool", ".idea", "build", ".git", "android", "ios", ".pub-cache", ".pub"},
+            "files": {".metadata", "pubspec.lock", ".iml"},
+        },
+        "react": {
+            "dirs": {"node_modules", ".git", "dist", ".cache"},
+            "files": {"package-lock.json", ".DS_Store"},
+        },
+        "nextjs": {
+            "dirs": {"node_modules", ".git", ".next", "out", ".cache"},
+            "files": {"package-lock.json", ".DS_Store"},
+        },
+    }
 
-    def __init__(self, github_service: Optional[GitHubService] = None) -> None:
+    def __init__(self, github_service: Optional[GitHubService] = None, framework: str = "flutter") -> None:
         """Initialize starter template service.
 
         Args:
             github_service: Optional GitHubService instance for pushing to GitHub
+            framework: Framework type (flutter, react, nextjs)
         """
         self.github_service = github_service
+        self.framework = framework
+        self._validate_framework()
+    
+    def _validate_framework(self) -> None:
+        """Validate the framework is supported."""
+        if self.framework not in self.FRAMEWORK_DIRS:
+            raise ValueError(f"Unsupported framework: {self.framework}. Supported: {list(self.FRAMEWORK_DIRS.keys())}")
+    
+    @property
+    def TEMPLATE_DIR(self) -> Path:
+        """Get the template directory for the current framework."""
+        return self.TEMPLATES_BASE / self.FRAMEWORK_DIRS[self.framework]
 
     def _should_include_path(self, path: Path) -> bool:
         """Check if a file path should be included in the template.
@@ -219,13 +343,17 @@ class StarterTemplateService:
         Returns:
             True if the path should be included
         """
+        excludes = self.FRAMEWORK_EXCLUDES.get(self.framework, {"dirs": set(), "files": set()})
+        exclude_dirs = excludes.get("dirs", set())
+        exclude_files = excludes.get("files", set())
+        
         # Check if any parent directory is in exclude list
         for part in path.parts:
-            if part in EXCLUDE_DIRS:
+            if part in exclude_dirs:
                 return False
 
-        # Check file extensions and names
-        if path.name in EXCLUDE_FILES:
+        # Check file names
+        if path.name in exclude_files:
             return False
         if path.suffix == ".iml":
             return False
@@ -249,7 +377,7 @@ class StarterTemplateService:
         project_name: str,
         project_title: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Get starter template files from the codiexample directory.
+        """Get starter template files for the configured framework.
 
         Args:
             project_name: Name of the project (snake_case or kebab-case)
@@ -263,11 +391,16 @@ class StarterTemplateService:
 
         repo_name = GitHubService.slugify(project_name)
         
-        # Ensure name is a valid Dart identifier (only lowercase, digits, and underscores)
+        # Framework-specific name processing
         import re
-        dart_package_name = re.sub(r'[^a-z0-9_]', '_', project_name.lower())
-        if dart_package_name and (not dart_package_name[0].isalpha() and dart_package_name[0] != '_'):
-            dart_package_name = "app_" + dart_package_name
+        if self.framework == "flutter":
+            # Dart package name: only lowercase, digits, and underscores
+            package_name = re.sub(r'[^a-z0-9_]', '_', project_name.lower())
+            if package_name and (not package_name[0].isalpha() and package_name[0] != '_'):
+                package_name = "app_" + package_name
+        else:
+            # JavaScript/TypeScript: kebab-case
+            package_name = re.sub(r'[^a-z0-9-]', '-', project_name.lower())
 
         if not self.TEMPLATE_DIR.exists():
             logger.error(f"Template directory not found: {self.TEMPLATE_DIR}")
@@ -294,26 +427,9 @@ class StarterTemplateService:
                 else:
                     # Read text files and perform replacements
                     content = file_path.read_text(encoding="utf-8")
-
-                    # Replace placeholders in text files
-                    if file_path.suffix == ".dart":
-                        # Update internal package imports
-                        content = content.replace("package:codiexample/", f"package:{dart_package_name}/")
                     
-                    if file_path.name == "pubspec.yaml":
-                        # Update the package name
-                        content = content.replace("name: codiexample", f"name: {dart_package_name}")
-                        # Ensure SDK version is compatible with modern lints (3.5.0+)
-                        # But avoid hardcoding too strictly to allow range matching
-                        for old_sdk in ['sdk: ">=3.0.0 <4.0.0"', "sdk: '>=3.0.0 <4.0.0'", 
-                                       'sdk: ">=3.8.0 <4.0.0"', "sdk: '>=3.8.0 <4.0.0'"]:
-                            content = content.replace(old_sdk, 'sdk: ">=3.5.0 <4.0.0"')
-                    elif file_path.name == "index.html":
-                        # Update the title in web/index.html
-                        content = content.replace("codiexample", project_title)
-                    elif file_path.name == "manifest.json":
-                        # Update the manifest
-                        content = content.replace("codiexample", project_title)
+                    # Apply framework-specific replacements
+                    content = self._apply_replacements(content, file_path, project_name, project_title, package_name)
 
                     files[str(rel_path)] = {"content": content, "is_binary": False}
 
@@ -321,14 +437,63 @@ class StarterTemplateService:
                 logger.warning(f"Failed to read file {file_path}: {e}")
                 continue
 
-        # Add the GitHub Actions workflow
-        files[".github/workflows/flutter_web_deploy.yml"] = {
-            "content": DEPLOY_WORKFLOW,
+        # Add framework-specific GitHub Actions workflow
+        workflow = self._get_deploy_workflow()
+        workflow_name = self._get_workflow_filename()
+        files[f".github/workflows/{workflow_name}"] = {
+            "content": workflow,
             "is_binary": False,
         }
 
-        logger.info(f"Loaded {len(files)} template files from {self.TEMPLATE_DIR}")
+        logger.info(f"Loaded {len(files)} template files for {self.framework} from {self.TEMPLATE_DIR}")
         return files
+    
+    def _apply_replacements(self, content: str, file_path: Path, project_name: str, project_title: str, package_name: str) -> str:
+        """Apply framework-specific placeholder replacements."""
+        # Universal replacements
+        content = content.replace("{{PROJECT_TITLE}}", project_title)
+        content = content.replace("{{PROJECT_NAME}}", project_name)
+        
+        if self.framework == "flutter":
+            if file_path.suffix == ".dart":
+                content = content.replace("package:codiexample/", f"package:{package_name}/")
+            
+            if file_path.name == "pubspec.yaml":
+                content = content.replace("name: codiexample", f"name: {package_name}")
+                for old_sdk in ['sdk: ">=3.0.0 <4.0.0"', "sdk: '>=3.0.0 <4.0.0'", 
+                               'sdk: ">=3.8.0 <4.0.0"', "sdk: '>=3.8.0 <4.0.0'"]:
+                    content = content.replace(old_sdk, 'sdk: ">=3.5.0 <4.0.0"')
+            elif file_path.name == "index.html":
+                content = content.replace("codiexample", project_title)
+            elif file_path.name == "manifest.json":
+                content = content.replace("codiexample", project_title)
+                
+        elif self.framework in ("react", "nextjs"):
+            if file_path.name == "package.json":
+                content = content.replace('"react-starter"', f'"{package_name}"')
+                content = content.replace('"nextjs-starter"', f'"{package_name}"')
+            elif file_path.name == "index.html":
+                content = content.replace("{{PROJECT_TITLE}}", project_title)
+        
+        return content
+    
+    def _get_workflow_filename(self) -> str:
+        """Get the GitHub Actions workflow filename for the framework."""
+        return {
+            "flutter": "flutter_web_deploy.yml",
+            "react": "react_deploy.yml",
+            "nextjs": "nextjs_deploy.yml",
+        }.get(self.framework, "deploy.yml")
+    
+    def _get_deploy_workflow(self) -> str:
+        """Get the GitHub Actions deployment workflow for the framework."""
+        if self.framework == "flutter":
+            return DEPLOY_WORKFLOW
+        elif self.framework == "react":
+            return REACT_DEPLOY_WORKFLOW
+        elif self.framework == "nextjs":
+            return NEXTJS_DEPLOY_WORKFLOW
+        return DEPLOY_WORKFLOW
 
     async def push_template_to_repo(
         self,

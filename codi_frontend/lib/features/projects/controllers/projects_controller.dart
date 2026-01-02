@@ -65,11 +65,15 @@ class ProjectsController extends GetxController {
     }
   }
 
-  /// Create a new project
+  /// Create a new project with multi-platform support
   Future<bool> createProject({
     required String name,
     String? description,
     bool isPrivate = false,
+    String platformType = 'mobile',
+    String framework = 'flutter',
+    String? backendType,
+    String? deploymentPlatform,
   }) async {
     isCreating.value = true;
     errorMessage.value = null;
@@ -79,6 +83,10 @@ class ProjectsController extends GetxController {
         name: name,
         description: description,
         isPrivate: isPrivate,
+        platformType: platformType,
+        framework: framework,
+        backendType: backendType,
+        deploymentPlatform: deploymentPlatform,
       );
 
       final result = await _projectService.createProject(request);
@@ -88,7 +96,7 @@ class ProjectsController extends GetxController {
         
         Get.snackbar(
           'Success!',
-          'Project "${result.name}" created',
+          'Project "${result.name}" created with ${result.frameworkLabel}',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: AppColors.success,
           colorText: Colors.white,

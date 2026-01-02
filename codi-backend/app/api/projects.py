@@ -74,6 +74,12 @@ async def list_projects(
                 github_default_branch=p.github_default_branch,
                 github_current_branch=p.github_current_branch,
                 is_private=p.is_private,
+                # Platform configuration
+                platform_type=p.platform_type,
+                framework=p.framework,
+                backend_type=p.backend_type,
+                deployment_platform=p.deployment_platform,
+                # Status
                 status=p.status if isinstance(p.status, str) else p.status.value,
                 deployment_url=p.deployment_url,
                 deployment_provider=p.deployment_provider,
@@ -112,12 +118,27 @@ async def create_project(
     """
     # Create GitHub repository
     github_service = GitHubService(access_token=github_token)
+    
+    # Determine framework - default to flutter for backward compatibility
+    framework = getattr(project_data, 'framework', 'flutter') or 'flutter'
+    platform_type = getattr(project_data, 'platform_type', 'mobile') or 'mobile'
+    backend_type = getattr(project_data, 'backend_type', None)
+    deployment_platform = getattr(project_data, 'deployment_platform', None)
 
     try:
         repo_name = GitHubService.slugify(project_data.name)
+        
+        # Framework-specific description
+        framework_desc = {
+            "flutter": "Flutter app",
+            "react": "React app",
+            "nextjs": "Next.js app",
+            "react_native": "React Native app",
+        }.get(framework, "App")
+        
         repo_info = github_service.create_repository(
             name=repo_name,
-            description=project_data.description or f"Flutter app: {project_data.name}",
+            description=project_data.description or f"{framework_desc}: {project_data.name}",
             private=project_data.is_private,
             auto_init=True,
         )
@@ -136,7 +157,11 @@ async def create_project(
     # Push starter template and enable Pages
     deployment_url = None
     try:
-        template_service = StarterTemplateService(github_service=github_service)
+        # Use framework-specific template service
+        template_service = StarterTemplateService(
+            github_service=github_service,
+            framework=framework,
+        )
         await template_service.push_template_to_repo(
             repo_full_name=repo_full_name,
             project_name=repo_name,
@@ -163,7 +188,7 @@ async def create_project(
         logger.error(f"Failed to setup repository: {e}")
         # Continue anyway - repo exists
 
-    # Create project in database
+    # Create project in database with platform configuration
     project = Project(
         name=project_data.name,
         description=project_data.description,
@@ -173,6 +198,12 @@ async def create_project(
         github_repo_url=repo_url,
         github_current_branch=default_branch,
         is_private=project_data.is_private,
+        # Multi-platform fields
+        platform_type=platform_type,
+        framework=framework,
+        backend_type=backend_type,
+        deployment_platform=deployment_platform or ("github_pages" if deployment_url else None),
+        # Status
         status=ProjectStatus.ACTIVE,
         deployment_url=deployment_url,
         deployment_provider="github_pages" if deployment_url else None,
@@ -201,6 +232,12 @@ async def create_project(
         github_default_branch=project.github_default_branch,
         github_current_branch=project.github_current_branch,
         is_private=project.is_private,
+        # Platform configuration
+        platform_type=project.platform_type,
+        framework=project.framework,
+        backend_type=project.backend_type,
+        deployment_platform=project.deployment_platform,
+        # Status
         status=project.status if isinstance(project.status, str) else project.status.value,
         deployment_url=project.deployment_url,
         deployment_provider=project.deployment_provider,

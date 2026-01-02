@@ -16,6 +16,12 @@ class ProjectModel {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  // Platform configuration
+  final String? platformType;
+  final String? framework;
+  final String? backendType;
+  final String? deploymentPlatform;
+
   // Optional owner info
   final int? ownerId;
   final String? ownerUsername;
@@ -34,6 +40,10 @@ class ProjectModel {
     this.lastBuildAt,
     required this.createdAt,
     required this.updatedAt,
+    this.platformType,
+    this.framework,
+    this.backendType,
+    this.deploymentPlatform,
     this.ownerId,
     this.ownerUsername,
     this.ownerAvatarUrl,
@@ -55,6 +65,10 @@ class ProjectModel {
           : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      platformType: json['platform_type'] as String?,
+      framework: json['framework'] as String?,
+      backendType: json['backend_type'] as String?,
+      deploymentPlatform: json['deployment_platform'] as String?,
       ownerId: json['owner_id'] as int?,
       ownerUsername: json['owner_username'] as String?,
       ownerAvatarUrl: json['owner_avatar_url'] as String?,
@@ -75,6 +89,10 @@ class ProjectModel {
       'last_build_at': lastBuildAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'platform_type': platformType,
+      'framework': framework,
+      'backend_type': backendType,
+      'deployment_platform': deploymentPlatform,
     };
   }
 
@@ -82,6 +100,16 @@ class ProjectModel {
   bool get isBuilding => status == 'building';
   bool get isDeploying => status == 'deploying';
   bool get isActive => status == 'active';
+  
+  String get frameworkLabel {
+    switch (framework) {
+      case 'flutter': return 'Flutter';
+      case 'react': return 'React';
+      case 'nextjs': return 'Next.js';
+      case 'react_native': return 'React Native';
+      default: return 'Flutter';
+    }
+  }
 }
 
 /// Request model for creating a project
@@ -89,11 +117,19 @@ class CreateProjectRequest {
   final String name;
   final String? description;
   final bool isPrivate;
+  final String platformType;
+  final String framework;
+  final String? backendType;
+  final String? deploymentPlatform;
 
   CreateProjectRequest({
     required this.name,
     this.description,
     this.isPrivate = false,
+    this.platformType = 'mobile',
+    this.framework = 'flutter',
+    this.backendType,
+    this.deploymentPlatform,
   });
 
   Map<String, dynamic> toJson() {
@@ -101,6 +137,11 @@ class CreateProjectRequest {
       'name': name,
       'description': description,
       'is_private': isPrivate,
+      'platform_type': platformType,
+      'framework': framework,
+      'backend_type': backendType,
+      'deployment_platform': deploymentPlatform,
     };
   }
 }
+

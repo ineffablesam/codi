@@ -10,7 +10,7 @@ import '../features/auth/views/login_screen.dart';
 import '../features/auth/views/splash_screen.dart';
 import '../features/deployments/views/deployments_screen.dart';
 import '../features/editor/views/editor_screen.dart';
-import '../features/projects/views/create_project_screen.dart';
+import '../features/projects/views/project_wizard_screen.dart';
 import '../features/projects/views/project_detail_screen.dart';
 import '../features/projects/views/projects_list_screen.dart';
 import '../features/settings/views/settings_screen.dart';
@@ -53,10 +53,10 @@ class AppRoutes {
           transition: Transition.fadeIn,
         ),
 
-        // Create project
+        // Create project wizard
         GetPage(
           name: createProject,
-          page: () => const CreateProjectScreen(),
+          page: () => const ProjectWizardScreen(),
           binding: ProjectsBinding(),
           transition: Transition.rightToLeft,
         ),

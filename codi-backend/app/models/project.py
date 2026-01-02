@@ -12,6 +12,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.operation_log import OperationLog
+    from app.models.backend_connection import ProjectBackendConfig
 
 
 class ProjectStatus(str, Enum):
@@ -58,6 +59,23 @@ class Project(Base):
     dart_version: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     settings: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
+    # Multi-platform configuration
+    platform_type: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, default="mobile", index=True
+    )  # mobile, web
+    framework: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, default="flutter", index=True
+    )  # flutter, react, nextjs, react_native
+    backend_type: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True
+    )  # supabase, firebase, serverpod
+    backend_config: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )  # Encrypted JSON with API keys and configuration
+    deployment_platform: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True
+    )  # github_pages, vercel, netlify
+
     # Project status
     status: Mapped[ProjectStatus] = mapped_column(
         SQLEnum("active", "building", "deploying", "archived", "error", name="projectstatus"),
@@ -100,6 +118,12 @@ class Project(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    backend_configs: Mapped[List["ProjectBackendConfig"]] = relationship(
+        "ProjectBackendConfig",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         """String representation of Project."""
@@ -119,6 +143,12 @@ class Project(Base):
             "github_default_branch": self.github_default_branch,
             "github_current_branch": self.github_current_branch,
             "is_private": self.is_private,
+            # Multi-platform configuration
+            "platform_type": self.platform_type,
+            "framework": self.framework,
+            "backend_type": self.backend_type,
+            "deployment_platform": self.deployment_platform,
+            # Note: backend_config is encrypted and not exposed directly
             "deployment_url": self.deployment_url,
             "deployment_provider": self.deployment_provider,
             "last_deployment_at": (
@@ -130,3 +160,4 @@ class Project(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+

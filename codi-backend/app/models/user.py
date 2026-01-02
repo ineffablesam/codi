@@ -10,6 +10,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.project import Project
     from app.models.operation_log import OperationLog
+    from app.models.backend_connection import BackendConnection
 
 
 class User(Base):
@@ -59,6 +60,12 @@ class User(Base):
     )
     operation_logs: Mapped[List["OperationLog"]] = relationship(
         "OperationLog",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    backend_connections: Mapped[List["BackendConnection"]] = relationship(
+        "BackendConnection",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="selectin",

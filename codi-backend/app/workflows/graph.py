@@ -741,6 +741,193 @@ async def build_deploy_node(state: WorkflowState) -> WorkflowState:
         return mark_step_failed(state, step["id"], str(e))
 
 
+async def react_engineer_node(state: WorkflowState) -> WorkflowState:
+    """React Engineer agent node - generates React/TypeScript code."""
+    from app.agents.base import AgentContext
+    from app.agents.react_engineer import ReactEngineerAgent
+    
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "react_engineer":
+        return state
+    
+    project_id = state["project_id"]
+    task_description = step.get("description", state["user_message"])
+    
+    await broadcast_status(project_id, "react_engineer", "started", f"Working on: {task_description[:50]}...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state["repo_full_name"],
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    agent = ReactEngineerAgent(context)
+    
+    try:
+        result = await agent.run({"step": step})
+        
+        # Update code changes
+        code_changes = state.get("code_changes", {}).copy()
+        if result.get("file_path") and result.get("code"):
+            code_changes[result["file_path"]] = result["code"]
+        
+        await broadcast_status(project_id, "react_engineer", "completed", "Code generation complete")
+        
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["code_changes"] = code_changes
+        new_state["current_agent"] = "react_engineer"
+        
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"React engineer failed: {e}")
+        await broadcast_status(project_id, "react_engineer", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def nextjs_engineer_node(state: WorkflowState) -> WorkflowState:
+    """Next.js Engineer agent node - generates Next.js App Router code."""
+    from app.agents.base import AgentContext
+    from app.agents.nextjs_engineer import NextjsEngineerAgent
+    
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "nextjs_engineer":
+        return state
+    
+    project_id = state["project_id"]
+    task_description = step.get("description", state["user_message"])
+    
+    await broadcast_status(project_id, "nextjs_engineer", "started", f"Working on: {task_description[:50]}...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state["repo_full_name"],
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    agent = NextjsEngineerAgent(context)
+    
+    try:
+        result = await agent.run({"step": step})
+        
+        code_changes = state.get("code_changes", {}).copy()
+        if result.get("file_path") and result.get("code"):
+            code_changes[result["file_path"]] = result["code"]
+        
+        await broadcast_status(project_id, "nextjs_engineer", "completed", "Code generation complete")
+        
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["code_changes"] = code_changes
+        new_state["current_agent"] = "nextjs_engineer"
+        
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Next.js engineer failed: {e}")
+        await broadcast_status(project_id, "nextjs_engineer", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def react_native_engineer_node(state: WorkflowState) -> WorkflowState:
+    """React Native Engineer agent node - generates React Native code."""
+    from app.agents.base import AgentContext
+    from app.agents.react_native_engineer import ReactNativeEngineerAgent
+    
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "react_native_engineer":
+        return state
+    
+    project_id = state["project_id"]
+    task_description = step.get("description", state["user_message"])
+    
+    await broadcast_status(project_id, "react_native_engineer", "started", f"Working on: {task_description[:50]}...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state["repo_full_name"],
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    agent = ReactNativeEngineerAgent(context)
+    
+    try:
+        result = await agent.run({"step": step})
+        
+        code_changes = state.get("code_changes", {}).copy()
+        if result.get("file_path") and result.get("code"):
+            code_changes[result["file_path"]] = result["code"]
+        
+        await broadcast_status(project_id, "react_native_engineer", "completed", "Code generation complete")
+        
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["code_changes"] = code_changes
+        new_state["current_agent"] = "react_native_engineer"
+        
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"React Native engineer failed: {e}")
+        await broadcast_status(project_id, "react_native_engineer", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def backend_integration_node(state: WorkflowState) -> WorkflowState:
+    """Backend Integration agent node - sets up Supabase/Firebase/Serverpod."""
+    from app.agents.base import AgentContext
+    from app.agents.backend_integration import BackendIntegrationAgent
+    
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "backend_integration":
+        return state
+    
+    project_id = state["project_id"]
+    
+    await broadcast_status(project_id, "backend_integration", "started", "Setting up backend integration...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state["repo_full_name"],
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    agent = BackendIntegrationAgent(context)
+    
+    try:
+        # Detect framework and backend from state or step
+        framework = state.get("detected_framework", "flutter")
+        backend_type = step.get("backend_type", "supabase")
+        
+        result = await agent.run({
+            "step": step,
+            "framework": framework,
+            "backend_type": backend_type,
+        })
+        
+        await broadcast_status(project_id, "backend_integration", "completed", f"Backend integration complete")
+        
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["current_agent"] = "backend_integration"
+        
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Backend integration failed: {e}")
+        await broadcast_status(project_id, "backend_integration", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
 async def memory_node(state: WorkflowState) -> WorkflowState:
     """Memory agent node - logs operations to database."""
     from app.agents.base import AgentContext
@@ -793,7 +980,7 @@ async def memory_node(state: WorkflowState) -> WorkflowState:
 # ROUTING
 # =============================================================================
 
-def route_next_agent(state: WorkflowState) -> Literal["flutter_engineer", "code_reviewer", "git_operator", "build_deploy", "memory", "__end__"]:
+def route_next_agent(state: WorkflowState) -> Literal["flutter_engineer", "react_engineer", "nextjs_engineer", "react_native_engineer", "backend_integration", "code_reviewer", "git_operator", "build_deploy", "memory", "__end__"]:
     """Determine the next agent to run based on state."""
     if state.get("has_error"):
         return "memory"
@@ -805,17 +992,32 @@ def route_next_agent(state: WorkflowState) -> Literal["flutter_engineer", "code_
     
     if next_step:
         agent = next_step["agent"]
-        if agent in ["flutter_engineer", "code_reviewer", "git_operator", "build_deploy", "memory"]:
+        # Map agent names to valid node names
+        valid_agents = [
+            "flutter_engineer", "react_engineer", "nextjs_engineer", 
+            "react_native_engineer", "backend_integration",
+            "code_reviewer", "git_operator", "build_deploy", "memory"
+        ]
+        if agent in valid_agents:
             return agent
-        return "flutter_engineer"
+        # Default based on detected framework or fall back to flutter
+        framework = state.get("detected_framework", "flutter")
+        framework_to_agent = {
+            "flutter": "flutter_engineer",
+            "react": "react_engineer",
+            "nextjs": "nextjs_engineer",
+            "react_native": "react_native_engineer",
+        }
+        return framework_to_agent.get(framework, "flutter_engineer")
     
     return "memory"
 
 
 def create_workflow_graph() -> StateGraph:
-    """Create the LangGraph workflow graph."""
+    """Create the LangGraph workflow graph with multi-platform support."""
     graph = StateGraph(WorkflowState)
     
+    # Core nodes
     graph.add_node("planner", planner_node)
     graph.add_node("flutter_engineer", flutter_engineer_node)
     graph.add_node("code_reviewer", code_reviewer_node)
@@ -823,10 +1025,21 @@ def create_workflow_graph() -> StateGraph:
     graph.add_node("build_deploy", build_deploy_node)
     graph.add_node("memory", memory_node)
     
+    # New platform-specific nodes
+    graph.add_node("react_engineer", react_engineer_node)
+    graph.add_node("nextjs_engineer", nextjs_engineer_node)
+    graph.add_node("react_native_engineer", react_native_engineer_node)
+    graph.add_node("backend_integration", backend_integration_node)
+    
     graph.set_entry_point("planner")
     
+    # Edge mapping for all agents
     edge_mapping = {
         "flutter_engineer": "flutter_engineer",
+        "react_engineer": "react_engineer",
+        "nextjs_engineer": "nextjs_engineer",
+        "react_native_engineer": "react_native_engineer",
+        "backend_integration": "backend_integration",
         "code_reviewer": "code_reviewer",
         "git_operator": "git_operator",
         "build_deploy": "build_deploy",
@@ -836,7 +1049,13 @@ def create_workflow_graph() -> StateGraph:
     
     graph.add_conditional_edges("planner", route_next_agent, edge_mapping)
     
-    for agent in ["flutter_engineer", "code_reviewer", "git_operator", "build_deploy"]:
+    # All engineer agents can route to any other agent
+    all_agents = [
+        "flutter_engineer", "react_engineer", "nextjs_engineer", 
+        "react_native_engineer", "backend_integration",
+        "code_reviewer", "git_operator", "build_deploy"
+    ]
+    for agent in all_agents:
         graph.add_conditional_edges(agent, route_next_agent, edge_mapping)
     
     graph.add_edge("memory", END)
