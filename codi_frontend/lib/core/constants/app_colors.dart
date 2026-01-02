@@ -31,6 +31,7 @@ class AppColors {
   // Background colors (Light theme)
   static const Color background = Color(0xFFF9FAFB);
   static const Color surface = Color(0xFFFFFFFF);
+  static const Color cardBackground = Color(0xFFFFFFFF);
   static const Color inputBackground = Color(0xFFF3F4F6);
 
   // Background colors (Dark theme)

@@ -737,6 +737,163 @@ class GitHubService:
         logger.error(f"Failed to commit after {max_retries} attempts")
         raise ValueError(f"Failed to commit files after {max_retries} retries: {last_error}")
 
+    def get_repository_tree(
+        self,
+        repo_full_name: str,
+        branch: str = "main",
+        recursive: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """Get the complete file tree of a repository.
+
+        Args:
+            repo_full_name: Full repository name (owner/repo)
+            branch: Branch name
+            recursive: Whether to get tree recursively
+
+        Returns:
+            List of tree items with path, type, size, sha
+        """
+        try:
+            repo = self.get_repository(repo_full_name)
+            branch_ref = repo.get_branch(branch)
+            tree = repo.get_git_tree(branch_ref.commit.sha, recursive=recursive)
+            
+            return [
+                {
+                    "path": item.path,
+                    "type": item.type,  # 'blob' for files, 'tree' for directories
+                    "size": item.size if item.type == "blob" else 0,
+                    "sha": item.sha,
+                }
+                for item in tree.tree
+            ]
+        except GithubException as e:
+            logger.error(f"Failed to get repository tree: {e}")
+            raise ValueError(f"Failed to get repository tree: {e.data.get('message', str(e))}")
+
+    def get_file_content_with_sha(
+        self,
+        repo_full_name: str,
+        file_path: str,
+        ref: str = "main",
+    ) -> Tuple[str, str]:
+        """Get file content and SHA from a repository.
+
+        Args:
+            repo_full_name: Full repository name (owner/repo)
+            file_path: Path to the file in the repository
+            ref: Branch or commit reference
+
+        Returns:
+            Tuple of (content, sha)
+        """
+        try:
+            repo = self.get_repository(repo_full_name)
+            contents = repo.get_contents(file_path, ref=ref)
+
+            if isinstance(contents, list):
+                raise ValueError(f"Path is a directory: {file_path}")
+
+            return contents.decoded_content.decode("utf-8"), contents.sha
+
+        except GithubException as e:
+            if e.status == 404:
+                raise ValueError(f"File not found: {file_path}")
+            logger.error(f"Failed to get file content: {e}")
+            raise
+
+    def list_branches(self, repo_full_name: str) -> List[Dict[str, Any]]:
+        """List all branches in a repository.
+
+        Args:
+            repo_full_name: Full repository name (owner/repo)
+
+        Returns:
+            List of branch information dictionaries
+        """
+        try:
+            repo = self.get_repository(repo_full_name)
+            branches = repo.get_branches()
+            
+            return [
+                {
+                    "name": branch.name,
+                    "sha": branch.commit.sha,
+                    "protected": branch.protected,
+                }
+                for branch in branches
+            ]
+        except GithubException as e:
+            logger.error(f"Failed to list branches: {e}")
+            raise ValueError(f"Failed to list branches: {e.data.get('message', str(e))}")
+
+    def get_commits(
+        self,
+        repo_full_name: str,
+        branch: str = "main",
+        page: int = 1,
+        per_page: int = 20,
+        path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get commit history for a repository.
+
+        Args:
+            repo_full_name: Full repository name (owner/repo)
+            branch: Branch name
+            page: Page number (1-indexed)
+            per_page: Results per page
+            path: Optional file path to filter commits
+
+        Returns:
+            Dictionary with commits list and total count
+        """
+        try:
+            repo = self.get_repository(repo_full_name)
+            
+            # Get commits with optional path filter
+            kwargs = {"sha": branch}
+            if path:
+                kwargs["path"] = path
+            
+            commits_paginated = repo.get_commits(**kwargs)
+            
+            # Get the specific page
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            
+            commits_list = []
+            for i, commit in enumerate(commits_paginated):
+                if i < start_idx:
+                    continue
+                if i >= end_idx:
+                    break
+                    
+                commits_list.append({
+                    "sha": commit.sha,
+                    "message": commit.commit.message,
+                    "author": {
+                        "name": commit.commit.author.name,
+                        "email": commit.commit.author.email,
+                        "date": commit.commit.author.date.isoformat() if commit.commit.author.date else None,
+                        "avatar_url": commit.author.avatar_url if commit.author else None,
+                    },
+                    "timestamp": commit.commit.author.date.isoformat() if commit.commit.author.date else None,
+                    "url": commit.html_url,
+                    "stats": {
+                        "additions": commit.stats.additions if commit.stats else 0,
+                        "deletions": commit.stats.deletions if commit.stats else 0,
+                        "total": commit.stats.total if commit.stats else 0,
+                    },
+                })
+            
+            return {
+                "commits": commits_list,
+                "total_count": commits_paginated.totalCount,
+            }
+        except GithubException as e:
+            logger.error(f"Failed to get commits: {e}")
+            raise ValueError(f"Failed to get commits: {e.data.get('message', str(e))}")
+
     @staticmethod
     def slugify(name: str) -> str:
         """Convert a name to a valid GitHub repository name.
@@ -759,3 +916,4 @@ class GitHubService:
         slug = slug.strip("-")
         # Limit length
         return slug[:100] if slug else "project"
+

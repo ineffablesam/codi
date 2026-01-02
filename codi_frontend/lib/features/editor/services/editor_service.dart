@@ -41,7 +41,7 @@ class EditorService {
     return [];
   }
 
-  /// Get project files
+  /// Get project files (flat list)
   Future<List<Map<String, dynamic>>> getFiles(int projectId, {String path = ''}) async {
     final response = await ApiClient.get<Map<String, dynamic>>(
       ApiEndpoints.projectFiles(projectId),
@@ -57,7 +57,7 @@ class EditorService {
     return [];
   }
 
-  /// Get file content
+  /// Get file content (legacy)
   Future<String?> getFileContent(int projectId, String filePath) async {
     final response = await ApiClient.get<Map<String, dynamic>>(
       ApiEndpoints.projectFile(projectId, filePath),
@@ -68,4 +68,123 @@ class EditorService {
     }
     return null;
   }
+
+  // === NEW CODE EDITOR APIs ===
+
+  /// Get file tree (hierarchical)
+  Future<Map<String, dynamic>?> getFileTree(int projectId, {String? branch}) async {
+    final response = await ApiClient.get<Map<String, dynamic>>(
+      ApiEndpoints.projectFilesTree(projectId),
+      queryParameters: branch != null ? {'branch': branch} : null,
+    );
+
+    return response.success ? response.data : null;
+  }
+
+  /// Read file with SHA
+  Future<Map<String, dynamic>?> readFile(int projectId, String filePath, {String? branch}) async {
+    final response = await ApiClient.get<Map<String, dynamic>>(
+      ApiEndpoints.projectFilesRead(projectId),
+      queryParameters: {
+        'file_path': filePath,
+        if (branch != null) 'branch': branch,
+      },
+    );
+
+    return response.success ? response.data : null;
+  }
+
+  /// Update file content
+  Future<Map<String, dynamic>?> updateFile(
+    int projectId,
+    String filePath,
+    String content,
+    String message,
+    String? sha, {
+    String? branch,
+  }) async {
+    final response = await ApiClient.put<Map<String, dynamic>>(
+      ApiEndpoints.projectFilesUpdate(projectId),
+      data: {
+        'file_path': filePath,
+        'content': content,
+        'message': message,
+        if (sha != null) 'sha': sha,
+        if (branch != null) 'branch': branch,
+      },
+    );
+
+    return response.success ? response.data : null;
+  }
+
+  /// Get commit history
+  Future<Map<String, dynamic>?> getCommitHistory(
+    int projectId, {
+    int page = 1,
+    int perPage = 20,
+    String? branch,
+    String? filePath,
+  }) async {
+    final response = await ApiClient.get<Map<String, dynamic>>(
+      ApiEndpoints.projectCommits(projectId),
+      queryParameters: {
+        'page': page,
+        'per_page': perPage,
+        if (branch != null) 'branch': branch,
+        if (filePath != null) 'file_path': filePath,
+      },
+    );
+
+    return response.success ? response.data : null;
+  }
+
+  /// Commit multiple files
+  Future<Map<String, dynamic>?> commitMultipleFiles(
+    int projectId,
+    List<Map<String, dynamic>> files,
+    String message,
+    String branch, {
+    bool createNewBranch = false,
+    String? baseBranch,
+  }) async {
+    final response = await ApiClient.post<Map<String, dynamic>>(
+      ApiEndpoints.projectCommitsMulti(projectId),
+      data: {
+        'files': files,
+        'message': message,
+        'branch': branch,
+        'create_branch': createNewBranch,
+        if (baseBranch != null) 'base_branch': baseBranch,
+      },
+    );
+
+    return response.success ? response.data : null;
+  }
+
+  /// List branches
+  Future<Map<String, dynamic>?> listBranches(int projectId) async {
+    final response = await ApiClient.get<Map<String, dynamic>>(
+      ApiEndpoints.projectBranches(projectId),
+    );
+
+    return response.success ? response.data : null;
+  }
+
+  /// Create branch
+  Future<Map<String, dynamic>?> createBranch(
+    int projectId,
+    String branchName,
+    String baseBranch,
+  ) async {
+    final response = await ApiClient.post<Map<String, dynamic>>(
+      ApiEndpoints.projectBranches(projectId),
+      data: {
+        'branch_name': branchName,
+        'base_branch': baseBranch,
+      },
+    );
+
+    return response.success ? response.data : null;
+  }
 }
+

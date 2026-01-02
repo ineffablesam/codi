@@ -17,6 +17,14 @@ class ApiEndpoints {
   static String projectFiles(int id) => '/projects/$id/files';
   static String projectFile(int id, String path) => '/projects/$id/files/$path';
 
+  // File operations endpoints (Code Editor)
+  static String projectFilesTree(int id) => '/projects/$id/files/tree';
+  static String projectFilesRead(int id) => '/projects/$id/files/read';
+  static String projectFilesUpdate(int id) => '/projects/$id/files/update';
+  static String projectCommits(int id) => '/projects/$id/commits';
+  static String projectCommitsMulti(int id) => '/projects/$id/commits/multi';
+  static String projectBranches(int id) => '/projects/$id/branches';
+
   // Agents endpoints
   static String agentTask(int projectId) => '/agents/$projectId/task';
   static String agentTaskStatus(int projectId, String taskId) =>
@@ -28,3 +36,4 @@ class ApiEndpoints {
   static const String health = '/health';
   static const String healthReady = '/health/ready';
 }
+

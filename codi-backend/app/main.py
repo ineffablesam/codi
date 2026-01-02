@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import agents_router, auth_router, health_router, projects_router
+from app.api import agents_router, auth_router, health_router, projects_router, files_router
 from app.config import settings
 from app.database import init_db
 from app.utils.logging import get_logger, setup_logging
@@ -125,6 +125,8 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 # Include routers
 app.include_router(health_router)
 app.include_router(auth_router, prefix="/api/v1")
+# files_router MUST come before projects_router since projects has catch-all /files/{path:path}
+app.include_router(files_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")
 
