@@ -125,6 +125,7 @@ async def create_project(
     deployment_platform = getattr(project_data, 'deployment_platform', None)
     backend_type = getattr(project_data, 'backend_type', None)
     vercel_config = {}
+    vercel_token = None
 
     # If Vercel is selected, try to get stored OAuth token
     if deployment_platform == "vercel":
@@ -138,13 +139,11 @@ async def create_project(
             )
             connection = result.scalar_one_or_none()
             if connection:
-                token = connection.get_access_token()
-                if token:
-                    vercel_config["VERCEL_TOKEN"] = token
+                vercel_token = connection.get_access_token()
+                if vercel_token:
+                    vercel_config["VERCEL_TOKEN"] = vercel_token
                     if connection.organization_id:
                         vercel_config["VERCEL_ORG_ID"] = connection.organization_id
-                    if connection.provider_user_id:
-                        vercel_config["VERCEL_PROJECT_ID"] = connection.provider_user_id # Using user ID as project owner ID context if needed
                     logger.info("Using stored Vercel OAuth token")
         except Exception as e:
             logger.warning(f"Failed to fetch Vercel connection: {e}")
@@ -183,6 +182,26 @@ async def create_project(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to create GitHub repository: {str(e)}",
         )
+
+    # Create Vercel project if deploying to Vercel
+    if deployment_platform == "vercel" and vercel_token:
+        try:
+            from app.services.vercel import VercelService
+            vercel_project = await VercelService.create_project(
+                access_token=vercel_token,
+                project_name=repo_name,
+                github_repo=repo_full_name,
+                team_id=vercel_config.get("VERCEL_ORG_ID"),
+                framework=framework,
+            )
+            vercel_config["VERCEL_PROJECT_ID"] = vercel_project["id"]
+            logger.info(f"Created Vercel project: {vercel_project['name']} (ID: {vercel_project['id']})")
+        except Exception as e:
+            logger.error(f"Failed to create Vercel project: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to create Vercel project: {str(e)}. Please try again.",
+            )
 
     # Push starter template and enable Pages
     deployment_url = None

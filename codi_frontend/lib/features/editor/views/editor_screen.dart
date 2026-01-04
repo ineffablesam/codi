@@ -59,6 +59,7 @@ class _EditorScreenState extends State<EditorScreen>
 
         return TabBarView(
           controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
           children: [
             // Agent Tab (existing layout)
             _buildAgentTab(context),
@@ -187,8 +188,7 @@ class _EditorScreenState extends State<EditorScreen>
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       value: controller.buildProgress.value,
-                      valueColor:
-                          const AlwaysStoppedAnimation(AppColors.info),
+                      valueColor: const AlwaysStoppedAnimation(AppColors.info),
                     ),
                   ),
                   SizedBox(width: 6.w),
@@ -325,4 +325,3 @@ class _EditorScreenState extends State<EditorScreen>
     );
   }
 }
-

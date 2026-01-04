@@ -160,17 +160,19 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      - name: Deploy to Vercel
-        id: vercel-deploy
+      - name: Setup Vercel Project
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          cd build/web
+          mkdir -p .vercel
+          echo '{"projectId":"'$VERCEL_PROJECT_ID'","orgId":"'$VERCEL_ORG_ID'"}' > .vercel/project.json
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           cd build/web
-          # Default to production for push events or if specified
           if [ "${{ github.event.inputs.environment || 'production' }}" == "production" ]; then
             vercel deploy --prod --token=$VERCEL_TOKEN --yes
           else
@@ -273,13 +275,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
-      - name: Deploy to Vercel
+      - name: Setup Vercel Project
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          # Default to production for push events or if specified
+          mkdir -p .vercel
+          echo '{"projectId":"'$VERCEL_PROJECT_ID'","orgId":"'$VERCEL_ORG_ID'"}' > .vercel/project.json
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
           if [ "${{ github.event.inputs.environment || 'production' }}" == "production" ]; then
             vercel deploy --prod --token=$VERCEL_TOKEN --yes
           else
@@ -361,16 +367,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      # Simplified Vercel Deploy (Let Vercel build it)
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
-      - name: Deploy to Vercel
+      - name: Setup Vercel Project
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          # Default to production for push events or if specified
+          mkdir -p .vercel
+          echo '{"projectId":"'$VERCEL_PROJECT_ID'","orgId":"'$VERCEL_ORG_ID'"}' > .vercel/project.json
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
           if [ "${{ github.event.inputs.environment || 'production' }}" == "production" ]; then
             vercel deploy --prod --token=$VERCEL_TOKEN --yes
           else

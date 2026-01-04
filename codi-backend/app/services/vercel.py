@@ -117,3 +117,83 @@ class VercelService:
                 "name": user.get("name"),
                 "avatar": f"https://vercel.com/api/www/avatar/{user.get('avatar')}" if user.get("avatar") else None
             }
+
+    @classmethod
+    async def create_project(
+        cls,
+        access_token: str,
+        project_name: str,
+        github_repo: str,
+        team_id: Optional[str] = None,
+        framework: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a new Vercel project linked to a GitHub repository.
+
+        Args:
+            access_token: Vercel access token
+            project_name: Name for the new project (will be slugified)
+            github_repo: GitHub repository in "owner/repo" format
+            team_id: Optional team ID (for team deployments)
+            framework: Optional framework hint (nextjs, vite, etc.)
+
+        Returns:
+            Dictionary with project id, name, etc.
+
+        Raises:
+            ValueError: If project creation fails
+        """
+        import re
+        # Vercel project names: lowercase, alphanumeric and hyphens only
+        slug = re.sub(r'[^a-z0-9-]', '-', project_name.lower())
+        slug = re.sub(r'-+', '-', slug).strip('-')
+        
+        url = f"{cls.VERCEL_API_URL}/v10/projects"
+        if team_id:
+            url = f"{url}?teamId={team_id}"
+
+        body: Dict[str, Any] = {
+            "name": slug,
+            "gitRepository": {
+                "type": "github",
+                "repo": github_repo,
+            },
+        }
+        
+        # Optional framework hint for better build defaults
+        if framework:
+            framework_map = {
+                "nextjs": "nextjs",
+                "react": "vite",
+                "flutter": None,  # Static site, no framework needed
+            }
+            vercel_framework = framework_map.get(framework)
+            if vercel_framework:
+                body["framework"] = vercel_framework
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    url,
+                    json=body,
+                    headers={
+                        "Authorization": f"Bearer {access_token}",
+                        "Content-Type": "application/json",
+                    },
+                )
+
+                if response.status_code not in (200, 201):
+                    logger.error(f"Failed to create Vercel project: {response.text}")
+                    raise ValueError(f"Failed to create Vercel project: {response.text}")
+
+                data = response.json()
+                logger.info(f"Created Vercel project: {data.get('name')} (ID: {data.get('id')}) linked to {github_repo}")
+                
+                return {
+                    "id": data["id"],
+                    "name": data["name"],
+                    "account_id": data.get("accountId"),
+                }
+
+            except httpx.RequestError as e:
+                logger.error(f"Vercel project creation request error: {e}")
+                raise ValueError("Network error during Vercel project creation")
