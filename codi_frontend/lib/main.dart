@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' hide Colors;
 
 import 'app.dart';
 import 'bindings/initial_binding.dart';
@@ -38,7 +39,11 @@ void main() async {
   // Initialize GetX bindings
   InitialBinding().dependencies();
 
-  runApp(const CodiApp());
+  runApp(ShadcnApp(
+    builder: (context, child) {
+      return CodiApp();
+    },
+  ));
 }
 
 /// Main application widget with ScreenUtil initialization

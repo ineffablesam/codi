@@ -17,7 +17,9 @@ class PreviewController extends GetxController {
   final isLoading = false.obs;
   final hasError = false.obs;
   final loadProgress = 0.obs;
-  
+  final isScrollingDown = false.obs;
+  int _lastScrollY = 0;
+
   // Build state (GitHub Actions workflow running)
   final isBuilding = false.obs;
   final buildStage = ''.obs;
@@ -27,10 +29,10 @@ class PreviewController extends GetxController {
   void onInit() {
     super.onInit();
     _editorController = Get.find<EditorController>();
-    
+
     // Initialize with current deployment URL
     deploymentUrl.value = _editorController.previewUrl.value;
-    
+
     // Listen for URL changes
     ever(_editorController.previewUrl, (String? url) {
       if (url != null && url.isNotEmpty) {
@@ -55,7 +57,7 @@ class PreviewController extends GetxController {
   /// Called when WebView is created
   void onWebViewCreated(InAppWebViewController controller) {
     webViewController = controller;
-    
+
     // Load initial URL if available
     if (deploymentUrl.value != null && deploymentUrl.value!.isNotEmpty) {
       loadUrl(deploymentUrl.value!);
@@ -66,7 +68,7 @@ class PreviewController extends GetxController {
   void onProgressChanged(int progress) {
     loadProgress.value = progress;
     isLoading.value = progress < 100;
-    
+
     if (progress == 100) {
       pullToRefreshController?.endRefreshing();
     }
@@ -84,6 +86,18 @@ class PreviewController extends GetxController {
     isLoading.value = false;
     pullToRefreshController?.endRefreshing();
     AppLogger.debug('WebView loaded: $url');
+  }
+
+  void onScrollChanged(int x, int y) {
+    if (y > _lastScrollY) {
+      // ⬇️ scrolling down
+      isScrollingDown.value = true;
+    } else if (y < _lastScrollY) {
+      // ⬆️ scrolling up
+      isScrollingDown.value = false;
+    }
+
+    _lastScrollY = y;
   }
 
   /// Handle load errors

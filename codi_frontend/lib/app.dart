@@ -3,7 +3,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'config/routes.dart';
 import 'config/theme.dart';
@@ -17,30 +16,25 @@ class App extends StatelessWidget {
     return GetMaterialApp(
       title: 'Codi',
       debugShowCheckedModeBanner: false,
-      
+
       // Theme configuration
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
-      
+
       // Default text style
       builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: const TextScaler.linear(1.0),
-          ),
-          child: child ?? const SizedBox.shrink(),
-        );
+        return child ?? const SizedBox.shrink();
       },
-      
+
       // GetX routing
       initialRoute: AppRoutes.splash,
       getPages: AppRoutes.routes,
-      
+
       // Transitions
       defaultTransition: Transition.cupertino,
       transitionDuration: const Duration(milliseconds: 300),
-      
+
       // Localization (can be extended)
       locale: const Locale('en', 'US'),
       fallbackLocale: const Locale('en', 'US'),

@@ -1,7 +1,7 @@
 /// Editor controller
 library;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide SingleTickerProviderStateMixin;
 import 'package:get/get.dart';
 
 import '../../../core/api/websocket_client.dart';
@@ -10,8 +10,14 @@ import '../../../core/utils/logger.dart';
 import '../../projects/models/project_model.dart';
 import '../../projects/services/project_service.dart';
 
+enum EditorTab {
+  preview,
+  code,
+}
+
 /// Main editor controller managing project state
-class EditorController extends GetxController {
+class EditorController extends GetxController
+    with GetSingleTickerProviderStateMixin {
   final ProjectService _projectService = ProjectService();
   late final WebSocketClient _webSocketClient;
 
@@ -23,9 +29,28 @@ class EditorController extends GetxController {
   final previewUrl = RxnString();
   final errorMessage = RxnString();
 
+  late final TabController tabController;
+  final currentTab = EditorTab.preview.obs;
+
+  void setTab(EditorTab tab) {
+    final index = tab == EditorTab.preview ? 0 : 1;
+    if (tabController.index != index) {
+      tabController.animateTo(index,
+          duration: const Duration(milliseconds: 100));
+    }
+  }
+
   @override
   void onInit() {
     super.onInit();
+    tabController = TabController(length: 2, vsync: this);
+
+    tabController.addListener(() {
+      if (tabController.indexIsChanging) return;
+
+      currentTab.value =
+          tabController.index == 0 ? EditorTab.preview : EditorTab.code;
+    });
     _webSocketClient = Get.find<WebSocketClient>();
     _loadProject();
   }
@@ -80,7 +105,7 @@ class EditorController extends GetxController {
   /// Update preview URL after deployment
   void updatePreviewUrl(String url) {
     previewUrl.value = url;
-    
+
     // Also update project model
     if (currentProject.value != null) {
       currentProject.value = ProjectModel(
@@ -103,7 +128,8 @@ class EditorController extends GetxController {
   /// Refresh project data
   Future<void> refresh() async {
     if (currentProject.value != null) {
-      final project = await _projectService.getProject(currentProject.value!.id);
+      final project =
+          await _projectService.getProject(currentProject.value!.id);
       if (project != null) {
         currentProject.value = project;
         previewUrl.value = project.deploymentUrl;
@@ -114,6 +140,7 @@ class EditorController extends GetxController {
   @override
   void onClose() {
     _webSocketClient.disconnect();
+    tabController.dispose();
     super.onClose();
   }
 }

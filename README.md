@@ -1,6 +1,10 @@
 # Codi Platform - Complete Setup & Documentation
 
 Commands
+
+python -m venv venv
+source venv/bin/activate 
+
 Celery : celery -A app.tasks.celery_app worker --loglevel=debug
 Uvicorn: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000;
 Ngrok: ngrok http 8000

@@ -32,83 +32,93 @@ class PreviewPanel extends StatelessWidget {
         return _buildErrorState(controller);
       }
 
-      return Column(
+      return Stack(
         children: [
-          _buildPreviewControls(controller),
-          Expanded(
-            child: Stack(
-              children: [
-                // InAppWebView
-                InAppWebView(
-                  initialSettings: InAppWebViewSettings(
-                    javaScriptEnabled: true,
-                    useOnDownloadStart: true,
-                    useOnLoadResource: true,
-                    useWideViewPort: true,
-                    loadWithOverviewMode: true,
-                    supportZoom: true,
-                    builtInZoomControls: true,
-                    displayZoomControls: false,
-                    transparentBackground: true,
-                  ),
-                  pullToRefreshController: controller.pullToRefreshController,
-                  onWebViewCreated: (webController) {
-                    controller.onWebViewCreated(webController);
-                  },
-                  onLoadStart: (webController, url) {
-                    controller.onLoadStart(url);
-                  },
-                  onLoadStop: (webController, url) {
-                    controller.onLoadStop(url);
-                  },
-                  onProgressChanged: (webController, progress) {
-                    controller.onProgressChanged(progress);
-                  },
-                  onReceivedError: (webController, request, error) {
-                    controller.onLoadError(
-                      request.url,
-                      error.type.toNativeValue() as int,
-                      error.description,
-                    );
-                  },
+          Column(
+            children: [
+              // _buildPreviewControls(controller),
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // InAppWebView
+                    InAppWebView(
+                      initialSettings: InAppWebViewSettings(
+                        javaScriptEnabled: true,
+                        useOnDownloadStart: true,
+                        useOnLoadResource: true,
+                        useWideViewPort: true,
+                        loadWithOverviewMode: true,
+                        supportZoom: true,
+                        builtInZoomControls: true,
+                        displayZoomControls: false,
+                        transparentBackground: true,
+                      ),
+                      pullToRefreshController:
+                          controller.pullToRefreshController,
+                      onWebViewCreated: (webController) {
+                        controller.onWebViewCreated(webController);
+                      },
+                      onLoadStart: (webController, url) {
+                        controller.onLoadStart(url);
+                      },
+                      onLoadStop: (webController, url) {
+                        controller.onLoadStop(url);
+                      },
+                      onScrollChanged: (controller, x, y) {
+                        Get.find<PreviewController>().onScrollChanged(x, y);
+                      },
+                      onProgressChanged: (webController, progress) {
+                        controller.onProgressChanged(progress);
+                      },
+                      onReceivedError: (webController, request, error) {
+                        controller.onLoadError(
+                          request.url,
+                          error.type.toNativeValue() as int,
+                          error.description,
+                        );
+                      },
+                    ),
+
+                    // Top linear progress bar (modern loading feel)
+                    if (controller.isLoading.value &&
+                        !controller.isBuilding.value)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: LinearProgressIndicator(
+                          value: controller.loadProgress.value / 100,
+                          backgroundColor: Colors.transparent,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primary.withOpacity(0.8),
+                          ),
+                          minHeight: 3.h,
+                        ),
+                      ),
+
+                    // Centered loading overlay (only shown for initial/slow loads)
+                    if (controller.isLoading.value &&
+                        !controller.isBuilding.value &&
+                        controller.loadProgress.value < 20)
+                      Container(
+                        color: Colors.white.withOpacity(0.5),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                                AppColors.primary),
+                          ),
+                        ),
+                      ),
+
+                    // Building overlay (GitHub Actions running)
+                    if (controller.isBuilding.value)
+                      _buildBuildingOverlay(controller),
+                  ],
                 ),
-
-                // Top linear progress bar (modern loading feel)
-                if (controller.isLoading.value && !controller.isBuilding.value)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: LinearProgressIndicator(
-                      value: controller.loadProgress.value / 100,
-                      backgroundColor: Colors.transparent,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.primary.withOpacity(0.8),
-                      ),
-                      minHeight: 3.h,
-                    ),
-                  ),
-
-                // Centered loading overlay (only shown for initial/slow loads)
-                if (controller.isLoading.value &&
-                    !controller.isBuilding.value &&
-                    controller.loadProgress.value < 20)
-                  Container(
-                    color: Colors.white.withOpacity(0.5),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                            AppColors.primary),
-                      ),
-                    ),
-                  ),
-
-                // Building overlay (GitHub Actions running)
-                if (controller.isBuilding.value)
-                  _buildBuildingOverlay(controller),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       );
