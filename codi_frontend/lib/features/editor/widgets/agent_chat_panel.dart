@@ -1,22 +1,23 @@
-/// Rich agent chat panel with 10+ message types
+/// Rich agent chat panel with professional icons and animations
 library;
 
+import 'package:codi_frontend/features/editor/widgets/chat/operation_messages.dart';
+import 'package:codi_frontend/features/editor/widgets/chat/progressive_action_message.dart';
+import 'package:codi_frontend/features/editor/widgets/chat/streaming_code_message.dart';
+import 'package:codi_frontend/features/editor/widgets/chat/success_message.dart';
+import 'package:codi_frontend/features/editor/widgets/chat/thinking_message.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/constants/image_placeholders.dart';
-import '../../../core/api/websocket_client.dart';
+import '../constants/chat_icons.dart';
 import '../controllers/agent_chat_controller.dart';
 import '../models/agent_message_model.dart';
 
-
-/// Agent chat panel with rich message rendering
 class AgentChatPanel extends StatelessWidget {
   const AgentChatPanel({super.key});
 
@@ -25,63 +26,11 @@ class AgentChatPanel extends StatelessWidget {
     final controller = Get.find<AgentChatController>();
 
     return Container(
-      color: AppColors.surface,
+      color: Colors.white, // Clean white background for professional look
       child: Column(
         children: [
-          _buildChatHeader(controller),
           Expanded(child: _buildMessageList(controller)),
           _buildInputArea(controller),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChatHeader(AgentChatController controller) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.chat_bubble_outline, size: 18.r, color: AppColors.textSecondary),
-          SizedBox(width: 8.w),
-          Text(
-            AppStrings.agentActivity,
-            style: GoogleFonts.inter(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const Spacer(),
-          Obx(() {
-            if (controller.isAgentWorking.value) {
-              return Row(
-                children: [
-                  SizedBox(
-                    width: 12.r,
-                    height: 12.r,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                    ),
-                  ),
-                  SizedBox(width: 6.w),
-                  Text(
-                    AppStrings.working,
-                    style: GoogleFonts.inter(
-                      fontSize: 11.sp,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              );
-            }
-            return const SizedBox.shrink();
-          }),
         ],
       ),
     );
@@ -90,14 +39,19 @@ class AgentChatPanel extends StatelessWidget {
   Widget _buildMessageList(AgentChatController controller) {
     return Obx(() {
       if (controller.messages.isEmpty) {
-        return _buildEmptyState();
+        return _buildEmptyState(controller);
       }
 
       return ListView.builder(
         controller: controller.scrollController,
-        padding: EdgeInsets.all(12.r),
-        itemCount: controller.messages.length,
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
+        itemCount:
+            controller.messages.length + (controller.isTyping.value ? 1 : 0),
         itemBuilder: (context, index) {
+          if (index == controller.messages.length) {
+            // Typing indicator at the end if needed (though usually handled by ThinkingMessage)
+            return SizedBox.shrink();
+          }
           final message = controller.messages[index];
           return _buildMessage(message);
         },
@@ -106,226 +60,132 @@ class AgentChatPanel extends StatelessWidget {
   }
 
   Widget _buildMessage(AgentMessage message) {
+    // Determine which widget to show based on message type
+    Widget messageWidget;
+
     switch (message.type) {
       case MessageType.user:
-        return _buildUserMessage(message);
+        messageWidget = _buildUserMessage(message);
+        break;
+
+      // Thinking & Planning
       case MessageType.agentStatus:
-        return _buildAgentStatusMessage(message);
-      case MessageType.fileOperation:
-        return _buildFileOperationMessage(message);
-      case MessageType.toolExecution:
-        return _buildToolExecutionMessage(message);
-      case MessageType.gitOperation:
-        return _buildGitOperationMessage(message);
-      case MessageType.buildProgress:
-        return _buildBuildProgressMessage(message);
-      case MessageType.buildStatus:
-        return _buildBuildStatusMessage(message);
-      case MessageType.deploymentComplete:
-        return _buildDeploymentCompleteMessage(message);
-      case MessageType.reviewProgress:
-        return _buildReviewProgressMessage(message);
-      case MessageType.reviewIssue:
-        return _buildReviewIssueMessage(message);
-      case MessageType.error:
-        return _buildErrorMessage(message);
-      case MessageType.userInputRequired:
-        return _buildUserInputMessage(message);
+        if (message.status == 'thinking' || message.status == 'planning') {
+          messageWidget = ThinkingMessage(message: message);
+        } else {
+          messageWidget = _buildAgentStatusMessage(message);
+        }
+        break;
+
+      // Progressive Action (Main Agent Work)
+      case MessageType.backgroundTaskStarted:
+      case MessageType.backgroundTaskProgress:
+      case MessageType.backgroundTaskCompleted:
+        messageWidget = ProgressiveActionMessage(message: message);
+        break;
+
+      // Code Generation
       case MessageType.llmStream:
-        return _buildStreamingMessage(message);
+        messageWidget = StreamingCodeMessage(message: message);
+        break;
+
+      // Completion & Success
+      case MessageType.deploymentComplete:
+      case MessageType.batchComplete: // Assuming a batch completion type
+        messageWidget = SuccessMessage(message: message);
+        break;
+
+      // Operations
+      case MessageType.fileOperation:
+        messageWidget = FileOperationMessage(message: message);
+        break;
+      case MessageType.gitOperation:
+        messageWidget = GitOperationMessage(message: message);
+        break;
+      case MessageType.buildProgress:
+        messageWidget = BuildProgressMessage(message: message);
+        break;
+      case MessageType.error:
+        messageWidget = ErrorMessage(message: message);
+        break;
+
+      // Fallback/Legacy
+      default:
+        messageWidget = _buildGenericMessage(message);
     }
-  }
 
-  // ========== MESSAGE TYPE BUILDERS ==========
-
-  Widget _buildStreamingMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 10.h),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildAgentAvatar(message.agent ?? 'planner'),
-          SizedBox(width: 8.w),
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.all(10.r),
-              decoration: BoxDecoration(
-                color: AppColors.messageAgent,
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        '${_getAgentDisplayName(message.agent ?? '')} (Streaming)',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      SizedBox(width: 6.w),
-                      SizedBox(
-                        width: 10.r,
-                        height: 10.r,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 6.h),
-                  Text(
-                    message.text,
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 12.sp,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    _formatTime(message.timestamp),
-                    style: GoogleFonts.inter(
-                      fontSize: 9.sp,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Wrap in common layout if needed (e.g. avatar for some)
+    // But most custom widgets handle their own layout
+    return messageWidget;
   }
 
   Widget _buildUserMessage(AgentMessage message) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.only(bottom: 16.h),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Flexible(
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
               decoration: BoxDecoration(
                 color: AppColors.messageUser,
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    message.text,
-                    style: GoogleFonts.inter(
-                      fontSize: 13.sp,
-                      color: Colors.white,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    _formatTime(message.timestamp),
-                    style: GoogleFonts.inter(
-                      fontSize: 9.sp,
-                      color: Colors.white70,
-                    ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16.r),
+                  topRight: Radius.circular(4.r),
+                  bottomLeft: Radius.circular(16.r),
+                  bottomRight: Radius.circular(16.r),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
                   ),
                 ],
+              ),
+              child: Text(
+                message.text,
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  color: Colors.white,
+                  height: 1.4,
+                ),
               ),
             ),
           ),
           SizedBox(width: 8.w),
           CircleAvatar(
-            radius: 14.r,
-            backgroundImage: NetworkImage(
-              ImagePlaceholders.userAvatar('user'),
-            ),
+            radius: 16.r,
+            backgroundColor: Colors.grey[200],
+            child: Icon(StatusIcons.user, size: 16.r, color: Colors.grey[600]),
           ),
         ],
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0);
   }
 
+  // Legacy status message backup
   Widget _buildAgentStatusMessage(AgentMessage message) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 10.h),
+      padding: EdgeInsets.only(bottom: 12.h),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildAgentAvatar(message.agent ?? 'planner'),
-          SizedBox(width: 8.w),
+          Icon(AgentAvatarIcons.ai, size: 24.r, color: AppColors.primary),
+          SizedBox(width: 12.w),
           Expanded(
             child: Container(
-              padding: EdgeInsets.all(10.r),
+              padding: EdgeInsets.all(12.r),
               decoration: BoxDecoration(
-                color: _getStatusColor(message.status),
-                borderRadius: BorderRadius.circular(8.r),
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12.r),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        _getAgentDisplayName(message.agent ?? ''),
-                        style: GoogleFonts.inter(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      SizedBox(width: 6.w),
-                      Text(
-                        _getStatusEmoji(message.status),
-                        style: TextStyle(fontSize: 14.sp),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    message.text,
-                    style: GoogleFonts.inter(
-                      fontSize: 12.sp,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  // Show plan steps if available
-                  if (message.planSteps.isNotEmpty) ...[
-                    SizedBox(height: 6.h),
-                    ...message.planSteps.map((step) => Padding(
-                          padding: EdgeInsets.only(left: 8.w, top: 2.h),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('•', style: TextStyle(fontSize: 12.sp)),
-                              SizedBox(width: 4.w),
-                              Expanded(
-                                child: Text(
-                                  step,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.sp,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )),
-                  ],
-                  SizedBox(height: 4.h),
-                  Text(
-                    _formatTime(message.timestamp),
-                    style: GoogleFonts.inter(
-                      fontSize: 9.sp,
-                      color: AppColors.textTertiary,
-                    ),
-                  ),
-                ],
+              child: Text(
+                message.text,
+                style: GoogleFonts.inter(
+                    fontSize: 13.sp, color: AppColors.textPrimary),
               ),
             ),
           ),
@@ -334,853 +194,222 @@ class AgentChatPanel extends StatelessWidget {
     );
   }
 
-  Widget _buildFileOperationMessage(AgentMessage message) {
-    final icon = _getFileOperationIcon(message.operation ?? 'create');
-    final color = _getFileOperationColor(message.operation ?? 'create');
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(8.r),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          border: Border.all(color: color.withOpacity(0.3)),
-          borderRadius: BorderRadius.circular(6.r),
-        ),
-        child: Row(
-          children: [
-            Text(icon, style: TextStyle(fontSize: 16.sp)),
-            SizedBox(width: 6.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _getOperationText(message.operation ?? 'create'),
-                    style: GoogleFonts.inter(
-                      fontSize: 10.sp,
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
-                  ),
-                  Text(
-                    message.filePath ?? '',
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 10.sp,
-                      color: AppColors.textPrimary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (message.stats != null)
-                    Text(
-                      message.stats!,
-                      style: GoogleFonts.inter(
-                        fontSize: 9.sp,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Text(
-              _formatTime(message.timestamp),
-              style: GoogleFonts.inter(fontSize: 8.sp, color: AppColors.textTertiary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToolExecutionMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 6.h, left: 36.w),
-      child: Row(
-        children: [
-          Text('📄', style: TextStyle(fontSize: 12.sp)),
-          SizedBox(width: 6.w),
-          Expanded(
-            child: Text(
-              message.text,
-              style: GoogleFonts.inter(
-                fontSize: 11.sp,
-                color: AppColors.textSecondary,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-          Text(
-            _formatTime(message.timestamp),
-            style: GoogleFonts.inter(fontSize: 8.sp, color: AppColors.textTertiary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGitOperationMessage(AgentMessage message) {
-    final icon = _getGitOperationIcon(message.operation ?? 'commit');
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: 10.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(10.r),
-        decoration: BoxDecoration(
-          color: AppColors.gitSuccess,
-          border: Border.all(color: AppColors.success.withOpacity(0.3)),
-          borderRadius: BorderRadius.circular(8.r),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(icon, style: TextStyle(fontSize: 16.sp)),
-                SizedBox(width: 6.w),
-                Text(
-                  _getGitOperationText(message.operation ?? 'commit'),
-                  style: GoogleFonts.inter(
-                    fontSize: 10.sp,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.success,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  _formatTime(message.timestamp),
-                  style: GoogleFonts.inter(fontSize: 8.sp, color: AppColors.textTertiary),
-                ),
-              ],
-            ),
-            SizedBox(height: 4.h),
-            Text(
-              message.text,
-              style: GoogleFonts.inter(fontSize: 11.sp, color: AppColors.textPrimary),
-            ),
-            if (message.gitStats.isNotEmpty) ...[
-              SizedBox(height: 2.h),
-              Text(
-                message.gitStats,
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 10.sp,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-            if (message.commitSha != null) ...[
-              SizedBox(height: 4.h),
-              GestureDetector(
-                onTap: () => _openCommit(message.commitSha!),
-                child: Text(
-                  'Commit: ${message.commitSha}',
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 9.sp,
-                    color: AppColors.primary,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBuildProgressMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 10.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(10.r),
-        decoration: BoxDecoration(
-          color: AppColors.buildProgress,
-          border: Border.all(color: AppColors.info.withOpacity(0.3)),
-          borderRadius: BorderRadius.circular(8.r),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text('⏳', style: TextStyle(fontSize: 16.sp)),
-                SizedBox(width: 6.w),
-                Expanded(
-                  child: Text(
-                    message.text,
-                    style: GoogleFonts.inter(fontSize: 11.sp, color: AppColors.textPrimary),
-                  ),
-                ),
-                Text(
-                  '${((message.progress ?? 0) * 100).toInt()}%',
-                  style: GoogleFonts.inter(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.info,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 6.h),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4.r),
-              child: LinearProgressIndicator(
-                value: message.progress ?? 0,
-                backgroundColor: Colors.grey[300],
-                valueColor: const AlwaysStoppedAnimation(AppColors.info),
-                minHeight: 6.h,
-              ),
-            ),
-            SizedBox(height: 4.h),
-            Text(
-              _formatTime(message.timestamp),
-              style: GoogleFonts.inter(fontSize: 8.sp, color: AppColors.textTertiary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBuildStatusMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 10.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(10.r),
-        decoration: BoxDecoration(
-          color: AppColors.buildProgress,
-          border: Border.all(color: AppColors.info.withOpacity(0.3)),
-          borderRadius: BorderRadius.circular(8.r),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text('🔨', style: TextStyle(fontSize: 16.sp)),
-                SizedBox(width: 6.w),
-                Expanded(
-                  child: Text(
-                    message.text,
-                    style: GoogleFonts.inter(fontSize: 11.sp, color: AppColors.textPrimary),
-                  ),
-                ),
-              ],
-            ),
-            if (message.workflowUrl != null) ...[
-              SizedBox(height: 6.h),
-              GestureDetector(
-                onTap: () => _openUrl(message.workflowUrl!),
-                child: Text(
-                  'View workflow',
-                  style: GoogleFonts.inter(
-                    fontSize: 10.sp,
-                    color: AppColors.primary,
-                    decoration: TextDecoration.underline,
-                  ),
-                ),
-              ),
-            ],
-            SizedBox(height: 4.h),
-            Text(
-              _formatTime(message.timestamp),
-              style: GoogleFonts.inter(fontSize: 8.sp, color: AppColors.textTertiary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDeploymentCompleteMessage(AgentMessage message) {
+  Widget _buildGenericMessage(AgentMessage message) {
+    // Similar to status message but simpler
     return Padding(
       padding: EdgeInsets.only(bottom: 12.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(12.r),
-        decoration: BoxDecoration(
-          color: AppColors.deploymentSuccess,
-          border: Border.all(color: AppColors.success.withOpacity(0.5), width: 2),
-          borderRadius: BorderRadius.circular(10.r),
+      child: Text(
+        message.text,
+        style: GoogleFonts.inter(
+          fontSize: 13.sp,
+          color: AppColors.textSecondary,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+  }
+
+  Widget _buildInputArea(AgentChatController controller) {
+    return Container(
+      padding: EdgeInsets.all(16.r),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.border)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Row(
-              children: [
-                Text('✅', style: TextStyle(fontSize: 22.sp)),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: Text(
-                    AppStrings.deployedSuccessfully,
-                    style: GoogleFonts.inter(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.success,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8.h),
-            GestureDetector(
-              onTap: () => _openUrl(message.deploymentUrl!),
+            Expanded(
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(6.r),
+                  color: AppColors.inputBackground,
+                  borderRadius: BorderRadius.circular(24.r),
                   border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.link, size: 14.r, color: AppColors.primary),
-                    SizedBox(width: 6.w),
+                    SizedBox(width: 16.w),
+                    Icon(
+                      StatusIcons.message,
+                      size: 20.r,
+                      color: AppColors.textTertiary,
+                    ),
+                    SizedBox(width: 10.w),
                     Expanded(
-                      child: Text(
-                        message.deploymentUrl ?? '',
-                        style: GoogleFonts.jetBrainsMono(
-                          fontSize: 10.sp,
-                          color: AppColors.primary,
-                          decoration: TextDecoration.underline,
+                      child: TextField(
+                        controller: controller.textController,
+                        decoration: InputDecoration(
+                          hintText: AppStrings.typeMessage,
+                          hintStyle: GoogleFonts.inter(
+                            fontSize: 14.sp,
+                            color: AppColors.textTertiary,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12.h),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(fontSize: 14.sp),
+                        maxLines: 4,
+                        minLines: 1,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: controller.sendMessage,
                       ),
                     ),
-                    Icon(Icons.open_in_new, size: 12.r, color: AppColors.primary),
+                    SizedBox(width: 8.w),
                   ],
                 ),
               ),
             ),
-            if (message.buildTime != null || message.size != null) ...[
-              SizedBox(height: 8.h),
-              Row(
-                children: [
-                  if (message.buildTime != null) ...[
-                    Icon(Icons.timer, size: 12.r, color: AppColors.textSecondary),
-                    SizedBox(width: 4.w),
-                    Text(
-                      message.buildTime!,
-                      style: GoogleFonts.inter(fontSize: 10.sp, color: AppColors.textSecondary),
-                    ),
-                  ],
-                  if (message.buildTime != null && message.size != null)
-                    SizedBox(width: 12.w),
-                  if (message.size != null) ...[
-                    Icon(Icons.data_usage, size: 12.r, color: AppColors.textSecondary),
-                    SizedBox(width: 4.w),
-                    Text(
-                      message.size!,
-                      style: GoogleFonts.inter(fontSize: 10.sp, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-            SizedBox(height: 4.h),
-            Text(
-              _formatTime(message.timestamp),
-              style: GoogleFonts.inter(fontSize: 8.sp, color: AppColors.textTertiary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReviewProgressMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(8.r),
-        decoration: BoxDecoration(
-          color: AppColors.accent.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(6.r),
-        ),
-        child: Row(
-          children: [
-            Text('🔍', style: TextStyle(fontSize: 14.sp)),
-            SizedBox(width: 6.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message.text,
-                    style: GoogleFonts.inter(fontSize: 11.sp, color: AppColors.textPrimary),
-                  ),
-                  if (message.filePath != null)
-                    Text(
-                      message.filePath!,
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 9.sp,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (message.progress != null)
-              Text(
-                '${((message.progress ?? 0) * 100).toInt()}%',
-                style: GoogleFonts.inter(
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.accent,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReviewIssueMessage(AgentMessage message) {
-    final color = message.severity == 'error'
-        ? AppColors.error
-        : message.severity == 'warning'
-            ? AppColors.warning
-            : AppColors.info;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(8.r),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          border: Border.all(color: color.withOpacity(0.3)),
-          borderRadius: BorderRadius.circular(6.r),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              message.severity == 'error' ? Icons.error : Icons.warning,
-              size: 16.r,
-              color: color,
-            ),
-            SizedBox(width: 6.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message.text,
-                    style: GoogleFonts.inter(fontSize: 11.sp, color: AppColors.textPrimary),
-                  ),
-                  if (message.filePath != null || message.line != null)
-                    Text(
-                      '${message.filePath ?? ''}${message.line != null ? ':${message.line}' : ''}',
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 9.sp,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 12.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(12.r),
-        decoration: BoxDecoration(
-          color: AppColors.errorBackground,
-          border: Border.all(color: AppColors.error.withOpacity(0.5), width: 2),
-          borderRadius: BorderRadius.circular(10.r),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text('❌', style: TextStyle(fontSize: 18.sp)),
-                SizedBox(width: 6.w),
-                Expanded(
-                  child: Text(
-                    'Error',
-                    style: GoogleFonts.inter(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.error,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 6.h),
-            Text(
-              message.text,
-              style: GoogleFonts.inter(fontSize: 12.sp, color: AppColors.textPrimary),
-            ),
-            if (message.errorDetails != null) ...[
-              SizedBox(height: 6.h),
-              Container(
-                padding: EdgeInsets.all(6.r),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(4.r),
-                ),
-                child: Text(
-                  message.errorDetails!,
-                  style: GoogleFonts.jetBrainsMono(
-                    fontSize: 9.sp,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ],
-            SizedBox(height: 4.h),
-            Text(
-              _formatTime(message.timestamp),
-              style: GoogleFonts.inter(fontSize: 8.sp, color: AppColors.textTertiary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUserInputMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 12.h, left: 36.w),
-      child: Container(
-        padding: EdgeInsets.all(12.r),
-        decoration: BoxDecoration(
-          color: AppColors.warningBackground,
-          border: Border.all(color: AppColors.warning.withOpacity(0.5)),
-          borderRadius: BorderRadius.circular(10.r),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text('❓', style: TextStyle(fontSize: 18.sp)),
-                SizedBox(width: 6.w),
-                Expanded(
-                  child: Text(
-                    'Input Required',
-                    style: GoogleFonts.inter(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.warning,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 6.h),
-            Text(
-              message.question ?? message.text,
-              style: GoogleFonts.inter(fontSize: 12.sp, color: AppColors.textPrimary),
-            ),
-            if (message.options != null && message.options!.isNotEmpty) ...[
-              SizedBox(height: 8.h),
-              Wrap(
-                spacing: 8.w,
-                runSpacing: 6.h,
-                children: message.options!.map((option) {
-                  return ElevatedButton(
-                    onPressed: () {
-                      Get.find<WebSocketClient>()
-                          .sendUserInputResponse(option);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                      minimumSize: Size.zero,
-                    ),
-                    child: Text(
-                      option,
-                      style: GoogleFonts.inter(fontSize: 11.sp),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ========== INPUT AREA ==========
-
-  Widget _buildInputArea(AgentChatController controller) {
-    return Container(
-      padding: EdgeInsets.all(12.r),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.border)),
-      ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller.textController,
-                decoration: InputDecoration(
-                  hintText: AppStrings.typeMessage,
-                  hintStyle: GoogleFonts.inter(fontSize: 13.sp, color: AppColors.textTertiary),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20.r),
-                    borderSide: BorderSide(color: AppColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20.r),
-                    borderSide: BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20.r),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-                  filled: true,
-                  fillColor: AppColors.inputBackground,
-                ),
-                style: GoogleFonts.inter(fontSize: 13.sp),
-                maxLines: 3,
-                minLines: 1,
-                textInputAction: TextInputAction.send,
-                onSubmitted: controller.sendMessage,
-              ),
-            ),
-            SizedBox(width: 8.w),
-            Obx(() => Container(
+            SizedBox(width: 12.w),
+            Obx(() => AnimatedContainer(
+                  duration: Duration(milliseconds: 200),
+                  width: 48.r,
+                  height: 48.r,
                   decoration: BoxDecoration(
-                    color: controller.isAgentWorking.value
-                        ? AppColors.textTertiary
-                        : AppColors.primary,
+                    gradient: controller.isAgentWorking.value
+                        ? LinearGradient(
+                            colors: [Colors.grey[400]!, Colors.grey[400]!])
+                        : LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              const Color(0xFF6366F1)
+                            ], // Modern gradients
+                          ),
                     shape: BoxShape.circle,
+                    boxShadow: controller.isAgentWorking.value
+                        ? []
+                        : [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                   ),
-                  child: IconButton(
-                    icon: Icon(Icons.send, color: Colors.white, size: 18.r),
-                    onPressed: controller.isAgentWorking.value
-                        ? null
-                        : () => controller.sendMessage(controller.textController.text),
-                    padding: EdgeInsets.all(10.r),
-                    constraints: BoxConstraints(minWidth: 40.r, minHeight: 40.r),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(24.r),
+                      onTap: controller.isAgentWorking.value
+                          ? null
+                          : () => controller
+                              .sendMessage(controller.textController.text),
+                      child: Center(
+                        child: Icon(
+                          controller.isAgentWorking.value
+                              ? StatusIcons.processing
+                              : StatusIcons.send,
+                          color: Colors.white,
+                          size: 20.r,
+                        ),
+                      ),
+                    ),
                   ),
-                )),
+                )
+                    .animate(target: controller.isAgentWorking.value ? 1 : 0)
+                    .scale(
+                        begin: Offset(1, 1),
+                        end: Offset(0.9, 0.9),
+                        duration: 200.ms)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AgentChatController controller) {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(24.r),
+        padding: EdgeInsets.all(32.r),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.network(
-              ImagePlaceholders.agentAvatar,
-              width: 100.w,
-              height: 100.h,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.smart_toy,
-                size: 64.r,
-                color: AppColors.textTertiary,
+            Container(
+              width: 100.r,
+              height: 100.r,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary.withOpacity(0.05),
+                    AppColors.accent.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
               ),
-            ),
-            SizedBox(height: 16.h),
+              child: Icon(
+                AgentAvatarIcons.ai,
+                size: 48.r,
+                color: AppColors.primary.withOpacity(0.8),
+              ),
+            ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
+            SizedBox(height: 24.h),
             Text(
               AppStrings.startConversation,
               style: GoogleFonts.inter(
-                fontSize: 16.sp,
+                fontSize: 18.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
-            ),
-            SizedBox(height: 6.h),
+            ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
+            SizedBox(height: 8.h),
             Text(
               AppStrings.startConversationSubtitle,
               style: GoogleFonts.inter(
-                fontSize: 13.sp,
+                fontSize: 14.sp,
                 color: AppColors.textSecondary,
+                height: 1.5,
               ),
               textAlign: TextAlign.center,
-            ),
+            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
+            SizedBox(height: 32.h),
+            Wrap(
+              spacing: 12.w,
+              runSpacing: 12.h,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildSuggestionChip(
+                    StatusIcons.plus, 'Add feature', controller),
+                _buildSuggestionChip(
+                    StatusIcons.palette, 'Change design', controller),
+                _buildSuggestionChip(StatusIcons.bug, 'Fix bug', controller),
+              ],
+            ).animate().fadeIn(delay: 500.ms),
           ],
         ),
       ),
     );
   }
 
-  // ========== HELPER METHODS ==========
-
-  Widget _buildAgentAvatar(String agent) {
-    return Container(
-      width: 28.r,
-      height: 28.r,
-      decoration: BoxDecoration(
-        color: _getAgentColor(agent).withOpacity(0.2),
-        borderRadius: BorderRadius.circular(6.r),
+  Widget _buildSuggestionChip(
+      IconData icon, String label, AgentChatController controller) {
+    return ActionChip(
+      avatar: Icon(icon, size: 16.r, color: AppColors.primary),
+      label: Text(
+        label,
+        style: GoogleFonts.inter(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary),
       ),
-      child: Center(
-        child: Text(
-          _getAgentEmoji(agent),
-          style: TextStyle(fontSize: 14.sp),
-        ),
-      ),
+      onPressed: () {
+        controller.textController.text = label;
+        // Optionally auto-send or just fill
+      },
+      backgroundColor: Colors.white,
+      shadowColor: Colors.black.withOpacity(0.05),
+      elevation: 2,
+      padding: EdgeInsets.all(8.r),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+          side: BorderSide(color: AppColors.border, width: 1.0)),
     );
-  }
-
-  String _formatTime(DateTime timestamp) => DateFormat('HH:mm:ss').format(timestamp);
-
-  Color _getStatusColor(String? status) {
-    switch (status) {
-      case 'started':
-      case 'in_progress':
-      case 'planning':
-        return AppColors.warningBackground;
-      case 'completed':
-        return AppColors.deploymentSuccess;
-      case 'failed':
-        return AppColors.errorBackground;
-      default:
-        return AppColors.messageAgent;
-    }
-  }
-
-  String _getStatusEmoji(String? status) {
-    switch (status) {
-      case 'started':
-        return '🚀';
-      case 'in_progress':
-      case 'planning':
-        return '⚙️';
-      case 'completed':
-        return '✅';
-      case 'failed':
-        return '❌';
-      default:
-        return '📋';
-    }
-  }
-
-  String _getAgentDisplayName(String agent) {
-    const names = {
-      'planner': 'Planner',
-      'flutter_engineer': 'Flutter Engineer',
-      'code_reviewer': 'Code Reviewer',
-      'git_operator': 'Git Operator',
-      'build_deploy': 'Build & Deploy',
-      'memory': 'Memory',
-    };
-    return names[agent] ?? agent;
-  }
-
-  String _getAgentEmoji(String agent) {
-    const emojis = {
-      'planner': '🤖',
-      'flutter_engineer': '👨‍💻',
-      'code_reviewer': '🔍',
-      'git_operator': '🌿',
-      'build_deploy': '🚀',
-      'memory': '📊',
-    };
-    return emojis[agent] ?? '🤖';
-  }
-
-  Color _getAgentColor(String agent) {
-    const colors = {
-      'planner': AppColors.planner,
-      'flutter_engineer': AppColors.flutterEngineer,
-      'code_reviewer': AppColors.codeReviewer,
-      'git_operator': AppColors.gitOperator,
-      'build_deploy': AppColors.buildDeploy,
-      'memory': AppColors.memory,
-    };
-    return colors[agent] ?? AppColors.primary;
-  }
-
-  String _getFileOperationIcon(String operation) {
-    switch (operation) {
-      case 'create':
-        return '✨';
-      case 'update':
-        return '📝';
-      case 'delete':
-        return '🗑️';
-      default:
-        return '📄';
-    }
-  }
-
-  Color _getFileOperationColor(String operation) {
-    switch (operation) {
-      case 'create':
-        return AppColors.fileCreate;
-      case 'update':
-        return AppColors.fileUpdate;
-      case 'delete':
-        return AppColors.fileDelete;
-      default:
-        return AppColors.textSecondary;
-    }
-  }
-
-  String _getOperationText(String operation) {
-    switch (operation) {
-      case 'create':
-        return 'CREATED';
-      case 'update':
-        return 'UPDATED';
-      case 'delete':
-        return 'DELETED';
-      default:
-        return operation.toUpperCase();
-    }
-  }
-
-  String _getGitOperationIcon(String operation) {
-    switch (operation) {
-      case 'create_branch':
-        return '🌿';
-      case 'commit':
-        return '💾';
-      case 'push':
-        return '📤';
-      case 'merge':
-        return '🔀';
-      default:
-        return '📋';
-    }
-  }
-
-  String _getGitOperationText(String operation) {
-    switch (operation) {
-      case 'create_branch':
-        return 'CREATED BRANCH';
-      case 'commit':
-        return 'COMMITTED';
-      case 'push':
-        return 'PUSHED';
-      case 'merge':
-        return 'MERGED';
-      default:
-        return operation.toUpperCase();
-    }
-  }
-
-  void _openCommit(String sha) {
-    // Would typically open commit URL
-  }
-
-  void _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 }

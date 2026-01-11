@@ -24,12 +24,14 @@ passlib[bcrypt]==1.7.4
 cryptography==44.0.0
 httpx==0.28.1
 
-# AI/ML - LangChain & LangGraph
-langchain==0.3.14
-langchain-core==0.3.29
-langchain-google-genai==2.0.8
-langgraph==0.2.60
-google-generativeai==0.8.3
+# AI/ML - LangChain & LangGraph (Latest with Gemini 3 support)
+langchain>=1.0.0
+langchain-core>=1.0.0
+langchain-google-genai>=4.0.0  # Full Gemini 3 thought signature support
+langchain-openai>=1.0.0
+langchain-anthropic>=1.0.0
+langgraph>=1.0.0
+google-generativeai>=1.0.0
 
 # GitHub Integration
 PyGithub==2.5.0

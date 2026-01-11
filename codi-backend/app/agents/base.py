@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Type
 
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool, tool
-from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel
 
 from app.config import settings
@@ -36,9 +36,10 @@ class BaseAgent(ABC):
 
     Each agent has:
     - A unique name and system prompt
-    - Access to the LLM (Gemini)
+    - Access to its designated LLM (multi-model support)
     - Tools specific to its role
     - WebSocket broadcasting capabilities
+    - Memory logging integration
     """
 
     # Agent identity
@@ -47,6 +48,14 @@ class BaseAgent(ABC):
 
     # Default system prompt (override in subclasses)
     system_prompt: str = "You are a helpful AI assistant."
+    
+    # Model configuration (override in subclasses for multi-model)
+    model_provider: str = "gemini"  # "openai", "anthropic", "gemini"
+    model_name: str = ""  # Leave empty to use default from config
+    
+    # Retry configuration
+    max_retries: int = 3
+    retry_delay: float = 1.0
 
     def __init__(self, context: AgentContext) -> None:
         """Initialize the agent.
@@ -55,30 +64,51 @@ class BaseAgent(ABC):
             context: Agent context with project info and credentials
         """
         self.context = context
-        self._llm: Optional[ChatGoogleGenerativeAI] = None
+        self._llm: Optional[BaseChatModel] = None
         self._github_service: Optional[GitHubService] = None
         self._tools: Optional[List[BaseTool]] = None
+        self._start_time: Optional[datetime] = None
 
     @property
-    def llm(self) -> ChatGoogleGenerativeAI:
-        """Get the LLM instance (lazy initialization)."""
+    def llm(self) -> BaseChatModel:
+        """Get the LLM instance (lazy initialization with multi-model support)."""
         if self._llm is None:
-            api_key = settings.gemini_api_key
-            if not api_key:
-                logger.error("GEMINI_API_KEY is not set in environment or .env file")
-                raise ValueError(
-                    "GEMINI_API_KEY is missing. Please add it to your .env file. "
-                    "You can get one from https://aistudio.google.com/app/apikey"
+            from app.agents.llm_providers import get_llm_for_agent, get_llm
+            
+            # Use agent-specific configuration if force_gemini is off
+            if settings.force_gemini_overall:
+                # Force Gemini for all agents
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                
+                api_key = settings.gemini_api_key
+                if not api_key:
+                    logger.error("GEMINI_API_KEY is not set")
+                    raise ValueError(
+                        "GEMINI_API_KEY is missing. Please add it to your .env file."
+                    )
+                
+                self._llm = ChatGoogleGenerativeAI(
+                    model=settings.gemini_model,
+                    google_api_key=api_key,
+                    temperature=1.0,
+                    max_output_tokens=8192,
+                    streaming=False,
+                    # Critical for Gemini 3 function calling with thought signatures
+                    convert_system_message_to_human=False,
                 )
-
-            self._llm = ChatGoogleGenerativeAI(
-                model=settings.gemini_model,
-                google_api_key=api_key,
-                temperature=1.0,
-                max_output_tokens=8192,
-                convert_system_message_to_human=True,
-                streaming=False,
-            )
+            else:
+                # Use multi-model configuration
+                if self.model_provider and self.model_name:
+                    self._llm = get_llm(
+                        provider=self.model_provider,
+                        model_name=self.model_name,
+                        temperature=1.0,
+                    )
+                else:
+                    self._llm = get_llm_for_agent(self.name)
+                    
+            logger.info(f"Initialized LLM for {self.name}: {self._llm.__class__.__name__}")
+        
         return self._llm
 
     @property
@@ -224,6 +254,15 @@ class BaseAgent(ABC):
 
         try:
             response = await llm_with_tools.ainvoke(full_messages, **kwargs)
+            
+            # Debug: Check for thoughtSignature
+            if hasattr(response, "additional_kwargs"):
+                sig = response.additional_kwargs.get("thoughtSignature")
+                if sig:
+                    logger.debug(f"Gemini Thought Signature captured: {sig[:50]}...")
+                elif response.tool_calls:
+                    logger.debug("Gemini ToolCall generated but NO thoughtSignature found in additional_kwargs.")
+
             return response
 
         except Exception as e:
@@ -233,6 +272,35 @@ class BaseAgent(ABC):
                 message=f"LLM invocation failed: {e}",
             )
             raise
+
+    async def invoke_with_retry(
+        self,
+        messages: List[BaseMessage],
+        **kwargs: Any,
+    ) -> AIMessage:
+        """Invoke the LLM with retry logic.
+
+        Args:
+            messages: List of messages to send
+            **kwargs: Additional arguments to pass to the LLM
+
+        Returns:
+            AI response message
+        """
+        last_error = None
+        
+        for attempt in range(self.max_retries):
+            try:
+                return await self.invoke(messages, **kwargs)
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    f"LLM invocation attempt {attempt + 1}/{self.max_retries} failed: {e}"
+                )
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay * (attempt + 1))
+        
+        raise last_error
 
     async def execute_tool(
         self,
@@ -293,6 +361,69 @@ class BaseAgent(ABC):
             Output data from the agent
         """
         pass
+
+    async def log_operation(
+        self,
+        operation_type: str,
+        message: str,
+        status: str = "completed",
+        details: Optional[Dict[str, Any]] = None,
+        file_path: Optional[str] = None,
+        duration_ms: Optional[int] = None,
+        error_message: Optional[str] = None,
+    ) -> None:
+        """Log an operation to the memory system.
+
+        Args:
+            operation_type: Type of operation
+            message: Human-readable message
+            status: Operation status
+            details: Additional details
+            file_path: File path if applicable
+            duration_ms: Duration in milliseconds
+            error_message: Error message if failed
+        """
+        try:
+            from app.agents.memory import MemoryAgent
+            from app.models.operation_log import AgentType, OperationType
+            
+            memory = MemoryAgent(self.context)
+            
+            # Map string to enum if needed
+            try:
+                op_type = OperationType(operation_type)
+            except ValueError:
+                op_type = OperationType.AGENT_TASK_COMPLETED
+            
+            try:
+                agent_type = AgentType(self.name)
+            except ValueError:
+                agent_type = AgentType.SYSTEM
+            
+            await memory.log_operation(
+                operation_type=op_type,
+                agent_type=agent_type,
+                message=message,
+                status=status,
+                details=details,
+                file_path=file_path,
+                duration_ms=duration_ms,
+                error_message=error_message,
+            )
+        except Exception as e:
+            # Don't let logging failures break the agent
+            logger.warning(f"Failed to log operation: {e}")
+
+    def start_timer(self) -> None:
+        """Start the operation timer."""
+        self._start_time = datetime.utcnow()
+
+    def get_duration_ms(self) -> Optional[int]:
+        """Get duration since timer start in milliseconds."""
+        if self._start_time is None:
+            return None
+        delta = datetime.utcnow() - self._start_time
+        return int(delta.total_seconds() * 1000)
 
 
 def create_tool(

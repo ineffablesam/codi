@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Dict
 
 from celery import Celery
+from celery.signals import worker_process_init, worker_process_shutdown
 
 from app.config import settings
 from app.utils.logging import get_logger
@@ -34,6 +35,74 @@ celery_app.conf.update(
 )
 
 
+# Worker-level database initialization (once per worker, not per task)
+_worker_db_initialized = False
+
+
+@worker_process_init.connect
+def init_worker_db(**kwargs):
+    """Initialize database connections when a worker process starts.
+    
+    This runs once per forked worker process, creating fresh
+    database connections that work with the worker's event loop.
+    """
+    global _worker_db_initialized
+    
+    if _worker_db_initialized:
+        return
+    
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+    import app.database as db_module
+    
+    logger.info("Initializing database connections for worker process")
+    
+    # Create a new engine for this worker process
+    db_module.engine = create_async_engine(
+        settings.database_url,
+        echo=settings.debug,
+        future=True,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
+    )
+    
+    # Create a new session factory
+    db_module.async_session_factory = async_sessionmaker(
+        db_module.engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+    
+    _worker_db_initialized = True
+    logger.info("Worker database connections initialized")
+
+
+@worker_process_shutdown.connect
+def shutdown_worker_db(**kwargs):
+    """Clean up database connections when worker shuts down."""
+    global _worker_db_initialized
+    
+    if not _worker_db_initialized:
+        return
+    
+    import app.database as db_module
+    
+    logger.info("Closing worker database connections")
+    
+    # Close the engine pool synchronously
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(db_module.engine.dispose())
+    except Exception as e:
+        logger.warning(f"Error disposing engine: {e}")
+    finally:
+        loop.close()
+    
+    _worker_db_initialized = False
+
+
 def run_async(coro: Any) -> Any:
     """Run an async coroutine in Celery task context.
 
@@ -44,9 +113,20 @@ def run_async(coro: Any) -> Any:
         Result of the coroutine
     """
     loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     try:
         return loop.run_until_complete(coro)
     finally:
+        # Clean up pending tasks before closing
+        try:
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+            if pending:
+                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
         loop.close()
 
 

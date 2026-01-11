@@ -74,6 +74,9 @@ class WorkflowState(TypedDict):
     is_complete: bool
     has_error: bool
     error_message: Optional[str]
+    
+    # Framework detection (determines which code engineer to use)
+    detected_framework: Optional[str]  # flutter, react, nextjs, react_native
 
     # Timing
     started_at: str
@@ -88,6 +91,7 @@ def create_initial_state(
     repo_full_name: Optional[str] = None,
     current_branch: str = "main",
     github_token: Optional[str] = None,
+    detected_framework: Optional[str] = None,
 ) -> WorkflowState:
     """Create the initial workflow state.
 
@@ -99,6 +103,7 @@ def create_initial_state(
         repo_full_name: GitHub repository full name
         current_branch: Current git branch
         github_token: GitHub access token for API operations
+        detected_framework: Project framework (flutter, react, nextjs, react_native)
 
     Returns:
         Initial WorkflowState
@@ -124,6 +129,7 @@ def create_initial_state(
         is_complete=False,
         has_error=False,
         error_message=None,
+        detected_framework=detected_framework,
         started_at=datetime.utcnow().isoformat(),
         completed_at=None,
     )

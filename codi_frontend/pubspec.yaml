@@ -56,6 +56,19 @@ dependencies:
   radix_icons: ^1.0.1
   shadcn_flutter: ^0.0.47
 
+  # Icons
+  lucide_icons_flutter: ^1.0.0
+  fluentui_system_icons: ^1.1.251
+  heroicons: ^0.11.0
+  solar_icon_pack: ^0.2.1
+
+  # Animations & UI
+  flutter_spinkit: ^5.2.1
+  animated_text_kit: ^4.2.2
+  shimmer: ^3.0.0
+  animations: ^2.1.1
+  flutter_animate: ^4.5.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

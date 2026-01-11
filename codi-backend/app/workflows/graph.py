@@ -28,114 +28,15 @@ logger = get_logger(__name__)
 
 
 # =============================================================================
-# PROMPTS (matching reference implementation)
+# NOTE: Prompts are defined in individual agent classes under app/agents/
+# - PlannerAgent: app/agents/planner.py
+# - FlutterEngineerAgent: app/agents/platform/flutter_engineer.py
+# - CodeReviewerAgent: app/agents/code_reviewer.py
+# - etc.
+# 
+# This graph file only orchestrates the workflow between agents.
+# All agent logic, prompts, and tools are in their respective classes.
 # =============================================================================
-
-PLANNER_PROMPT = """You are the Planner Agent for Codi, an AI-powered development platform.
-
-Your role is to analyze user requests and decompose them into atomic, executable steps.
-
-## Available Agents:
-- flutter_engineer: Writes Flutter/Dart code, UI components, state management
-- code_reviewer: Reviews code for quality, security, and best practices
-- git_operator: Handles Git operations (branch, commit, push, PR)
-
-## Output Format:
-Provide a JSON plan with the following structure:
-{{
-  "summary": "Brief description of what will be done",
-  "steps": [
-    {{
-      "step_number": 1,
-      "agent": "agent_name",
-      "action": "specific action to take",
-      "description": "detailed description of what to do"
-    }}
-  ]
-}}
-
-## Guidelines:
-- Be specific about file paths and changes
-- Include code review steps for any code changes
-- Always end with Git commit
-- Keep plans simple and focused
-
-Project: {project_name}
-Repository: {repo_full_name}
-"""
-
-FLUTTER_ENGINEER_PROMPT = """You are the Flutter Engineer Agent for Codi.
-
-Your role is to write high-quality Flutter/Dart code for mobile and web applications.
-
-## CRITICAL RULES FOR MODIFICATIONS:
-1. If modifying an existing file, you MUST preserve ALL existing code
-2. Only change the EXACT lines necessary for the requested change
-3. Do NOT reformat, reorganize, or "improve" other parts of the code
-4. Do NOT add comments or documentation unless explicitly requested
-5. Do NOT remove imports or other code unless explicitly requested
-6. Match the existing code style exactly (indentation, spacing, naming)
-
-## Code Standards:
-- Use const constructors where possible
-- Prefer final variables
-- Write null-safe code using Dart 3.0+ features
-- Handle loading and error states
-
-## Output Format:
-Return JSON with your changes:
-{{
-  "changes": [
-    {{
-      "path": "lib/path/to/file.dart",
-      "action": "create" | "modify",
-      "content": "full file content with minimal changes",
-      "description": "what this change does",
-      "lines_changed": 1,
-      "lines_preserved": 150
-    }}
-  ]
-}}
-
-## IMPORTANT:
-- When action is "modify", the content MUST include the ENTIRE existing file with ONLY the targeted lines changed
-- The "lines_changed" and "lines_preserved" fields help track minimal changes
-- If the user asks to "change", "update", "fix", or "modify" something, make the smallest possible change
-
-Current task: {task_description}
-
-{existing_file_section}
-
-Current files in project:
-{current_files}
-"""
-
-
-CODE_REVIEWER_PROMPT = """You are the Code Reviewer Agent for Codi.
-
-Your role is to review code changes for quality, security, and best practices.
-
-## Review Criteria:
-1. Correctness: Does the code do what it's supposed to?
-2. Security: Are there any security vulnerabilities?
-3. Performance: Are there any performance issues?
-4. Style: Does it follow Flutter/Dart coding standards?
-
-## Output Format:
-{{
-  "approved": true | false,
-  "issues": ["list of issues found"],
-  "suggestions": ["list of improvement suggestions"],
-  "severity": "none" | "minor" | "major" | "critical"
-}}
-
-## Guidelines:
-- Approve if issues are minor and don't block functionality
-- Be constructive and specific
-
-Changes to review:
-{changes}
-"""
 
 
 # =============================================================================
@@ -191,101 +92,507 @@ async def broadcast_status(project_id: int, agent: str, status: str, message: st
 
 
 # =============================================================================
+# AGENT HELPERS
+# =============================================================================
+
+def get_primary_agent_for_framework(framework: str) -> str:
+    """Get the code engineering agent for a given framework."""
+    framework_to_agent = {
+        "flutter": "flutter_engineer",
+        "react": "react_engineer",
+        "nextjs": "nextjs_engineer",
+        "next": "nextjs_engineer",
+        "next.js": "nextjs_engineer",
+        "react_native": "react_native_engineer",
+        "reactnative": "react_native_engineer",
+    }
+    if framework:
+        return framework_to_agent.get(framework.lower().strip(), "flutter_engineer")
+    return "flutter_engineer"
+
+
+# =============================================================================
 # AGENT NODES (Reference implementation pattern)
 # =============================================================================
 
-async def planner_node(state: WorkflowState) -> WorkflowState:
-    """Planner agent node - creates execution plan.
+async def conductor_node(state: WorkflowState) -> WorkflowState:
+    """Conductor agent node - master orchestrator entry point.
     
-    Uses direct LLM invocation matching reference implementation.
+    The Conductor classifies intent, selects appropriate agents, and creates
+    an execution plan. This is the new entry point for the workflow.
     """
+    from app.agents.base import AgentContext
+    from app.agents.conductor import ConductorAgent
+    
+    project_id = state["project_id"]
+    
+    await broadcast_status(project_id, "conductor", "started", "Analyzing your request...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    conductor = ConductorAgent(context)
+    
+    try:
+        # Conductor analyzes and creates plan
+        result = await conductor.run({
+            "message": state["user_message"],
+            "context": {
+                "framework": state.get("detected_framework", "flutter"),
+                "repo": state.get("repo_full_name", ""),
+            }
+        })
+        
+        intent = result.get("intent", "explicit")
+        
+        # Broadcast the plan
+        await broadcast_status(
+            project_id, "conductor", "in_progress",
+            f"Intent: {intent} - Creating execution plan..."
+        )
+        
+        # Now delegate to strategist for detailed task decomposition
+        # (Conductor provides high-level orchestration, strategist creates atomic steps)
+        await broadcast_status(project_id, "conductor", "completed", "Orchestration complete, creating execution plan...")
+        
+        return {
+            **state,
+            "conductor_intent": intent,
+            "conductor_plan": result.get("plan", ""),
+            "current_agent": "conductor",
+            "next_agent": "strategist",  # Use Strategist for task decomposition, not legacy planner
+        }
+        
+    except Exception as e:
+        logger.error(f"Conductor failed: {e}")
+        await broadcast_status(project_id, "conductor", "failed", str(e))
+        # Fall back to strategist directly
+        return {
+            **state,
+            "current_agent": "conductor",
+            "next_agent": "strategist",
+        }
+
+
+async def sage_node(state: WorkflowState) -> WorkflowState:
+    """Sage agent node - strategic advisor for complex decisions.
+    
+    Called when architecture decisions or debugging after 2+ attempts is needed.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.sage import SageAgent
+    
+    project_id = state["project_id"]
+    
+    await broadcast_status(project_id, "sage", "started", "Sage analyzing problem...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    sage = SageAgent(context)
+    
+    step = get_next_executable_step(state)
+    if not step:
+        return state
+    
+    try:
+        result = await sage.run({
+            "question": step.get("description", state["user_message"]),
+            "context": state.get("conductor_plan", ""),
+        })
+        
+        await broadcast_status(project_id, "sage", "completed", "Strategic analysis complete")
+        
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["sage_analysis"] = result.get("analysis", "")
+        new_state["current_agent"] = "sage"
+        
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Sage failed: {e}")
+        await broadcast_status(project_id, "sage", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def scout_node(state: WorkflowState) -> WorkflowState:
+    """Scout agent node - fast codebase exploration.
+    
+    Used for search, pattern matching, and file discovery.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.scout import ScoutAgent
+    
+    project_id = state["project_id"]
+    
+    await broadcast_status(project_id, "scout", "started", "Scout exploring codebase...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    scout = ScoutAgent(context)
+    
+    step = get_next_executable_step(state)
+    if not step:
+        return state
+    
+    try:
+        result = await scout.run({
+            "query": step.get("description", state["user_message"]),
+        })
+        
+        await broadcast_status(project_id, "scout", "completed", "Exploration complete")
+        
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["scout_findings"] = result.get("results", [])
+        new_state["current_agent"] = "scout"
+        
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Scout failed: {e}")
+        await broadcast_status(project_id, "scout", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def scholar_node(state: WorkflowState) -> WorkflowState:
+    """Scholar agent node - external documentation research.
+    
+    Searches official docs, OSS repos for examples and best practices.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.scholar import ScholarAgent
+    
+    project_id = state["project_id"]
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "scholar":
+        return state
+    
+    await broadcast_status(project_id, "scholar", "started", "Scholar researching...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    try:
+        agent = ScholarAgent(context)
+        result = await agent.run({
+            "query": step.get("description", state["user_message"]),
+        })
+        
+        await broadcast_status(project_id, "scholar", "completed", "Research complete")
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["current_agent"] = "scholar"
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Scholar failed: {e}")
+        await broadcast_status(project_id, "scholar", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def scribe_node(state: WorkflowState) -> WorkflowState:
+    """Scribe agent node - technical documentation writer.
+    
+    Creates README, API docs, technical guides.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.scribe import ScribeAgent
+    
+    project_id = state["project_id"]
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "scribe":
+        return state
+    
+    await broadcast_status(project_id, "scribe", "started", "Scribe writing docs...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    try:
+        agent = ScribeAgent(context)
+        result = await agent.run({
+            "task": step.get("description", state["user_message"]),
+        })
+        
+        await broadcast_status(project_id, "scribe", "completed", "Documentation complete")
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["current_agent"] = "scribe"
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Scribe failed: {e}")
+        await broadcast_status(project_id, "scribe", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def strategist_node(state: WorkflowState) -> WorkflowState:
+    """Strategist agent node - work planner.
+    
+    Creates detailed execution plans for complex tasks.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.strategist import StrategistAgent
+    
+    project_id = state["project_id"]
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "strategist":
+        return state
+    
+    await broadcast_status(project_id, "strategist", "started", "Strategist planning...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    try:
+        agent = StrategistAgent(context)
+        result = await agent.run({
+            "goal": step.get("description", state["user_message"]),
+            "context": state.get("conductor_plan", ""),
+        })
+        
+        await broadcast_status(project_id, "strategist", "completed", "Strategic plan ready")
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["current_agent"] = "strategist"
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Strategist failed: {e}")
+        await broadcast_status(project_id, "strategist", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def vision_node(state: WorkflowState) -> WorkflowState:
+    """Vision agent node - multimodal analysis.
+    
+    Analyzes images, screenshots, PDFs, diagrams.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.vision import VisionAgent
+    
+    project_id = state["project_id"]
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "vision":
+        return state
+    
+    await broadcast_status(project_id, "vision", "started", "Vision analyzing content...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    try:
+        agent = VisionAgent(context)
+        result = await agent.run({
+            "question": step.get("description", state["user_message"]),
+        })
+        
+        await broadcast_status(project_id, "vision", "completed", "Visual analysis complete")
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["current_agent"] = "vision"
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Vision failed: {e}")
+        await broadcast_status(project_id, "vision", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def analyst_node(state: WorkflowState) -> WorkflowState:
+    """Analyst agent node - pre-planning analysis.
+    
+    Identifies hidden requirements and potential failure points.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.analyst import AnalystAgent
+    
+    project_id = state["project_id"]
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "analyst":
+        return state
+    
+    await broadcast_status(project_id, "analyst", "started", "Analyst pre-analyzing...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    try:
+        agent = AnalystAgent(context)
+        result = await agent.run({
+            "request": step.get("description", state["user_message"]),
+            "context": state.get("conductor_plan", ""),
+        })
+        
+        await broadcast_status(project_id, "analyst", "completed", "Pre-analysis complete")
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["analyst_findings"] = result.get("analysis", "")
+        new_state["current_agent"] = "analyst"
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Analyst failed: {e}")
+        await broadcast_status(project_id, "analyst", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def artisan_node(state: WorkflowState) -> WorkflowState:
+    """Artisan agent node - UI/UX specialist.
+    
+    Creates beautiful, polished user interfaces.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.artisan import ArtisanAgent
+    
+    project_id = state["project_id"]
+    step = get_next_executable_step(state)
+    if not step or step["agent"] != "artisan":
+        return state
+    
+    await broadcast_status(project_id, "artisan", "started", "Artisan crafting UI...")
+    
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
+    
+    try:
+        agent = ArtisanAgent(context)
+        result = await agent.run({
+            "task": step.get("description", state["user_message"]),
+        })
+        
+        # Extract code changes if any
+        code_changes = state.get("code_changes", {}).copy()
+        if result.get("file_path") and result.get("code"):
+            code_changes[result["file_path"]] = result["code"]
+        
+        await broadcast_status(project_id, "artisan", "completed", "UI crafted")
+        new_state = mark_step_completed(state, step["id"], result)
+        new_state["code_changes"] = code_changes
+        new_state["current_agent"] = "artisan"
+        return new_state
+        
+    except Exception as e:
+        logger.error(f"Artisan failed: {e}")
+        await broadcast_status(project_id, "artisan", "failed", str(e))
+        return mark_step_failed(state, step["id"], str(e))
+
+
+async def planner_node(state: WorkflowState) -> WorkflowState:
+    """Planner agent node - creates execution plan using PlannerAgent.
+    
+    Delegates to PlannerAgent.run() which has the complete prompt and logic.
+    """
+    from app.agents.base import AgentContext
+    from app.agents.planner import PlannerAgent
+    
     project_id = state["project_id"]
     
     await broadcast_status(project_id, "planner", "started", "Analyzing request...")
     
-    llm = create_llm()
+    # Determine primary agent based on project framework
+    framework = state.get("detected_framework") or "flutter"
+    primary_agent = get_primary_agent_for_framework(framework)
     
-    system_prompt = PLANNER_PROMPT.format(
-        project_name=state.get("repo_full_name", "").split("/")[-1] if state.get("repo_full_name") else "project",
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
         repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
     )
     
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=f"User request: {state['user_message']}\n\nCreate a detailed execution plan."),
-    ]
-    
     try:
-        # Stream the response for real-time updates
-        full_content = ""
-        chunk_count = 0
+        planner = PlannerAgent(context)
+        result = await planner.run({
+            "user_message": state["user_message"],
+        })
         
-        async for chunk in llm.astream(messages):
-            chunk_text = ""
-            if hasattr(chunk, 'content'):
-                if isinstance(chunk.content, list):
-                    chunk_text = " ".join(
-                        part.get("text", "") if isinstance(part, dict) else str(part)
-                        for part in chunk.content
-                    )
-                elif chunk.content:
-                    chunk_text = str(chunk.content)
-            
-            if chunk_text:
-                full_content += chunk_text
-                chunk_count += 1
-                
-                # Send streaming updates every few chunks
-                if chunk_count % 5 == 0:
-                    await connection_manager.broadcast_to_project(
-                        project_id,
-                        {
-                            "type": "llm_stream",
-                            "agent": "planner",
-                            "chunk": chunk_text,
-                            "accumulated_length": len(full_content),
-                        }
-                    )
+        # Extract plan from result
+        plan = result.get("plan")
         
-        logger.debug(f"Planner response content length: {len(full_content)}")
-        
-        plan_data = extract_json_from_response(full_content)
-        
-        # Build plan steps from response
+        # Convert plan steps to our format
         plan_steps = []
-        for step in plan_data.get("steps", []):
-            if not isinstance(step, dict):
-                continue
-            plan_steps.append({
-                "id": step.get("step_number", len(plan_steps) + 1),
-                "description": step.get("description", state["user_message"]),
-                "agent": step.get("agent", "flutter_engineer"),
-                "action": step.get("action", "implement"),
-                "status": "pending",
-                "result": None,
-                "dependencies": [],
-                "file_path": None,
-            })
+        if plan and hasattr(plan, 'steps'):
+            for step in plan.steps:
+                # Ensure correct agent is used based on framework
+                agent = step.agent
+                if agent == "flutter_engineer" and framework != "flutter":
+                    agent = primary_agent
+                    
+                plan_steps.append({
+                    "id": step.id,
+                    "description": step.description,
+                    "agent": agent,
+                    "action": step.action,
+                    "status": "pending",
+                    "result": None,
+                    "dependencies": step.dependencies,
+                    "file_path": step.file_path,
+                })
         
-        # Default plan if none parsed
+        # Fallback default plan using correct framework agent
         if not plan_steps:
             plan_steps = [
-                {"id": 1, "description": state["user_message"], "agent": "flutter_engineer", "action": "implement", "status": "pending", "result": None, "dependencies": [], "file_path": None},
+                {"id": 1, "description": state["user_message"], "agent": primary_agent, "action": "implement", "status": "pending", "result": None, "dependencies": [], "file_path": None},
                 {"id": 2, "description": "Review code changes", "agent": "code_reviewer", "action": "review", "status": "pending", "result": None, "dependencies": [], "file_path": None},
                 {"id": 3, "description": "Commit changes", "agent": "git_operator", "action": "commit", "status": "pending", "result": None, "dependencies": [], "file_path": None},
             ]
         
-        # Ensure we have code_reviewer and git_operator steps
-        has_reviewer = any(
-            s["agent"].lower().replace("_", "").replace("-", "") == "codereviewer" or
-            "review" in s["description"].lower()
-            for s in plan_steps
-        )
-        has_git = any(
-            s["agent"].lower().replace("_", "").replace("-", "") == "gitoperator" or
-            "commit" in s["description"].lower()
-            for s in plan_steps
-        )
+        # Ensure code_reviewer and git_operator steps
+        has_reviewer = any(s["agent"] == "code_reviewer" for s in plan_steps)
+        has_git = any(s["agent"] == "git_operator" for s in plan_steps)
         
         if not has_reviewer:
             plan_steps.append({"id": len(plan_steps) + 1, "description": "Review code changes", "agent": "code_reviewer", "action": "review", "status": "pending", "result": None, "dependencies": [], "file_path": None})
@@ -298,13 +605,13 @@ async def planner_node(state: WorkflowState) -> WorkflowState:
             **state,
             "plan": {
                 "user_request": state["user_message"],
-                "summary": plan_data.get("summary", "Process user request"),
+                "summary": plan.summary if plan else "Process user request",
                 "steps": plan_steps,
-                "estimated_time_seconds": 120,
+                "estimated_time_seconds": plan.estimated_time_seconds if plan else 120,
             },
             "plan_steps": plan_steps,
             "current_agent": "planner",
-            "next_agent": plan_steps[0]["agent"] if plan_steps else "flutter_engineer",
+            "next_agent": plan_steps[0]["agent"] if plan_steps else primary_agent,
         }
         
     except Exception as e:
@@ -319,225 +626,59 @@ async def planner_node(state: WorkflowState) -> WorkflowState:
 
 
 async def flutter_engineer_node(state: WorkflowState) -> WorkflowState:
-    """Flutter Engineer agent node - generates code with streaming and surgical editing.
+    """Flutter Engineer agent node - delegates to FlutterEngineerAgent.
     
-    Uses direct LLM invocation with astream() for real-time updates.
-    Fetches existing files from GitHub to enable minimal, surgical edits.
+    The FlutterEngineerAgent has complete logic for:
+    - Reading existing files from GitHub
+    - Surgical edits vs full rewrites
+    - Code validation and anti-hallucination
     """
+    from app.agents.base import AgentContext
+    from app.agents.platform.flutter_engineer import FlutterEngineerAgent
+    
     step = get_next_executable_step(state)
     if not step or step["agent"] != "flutter_engineer":
         return state
     
     project_id = state["project_id"]
     task_description = step.get("description", state["user_message"])
-    repo_full_name = state.get("repo_full_name")
-    current_branch = state.get("current_branch", "main")
-    github_token = state.get("github_token", "")
     
     await broadcast_status(project_id, "flutter_engineer", "started", f"Working on: {task_description[:50]}...")
     
-    # Classify task type to determine if surgical edit is needed
-    surgical_keywords = ['change', 'update', 'modify', 'fix', 'correct', 'adjust', 
-                         'rename', 'replace', 'swap', 'alter', 'set']
-    is_surgical_edit = any(kw in task_description.lower() for kw in surgical_keywords)
-    
-    llm = create_llm()
-    
-    # Build file context from existing code_changes
-    current_files = ""
-    if state.get("code_changes"):
-        for path, content in list(state["code_changes"].items())[:3]:
-            current_files += f"\n### {path}\n```dart\n{content[:500]}\n```\n"
-    
-    # Try to fetch existing file from GitHub for surgical edits
-    existing_file_section = ""
-    if is_surgical_edit and repo_full_name and github_token:
-        # Try to infer target file from task description
-        target_file = None
-        
-        # Common Flutter file patterns
-        file_patterns = {
-            'main': 'lib/main.dart',
-            'home': 'lib/features/home/views/home_screen.dart',
-            'app bar': 'lib/main.dart',
-            'appbar': 'lib/main.dart',
-            'title': 'lib/main.dart',
-        }
-        
-        for pattern, file_path in file_patterns.items():
-            if pattern in task_description.lower():
-                target_file = file_path
-                break
-        
-        # If no pattern matched, default to main.dart for modifications
-        if not target_file:
-            target_file = 'lib/main.dart'
-        
-        # Fetch existing file content
-        try:
-            from app.services.github import GitHubService
-            github_service = GitHubService(access_token=github_token)
-            
-            await connection_manager.send_tool_execution(
-                project_id=project_id,
-                agent="flutter_engineer",
-                tool="read_file",
-                message=f"Reading existing file: {target_file}",
-                file_path=target_file,
-            )
-            
-            existing_content = github_service.get_file_content(
-                repo_full_name=repo_full_name,
-                file_path=target_file,
-                ref=current_branch,
-            )
-            
-            line_count = len(existing_content.split('\n'))
-            existing_file_section = f"""## EXISTING FILE TO MODIFY:
-The following file exists and must be modified surgically. Preserve ALL existing code, only change the specific parts needed:
-
-File: {target_file} ({line_count} lines)
-```dart
-{existing_content}
-```
-
-IMPORTANT: Your output MUST contain the complete file with ONLY the minimal changes applied. Do NOT remove or restructure any existing code.
-"""
-            await broadcast_status(
-                project_id, "flutter_engineer", "in_progress", 
-                f"Read {target_file} ({line_count} lines), applying surgical edit..."
-            )
-            
-        except ValueError as e:
-            logger.warning(f"Could not read existing file: {e}")
-            existing_file_section = ""
-        except Exception as e:
-            logger.warning(f"Error fetching file from GitHub: {e}")
-            existing_file_section = ""
-    
-    system_prompt = FLUTTER_ENGINEER_PROMPT.format(
-        task_description=task_description,
-        existing_file_section=existing_file_section,
-        current_files=current_files or "No files loaded yet",
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
     )
     
-    human_prompt = f"""Task: {task_description}
-
-{"This is a SURGICAL EDIT task. Make the SMALLEST possible change to accomplish the task. Preserve all existing code." if is_surgical_edit else "Provide the complete file changes needed."}
-
-Return JSON with format:
-{{
-  "changes": [
-    {{"path": "lib/path/to/file.dart", "action": "{"modify" if is_surgical_edit else "create"}", "content": "complete file content", "description": "what this does", "lines_changed": N, "lines_preserved": M}}
-  ]
-}}
-"""
-    
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=human_prompt),
-    ]
-    
     try:
-        # Stream the response for real-time updates
-        full_content = ""
-        chunk_count = 0
+        agent = FlutterEngineerAgent(context)
+        result = await agent.run({
+            "step": step,
+            "user_message": state["user_message"],
+            "code_changes": state.get("code_changes", {}),
+        })
         
-        async for chunk in llm.astream(messages):
-            chunk_text = ""
-            if hasattr(chunk, 'content'):
-                if isinstance(chunk.content, list):
-                    chunk_text = " ".join(
-                        part.get("text", "") if isinstance(part, dict) else str(part)
-                        for part in chunk.content
-                    )
-                elif chunk.content:
-                    chunk_text = str(chunk.content)
-            
-            if chunk_text:
-                full_content += chunk_text
-                chunk_count += 1
-                
-                # Send streaming updates every few chunks
-                if chunk_count % 5 == 0:
-                    await connection_manager.broadcast_to_project(
-                        project_id,
-                        {
-                            "type": "llm_stream",
-                            "agent": "flutter_engineer",
-                            "chunk": chunk_text,
-                            "accumulated_length": len(full_content),
-                        }
-                    )
-        
-        logger.debug(f"Flutter engineer response ({len(full_content)} chars): {full_content[:500]}")
-        
-        # Parse changes from response
-        changes = []
-        data = extract_json_from_response(full_content)
-        
-        if data.get("changes"):
-            for change in data["changes"]:
-                if isinstance(change, dict) and change.get("content"):
-                    changes.append({
-                        "path": change.get("path", "lib/main.dart"),
-                        "action": change.get("action", "modify"),
-                        "content": change["content"],
-                        "description": change.get("description", task_description),
-                        "lines_changed": change.get("lines_changed", 0),
-                        "lines_preserved": change.get("lines_preserved", 0),
-                    })
-        
-        # Fallback: extract dart code block
-        if not changes:
-            dart_pattern = r'```dart\s*(.*?)\s*```'
-            matches = re.findall(dart_pattern, full_content, re.DOTALL)
-            if matches:
-                changes.append({
-                    "path": "lib/main.dart",
-                    "action": "modify",
-                    "content": matches[0].strip(),
-                    "description": task_description,
-                    "lines_changed": 0,
-                    "lines_preserved": 0,
-                })
-        
-        # Update code changes in state
+        # Extract code changes from result
         code_changes = state.get("code_changes", {}).copy()
-        for change in changes:
-            code_changes[change["path"]] = change["content"]
-            
-            # Build detailed message with change stats
-            lines_changed = change.get("lines_changed", 0)
-            lines_preserved = change.get("lines_preserved", 0)
-            if lines_changed or lines_preserved:
-                message = f"{change['description']} (modified {lines_changed} lines, preserved {lines_preserved} lines)"
-            else:
-                message = change["description"]
-            
-            await connection_manager.send_file_operation(
-                project_id=project_id,
-                agent="flutter_engineer",
-                operation=change["action"],
-                file_path=change["path"],
-                message=message,
-                details={
-                    "lines_changed": lines_changed,
-                    "lines_preserved": lines_preserved,
-                    "is_surgical": is_surgical_edit,
-                },
-            )
+        if result.get("changes"):
+            for change in result["changes"]:
+                if change.get("path") and change.get("content"):
+                    code_changes[change["path"]] = change["content"]
+                    await connection_manager.send_file_operation(
+                        project_id=project_id,
+                        agent="flutter_engineer",
+                        operation=change.get("action", "modify"),
+                        file_path=change["path"],
+                        message=change.get("description", task_description),
+                    )
         
-        if not changes:
-            logger.warning(f"No code extracted from response. Content preview: {full_content[:300]}")
-            await broadcast_status(project_id, "flutter_engineer", "warning", "No code changes extracted")
-        else:
-            status_msg = f"Generated {len(changes)} file(s)"
-            if is_surgical_edit:
-                status_msg = f"✅ Applied surgical edit to {len(changes)} file(s)"
-            await broadcast_status(project_id, "flutter_engineer", "completed", status_msg)
+        await broadcast_status(project_id, "flutter_engineer", "completed", f"Completed: {task_description[:50]}")
         
-        new_state = mark_step_completed(state, step["id"], {"changes": changes})
+        new_state = mark_step_completed(state, step["id"], result)
         new_state["code_changes"] = code_changes
         new_state["current_agent"] = "flutter_engineer"
         
@@ -550,10 +691,13 @@ Return JSON with format:
 
 
 async def code_reviewer_node(state: WorkflowState) -> WorkflowState:
-    """Code Reviewer agent node - reviews code changes."""
+    """Code Reviewer agent node - reviews code changes using CodeReviewerAgent."""
+    from app.agents.base import AgentContext
+    from app.agents.code_reviewer import CodeReviewerAgent
+    
     step = get_next_executable_step(state)
     if not step or step["agent"] != "code_reviewer":
-        # If no explicit review step, check if we have changes to review
+        # If no explicit review step, check if we have changes to review  
         if not state.get("code_changes"):
             return state
         step = {"id": -1, "agent": "code_reviewer"}
@@ -562,61 +706,34 @@ async def code_reviewer_node(state: WorkflowState) -> WorkflowState:
     
     await broadcast_status(project_id, "code_reviewer", "started", "Reviewing code changes...")
     
-    llm = create_llm()
-    
-    # Format changes for review
-    changes_str = ""
-    for path, content in state.get("code_changes", {}).items():
-        changes_str += f"\n### {path}\n```dart\n{content[:2000]}\n```\n"
-    
-    system_prompt = CODE_REVIEWER_PROMPT.format(changes=changes_str or "No changes to review")
-    
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content="Review the code changes above and provide your assessment."),
-    ]
+    context = AgentContext(
+        project_id=state["project_id"],
+        user_id=state["user_id"],
+        github_token=state.get("github_token", ""),
+        repo_full_name=state.get("repo_full_name", ""),
+        current_branch=state["current_branch"],
+        task_id=state["task_id"],
+    )
     
     try:
-        # Stream the response for real-time updates
-        full_content = ""
-        chunk_count = 0
+        agent = CodeReviewerAgent(context)
         
-        async for chunk in llm.astream(messages):
-            chunk_text = ""
-            if hasattr(chunk, 'content'):
-                if isinstance(chunk.content, list):
-                    chunk_text = " ".join(
-                        part.get("text", "") if isinstance(part, dict) else str(part)
-                        for part in chunk.content
-                    )
-                elif chunk.content:
-                    chunk_text = str(chunk.content)
-            
-            if chunk_text:
-                full_content += chunk_text
-                chunk_count += 1
-                
-                # Send streaming updates every few chunks
-                if chunk_count % 5 == 0:
-                    await connection_manager.broadcast_to_project(
-                        project_id,
-                        {
-                            "type": "llm_stream",
-                            "agent": "code_reviewer",
-                            "chunk": chunk_text,
-                            "accumulated_length": len(full_content),
-                        }
-                    )
+        # Format changes for review
+        changes = []
+        for path, content in state.get("code_changes", {}).items():
+            changes.append({
+                "file_path": path,
+                "content": content,
+                "action": "modify",
+            })
         
-        logger.debug(f"Code reviewer response length: {len(full_content)}")
-        
-        review_data = extract_json_from_response(full_content)
+        result = await agent.run({"changes": changes})
         
         review_result = {
-            "approved": review_data.get("approved", True),
-            "issues": review_data.get("issues", []),
-            "suggestions": review_data.get("suggestions", []),
-            "severity": review_data.get("severity", "none"),
+            "approved": result.get("approved", True),
+            "issues": result.get("issues", []),
+            "suggestions": result.get("suggestions", []),
+            "severity": result.get("severity", "none"),
         }
         
         status = "approved" if review_result["approved"] else "needs_revision"
@@ -744,7 +861,7 @@ async def build_deploy_node(state: WorkflowState) -> WorkflowState:
 async def react_engineer_node(state: WorkflowState) -> WorkflowState:
     """React Engineer agent node - generates React/TypeScript code."""
     from app.agents.base import AgentContext
-    from app.agents.react_engineer import ReactEngineerAgent
+    from app.agents.platform.react_engineer import ReactEngineerAgent
     
     step = get_next_executable_step(state)
     if not step or step["agent"] != "react_engineer":
@@ -791,7 +908,7 @@ async def react_engineer_node(state: WorkflowState) -> WorkflowState:
 async def nextjs_engineer_node(state: WorkflowState) -> WorkflowState:
     """Next.js Engineer agent node - generates Next.js App Router code."""
     from app.agents.base import AgentContext
-    from app.agents.nextjs_engineer import NextjsEngineerAgent
+    from app.agents.platform.nextjs_engineer import NextjsEngineerAgent
     
     step = get_next_executable_step(state)
     if not step or step["agent"] != "nextjs_engineer":
@@ -837,7 +954,7 @@ async def nextjs_engineer_node(state: WorkflowState) -> WorkflowState:
 async def react_native_engineer_node(state: WorkflowState) -> WorkflowState:
     """React Native Engineer agent node - generates React Native code."""
     from app.agents.base import AgentContext
-    from app.agents.react_native_engineer import ReactNativeEngineerAgent
+    from app.agents.platform.react_native_engineer import ReactNativeEngineerAgent
     
     step = get_next_executable_step(state)
     if not step or step["agent"] != "react_native_engineer":
@@ -883,7 +1000,7 @@ async def react_native_engineer_node(state: WorkflowState) -> WorkflowState:
 async def backend_integration_node(state: WorkflowState) -> WorkflowState:
     """Backend Integration agent node - sets up Supabase/Firebase/Serverpod."""
     from app.agents.base import AgentContext
-    from app.agents.backend_integration import BackendIntegrationAgent
+    from app.agents.platform.backend_integration import BackendIntegrationAgent
     
     step = get_next_executable_step(state)
     if not step or step["agent"] != "backend_integration":
@@ -980,7 +1097,11 @@ async def memory_node(state: WorkflowState) -> WorkflowState:
 # ROUTING
 # =============================================================================
 
-def route_next_agent(state: WorkflowState) -> Literal["flutter_engineer", "react_engineer", "nextjs_engineer", "react_native_engineer", "backend_integration", "code_reviewer", "git_operator", "build_deploy", "memory", "__end__"]:
+def route_next_agent(state: WorkflowState) -> Literal[
+    "sage", "scout", "scholar", "scribe", "strategist", "vision", "analyst", "artisan",
+    "flutter_engineer", "react_engineer", "nextjs_engineer", "react_native_engineer", "backend_integration",
+    "code_reviewer", "git_operator", "build_deploy", "memory", "__end__"
+]:
     """Determine the next agent to run based on state."""
     if state.get("has_error"):
         return "memory"
@@ -992,54 +1113,84 @@ def route_next_agent(state: WorkflowState) -> Literal["flutter_engineer", "react
     
     if next_step:
         agent = next_step["agent"]
-        # Map agent names to valid node names
+        # Map agent names to valid node names (all 18 agents)
         valid_agents = [
+            # Specialized (8)
+            "sage", "scout", "scholar", "scribe", 
+            "strategist", "vision", "analyst", "artisan",
+            # Platform (5)
             "flutter_engineer", "react_engineer", "nextjs_engineer", 
             "react_native_engineer", "backend_integration",
+            # Operations (4)
             "code_reviewer", "git_operator", "build_deploy", "memory"
         ]
         if agent in valid_agents:
             return agent
         # Default based on detected framework or fall back to flutter
         framework = state.get("detected_framework", "flutter")
-        framework_to_agent = {
-            "flutter": "flutter_engineer",
-            "react": "react_engineer",
-            "nextjs": "nextjs_engineer",
-            "react_native": "react_native_engineer",
-        }
-        return framework_to_agent.get(framework, "flutter_engineer")
+        return get_primary_agent_for_framework(framework)
     
     return "memory"
 
 
 def create_workflow_graph() -> StateGraph:
-    """Create the LangGraph workflow graph with multi-platform support."""
+    """Create the LangGraph workflow graph with multi-agent orchestration.
+    
+    Flow: Conductor -> Planner -> Engineers/Specialized Agents -> Review -> Git -> Memory
+    """
     graph = StateGraph(WorkflowState)
     
-    # Core nodes
-    graph.add_node("planner", planner_node)
-    graph.add_node("flutter_engineer", flutter_engineer_node)
-    graph.add_node("code_reviewer", code_reviewer_node)
-    graph.add_node("git_operator", git_operator_node)
-    graph.add_node("build_deploy", build_deploy_node)
-    graph.add_node("memory", memory_node)
+    # Orchestration nodes (NEW)
+    graph.add_node("conductor", conductor_node)
+    graph.add_node("sage", sage_node)
+    graph.add_node("scout", scout_node)
+    graph.add_node("scholar", scholar_node)
+    graph.add_node("scribe", scribe_node)
+    graph.add_node("strategist", strategist_node)
+    graph.add_node("vision", vision_node)
+    graph.add_node("analyst", analyst_node)
+    graph.add_node("artisan", artisan_node)
     
-    # New platform-specific nodes
+    # Planning node
+    graph.add_node("planner", planner_node)
+    
+    # Platform engineer nodes
+    graph.add_node("flutter_engineer", flutter_engineer_node)
     graph.add_node("react_engineer", react_engineer_node)
     graph.add_node("nextjs_engineer", nextjs_engineer_node)
     graph.add_node("react_native_engineer", react_native_engineer_node)
     graph.add_node("backend_integration", backend_integration_node)
     
-    graph.set_entry_point("planner")
+    # Operations nodes
+    graph.add_node("code_reviewer", code_reviewer_node)
+    graph.add_node("git_operator", git_operator_node)
+    graph.add_node("build_deploy", build_deploy_node)
+    graph.add_node("memory", memory_node)
     
-    # Edge mapping for all agents
+    # Set Conductor as entry point (master orchestrator)
+    graph.set_entry_point("conductor")
+    
+    # Conductor always goes to planner
+    graph.add_edge("conductor", "planner")
+    
+    # Edge mapping for all agents (all 19 agents)
     edge_mapping = {
+        # Specialized agents (8)
+        "sage": "sage",
+        "scout": "scout",
+        "scholar": "scholar",
+        "scribe": "scribe",
+        "strategist": "strategist",
+        "vision": "vision",
+        "analyst": "analyst",
+        "artisan": "artisan",
+        # Platform engineers (5)
         "flutter_engineer": "flutter_engineer",
         "react_engineer": "react_engineer",
         "nextjs_engineer": "nextjs_engineer",
         "react_native_engineer": "react_native_engineer",
         "backend_integration": "backend_integration",
+        # Operations (4)
         "code_reviewer": "code_reviewer",
         "git_operator": "git_operator",
         "build_deploy": "build_deploy",
@@ -1047,15 +1198,28 @@ def create_workflow_graph() -> StateGraph:
         END: END,
     }
     
+    # Planner routes to appropriate agents
     graph.add_conditional_edges("planner", route_next_agent, edge_mapping)
     
-    # All engineer agents can route to any other agent
-    all_agents = [
+    # All specialized agents can route
+    specialized_agents = [
+        "sage", "scout", "scholar", "scribe", 
+        "strategist", "vision", "analyst", "artisan"
+    ]
+    for agent in specialized_agents:
+        graph.add_conditional_edges(agent, route_next_agent, edge_mapping)
+    
+    # All platform engineers can route to any other agent
+    platform_agents = [
         "flutter_engineer", "react_engineer", "nextjs_engineer", 
         "react_native_engineer", "backend_integration",
-        "code_reviewer", "git_operator", "build_deploy"
     ]
-    for agent in all_agents:
+    for agent in platform_agents:
+        graph.add_conditional_edges(agent, route_next_agent, edge_mapping)
+    
+    # Operations agents can route
+    ops_agents = ["code_reviewer", "git_operator", "build_deploy"]
+    for agent in ops_agents:
         graph.add_conditional_edges(agent, route_next_agent, edge_mapping)
     
     graph.add_edge("memory", END)

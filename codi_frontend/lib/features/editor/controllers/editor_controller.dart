@@ -28,9 +28,15 @@ class EditorController extends GetxController
   final buildProgress = 0.0.obs;
   final previewUrl = RxnString();
   final errorMessage = RxnString();
+  final isChatVisible = false.obs;  // Chat panel visibility
 
   late final TabController tabController;
   final currentTab = EditorTab.preview.obs;
+
+  /// Toggle chat panel visibility
+  void toggleChat() {
+    isChatVisible.value = !isChatVisible.value;
+  }
 
   void setTab(EditorTab tab) {
     final index = tab == EditorTab.preview ? 0 : 1;
