@@ -21,6 +21,7 @@ class ProjectsController extends GetxController {
   final isLoading = false.obs;
   final isCreating = false.obs;
   final errorMessage = RxnString();
+  final currentStatus = 'active'.obs;
 
   @override
   void onInit() {
@@ -29,12 +30,16 @@ class ProjectsController extends GetxController {
   }
 
   /// Load all projects
-  Future<void> loadProjects() async {
+  Future<void> loadProjects({String? status}) async {
+    if (status != null) {
+      currentStatus.value = status;
+    }
+    
     isLoading.value = true;
     errorMessage.value = null;
 
     try {
-      final result = await _projectService.getProjects();
+      final result = await _projectService.getProjects(status: currentStatus.value);
       projects.value = result;
     } catch (e) {
       AppLogger.error('Failed to load projects', error: e);
@@ -92,7 +97,9 @@ class ProjectsController extends GetxController {
       final result = await _projectService.createProject(request);
       
       if (result != null) {
-        projects.insert(0, result);
+        if (currentStatus.value == 'active') {
+          projects.insert(0, result);
+        }
         
         Get.snackbar(
           'Success!',
@@ -119,7 +126,57 @@ class ProjectsController extends GetxController {
     }
   }
 
-  /// Delete a project
+  /// Archive a project
+  Future<bool> archiveProject(int id) async {
+    try {
+      final success = await _projectService.archiveProject(id);
+      
+      if (success) {
+        projects.removeWhere((p) => p.id == id);
+        
+        Get.snackbar(
+          'Archived',
+          'Project has been moved to archive',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.info,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
+        return true;
+      }
+      return false;
+    } catch (e) {
+      AppLogger.error('Failed to archive project', error: e);
+      return false;
+    }
+  }
+  
+  /// Restore a project
+  Future<bool> restoreProject(int id) async {
+    try {
+      final success = await _projectService.restoreProject(id);
+      
+      if (success) {
+        projects.removeWhere((p) => p.id == id);
+        
+        Get.snackbar(
+          'Restored',
+          'Project has been restored',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: AppColors.success,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
+        return true;
+      }
+      return false;
+    } catch (e) {
+      AppLogger.error('Failed to restore project', error: e);
+      return false;
+    }
+  }
+
+  /// Delete a project (Hard Delete)
   Future<bool> deleteProject(int id) async {
     try {
       final success = await _projectService.deleteProject(id);
@@ -129,7 +186,7 @@ class ProjectsController extends GetxController {
         
         Get.snackbar(
           'Deleted',
-          'Project has been deleted',
+          'Project has been permanently deleted',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: AppColors.textSecondary,
           colorText: Colors.white,
@@ -144,12 +201,77 @@ class ProjectsController extends GetxController {
     }
   }
 
+  /// Confirm and archive project
+  Future<void> confirmArchiveProject(ProjectModel project) async {
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Archive Project'),
+        content: Text('Are you sure you want to archive "${project.name}"?\nIt will be hidden from the main list.'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.info,
+            ),
+            child: const Text('Archive'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await archiveProject(project.id);
+    }
+  }
+  
+  /// Confirm and restore project
+  Future<void> confirmRestoreProject(ProjectModel project) async {
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Restore Project'),
+        content: Text('Restore "${project.name}" to active projects?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Get.back(result: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+            ),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      await restoreProject(project.id);
+    }
+  }
+
   /// Confirm and delete project
   Future<void> confirmDeleteProject(ProjectModel project) async {
     final result = await Get.dialog<bool>(
       AlertDialog(
-        title: const Text('Delete Project'),
-        content: Text('Are you sure you want to delete "${project.name}"?'),
+        title: const Text('Delete Project Permanently'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to delete "${project.name}"?'),
+            SizedBox(height: 8),
+            Text(
+              'This action cannot be undone. All files, deployments, and databases associated with this project will be destroyed.',
+              style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
@@ -160,7 +282,7 @@ class ProjectsController extends GetxController {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.error,
             ),
-            child: const Text('Delete'),
+            child: const Text('Delete Permanently'),
           ),
         ],
       ),
@@ -173,6 +295,10 @@ class ProjectsController extends GetxController {
 
   /// Navigate to editor
   void openEditor(ProjectModel project) {
+    if (project.status == 'archived') {
+      confirmRestoreProject(project);
+      return;
+    }
     selectedProject.value = project;
     SharedPrefs.setLastProjectId(project.id);
     Get.toNamed(AppRoutes.editor.replaceFirst(':id', project.id.toString()));

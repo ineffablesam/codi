@@ -52,24 +52,58 @@ class ProjectsListScreen extends StatelessWidget {
           }),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: controller.refresh,
-        child: Obx(() {
-          if (controller.isLoading.value && controller.projects.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (controller.errorMessage.value != null &&
-              controller.projects.isEmpty) {
-            return _buildErrorState(controller);
-          }
-
-          if (controller.projects.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          return _buildProjectsList(controller);
-        }),
+      body: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
+            TabBar(
+              onTap: (index) {
+                controller.loadProjects(status: index == 0 ? 'active' : 'archived');
+              },
+              tabs: const [
+                Tab(text: 'Active'),
+                Tab(text: 'Archived'),
+              ],
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.primary,
+            ),
+            Expanded(
+              child: TabBarView(
+                physics: const NeverScrollableScrollPhysics(), // Disable swipe to avoid accidental refetch
+                children: [
+                  // Active Projects
+                  RefreshIndicator(
+                    onRefresh: () => controller.loadProjects(status: 'active'),
+                    child: Obx(() {
+                      if (controller.isLoading.value && controller.projects.isEmpty) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (controller.projects.isEmpty) {
+                        return _buildEmptyState(false);
+                      }
+                      return _buildProjectsList(controller, false);
+                    }),
+                  ),
+                  
+                  // Archived Projects
+                  RefreshIndicator(
+                    onRefresh: () => controller.loadProjects(status: 'archived'),
+                    child: Obx(() {
+                      if (controller.isLoading.value && controller.projects.isEmpty) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (controller.projects.isEmpty) {
+                        return _buildEmptyState(true);
+                      }
+                      return _buildProjectsList(controller, true);
+                    }),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Get.toNamed(AppRoutes.createProject),
@@ -83,7 +117,7 @@ class ProjectsListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProjectsList(ProjectsController controller) {
+  Widget _buildProjectsList(ProjectsController controller, bool isArchived) {
     return ListView.builder(
       padding: EdgeInsets.all(16.r),
       itemCount: controller.projects.length,
@@ -93,7 +127,15 @@ class ProjectsListScreen extends StatelessWidget {
           padding: EdgeInsets.only(bottom: 12.h),
           child: ProjectCard(
             project: project,
-            onTap: () => controller.openEditor(project),
+            onTap: () {
+               if (isArchived) {
+                 controller.confirmRestoreProject(project);
+               } else {
+                 controller.openEditor(project);
+               }
+            },
+            onArchive: () => controller.confirmArchiveProject(project),
+            onRestore: () => controller.confirmRestoreProject(project),
             onDelete: () => controller.confirmDeleteProject(project),
           ),
         );
@@ -101,27 +143,21 @@ class ProjectsListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isArchived) {
     return Center(
       child: Padding(
         padding: EdgeInsets.all(32.r),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.network(
-              ImagePlaceholders.emptyState,
-              width: 200.w,
-              height: 150.h,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.folder_open,
-                size: 80.r,
-                color: AppColors.textTertiary,
-              ),
+            Icon(
+              isArchived ? Icons.archive_outlined : Icons.folder_open,
+              size: 80.r,
+              color: AppColors.textTertiary,
             ),
             SizedBox(height: 24.h),
             Text(
-              AppStrings.noProjects,
+              isArchived ? 'No archived projects' : AppStrings.noProjects,
               style: GoogleFonts.inter(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w600,
@@ -130,19 +166,23 @@ class ProjectsListScreen extends StatelessWidget {
             ),
             SizedBox(height: 8.h),
             Text(
-              AppStrings.noProjectsSubtitle,
+              isArchived 
+                  ? 'Projects you archive will appear here'
+                  : AppStrings.noProjectsSubtitle,
               style: GoogleFonts.inter(
                 fontSize: 14.sp,
                 color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 32.h),
-            ElevatedButton.icon(
-              onPressed: () => Get.toNamed(AppRoutes.createProject),
-              icon: Icon(Icons.add, size: 20.r),
-              label: Text(AppStrings.createProject),
-            ),
+            if (!isArchived) ...[
+              SizedBox(height: 32.h),
+              ElevatedButton.icon(
+                onPressed: () => Get.toNamed(AppRoutes.createProject),
+                icon: Icon(Icons.add, size: 20.r),
+                label: Text(AppStrings.createProject),
+              ),
+            ],
           ],
         ),
       ),

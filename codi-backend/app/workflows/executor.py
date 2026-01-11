@@ -114,25 +114,24 @@ class WorkflowExecutor:
         self,
         project_id: int,
         user_id: int,
-        github_token: str,
         task_id: str,
+        project_folder: str | None = None,
     ) -> None:
         """Initialize the workflow executor.
 
         Args:
             project_id: Project ID
             user_id: User ID
-            github_token: Decrypted GitHub access token
             task_id: Unique task identifier
+            project_folder: Local path to project repository
         """
         self.project_id = project_id
         self.user_id = user_id
-        self.github_token = github_token
         self.task_id = task_id
+        self.project_folder = project_folder
         self._graph = None
-        self._repo_full_name: Optional[str] = None
         self._current_branch: str = "main"
-        self._framework: Optional[str] = None
+        self._framework: str | None = None
 
     async def _load_project_info(self) -> None:
         """Load project information from database."""
@@ -144,22 +143,17 @@ class WorkflowExecutor:
             project = result.scalar_one_or_none()
 
             if project:
-                self._repo_full_name = project.github_repo_full_name
-                self._current_branch = project.github_current_branch or "main"
-                self._framework = project.framework  # Load framework from project
+                self.project_folder = project.local_path
+                self._current_branch = project.git_branch or "main"
+                self._framework = project.framework
 
     def _patch_agent_context(self, state: WorkflowState) -> None:
-        """Patch agent context with GitHub token.
-
-        This is a workaround since the state doesn't carry the token
-        for security reasons. Each agent node will have access to the
-        token through the executor.
+        """Patch agent context with project folder.
 
         Args:
             state: Current workflow state
         """
-        # The agents will be initialized with the token in the graph nodes
-        # This method can be used for additional patching if needed
+        # Agents access project folder through context
         pass
 
     async def _handle_conversational(self, message: str) -> Dict[str, Any]:
@@ -184,15 +178,16 @@ class WorkflowExecutor:
 
 You help developers build applications by:
 - Generating code for Flutter, Next.js, React, React Native
-- Modifying existing code files in their GitHub repositories
+- Modifying existing code files in local project repositories  
 - Reviewing code quality
-- Committing changes to GitHub automatically
+- Committing changes to local Git automatically
 
 Capabilities:
 - Multi-framework support (Flutter, Next.js, React, React Native)
-- GitHub integration for seamless code management
+- Local Git integration for seamless code management
 - Intelligent code generation using specialized AI agents
 - Real-time collaboration and updates
+- Docker-based deployment and preview
 
 For casual conversation:
 - Be friendly, helpful, and concise
@@ -339,9 +334,8 @@ The more details you provide, the better I can help! 🎯"""
             user_id=self.user_id,
             task_id=self.task_id,
             user_message=user_message,
-            repo_full_name=self._repo_full_name,
+            project_folder=self.project_folder,
             current_branch=self._current_branch,
-            github_token=self.github_token,
             detected_framework=self._framework,
         )
 
@@ -377,7 +371,7 @@ The more details you provide, the better I can help! 🎯"""
 
         try:
             # Run the graph
-            # Note: In a full implementation, we'd need to inject the github_token
+            # Note: Agents access project_folder through AgentContext
             # into each agent. This is done through AgentContext in the node functions.
             final_state = await self.graph.ainvoke(
                 initial_state,
@@ -477,18 +471,18 @@ The more details you provide, the better I can help! 🎯"""
 async def run_workflow(
     project_id: int,
     user_id: int,
-    github_token: str,
     task_id: str,
     user_message: str,
+    project_folder: str | None = None,
 ) -> Dict[str, Any]:
     """Convenience function to run a workflow.
 
     Args:
         project_id: Project ID
         user_id: User ID
-        github_token: Decrypted GitHub access token
         task_id: Unique task identifier
         user_message: The user's request message
+        project_folder: Local path to project repository
 
     Returns:
         Final workflow state
@@ -496,8 +490,8 @@ async def run_workflow(
     executor = WorkflowExecutor(
         project_id=project_id,
         user_id=user_id,
-        github_token=github_token,
         task_id=task_id,
+        project_folder=project_folder,
     )
 
     return await executor.execute(user_message)

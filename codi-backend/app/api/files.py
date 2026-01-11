@@ -1,16 +1,20 @@
-"""File operations API endpoints for code editor."""
+"""File operations API endpoints for code editor - Local Git version.
+
+All file operations use local Git repositories. No GitHub API dependency.
+"""
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user, get_db_session, require_github_token
+from app.api.dependencies import get_current_user, get_db_session
 from app.models.project import Project
 from app.models.user import User
-from app.services.github import GitHubService
+from app.services.git_service import get_git_service
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -23,15 +27,12 @@ class FileUpdateRequest(BaseModel):
     file_path: str = Field(..., description="Path to the file in the repository")
     content: str = Field(..., description="New file content")
     message: str = Field(default="Update file", description="Commit message")
-    sha: Optional[str] = Field(None, description="Current file SHA for conflict detection")
-    branch: Optional[str] = Field(None, description="Branch to update (defaults to main)")
 
 
 class FileChange(BaseModel):
     """Single file change for multi-file commit."""
     path: str
     content: str
-    sha: Optional[str] = None
 
 
 class MultiFileCommitRequest(BaseModel):
@@ -40,37 +41,35 @@ class MultiFileCommitRequest(BaseModel):
     message: str
     branch: str = "main"
     create_branch: bool = False
-    base_branch: Optional[str] = "main"
 
 
 class CreateBranchRequest(BaseModel):
     """Request model for creating a new branch."""
     branch_name: str
-    base_branch: str = "main"
+    base_ref: str = "HEAD"
 
 
-def build_tree_hierarchy(flat_items: List[Dict]) -> List[Dict]:
-    """Convert flat GitHub tree into hierarchical structure."""
+def build_tree_from_local(files: List[Dict]) -> List[Dict]:
+    """Convert flat file list into hierarchical tree structure."""
     root: Dict[str, Any] = {"children": {}}
     
-    for item in flat_items:
-        path_parts = item["path"].split("/")
+    for file_info in files:
+        path_parts = file_info["path"].split("/")
         current = root
         
         for i, part in enumerate(path_parts):
             if i == len(path_parts) - 1:
-                # Leaf node
-                if item["type"] == "blob":
+                # Leaf node (file or empty dir)
+                if file_info["is_file"]:
                     current["children"][part] = {
-                        "path": item["path"],
+                        "path": file_info["path"],
                         "type": "file",
-                        "size": item.get("size", 0),
-                        "sha": item.get("sha"),
+                        "size": file_info.get("size", 0),
                     }
-                elif item["type"] == "tree":
+                else:
                     if part not in current["children"]:
                         current["children"][part] = {
-                            "path": item["path"],
+                            "path": file_info["path"],
                             "type": "directory",
                             "children": {},
                         }
@@ -108,7 +107,6 @@ def convert_tree_to_list(tree_dict: Dict) -> List[Dict]:
                 "path": node["path"],
                 "type": "file",
                 "size": node.get("size", 0),
-                "sha": node.get("sha"),
             })
     return result
 
@@ -135,46 +133,54 @@ def calculate_total_size(tree: List[Dict]) -> int:
     return total
 
 
-@router.get("/{project_id}/files/tree")
-async def get_file_tree(
-    project_id: int,
-    branch: Optional[str] = Query(None, description="Branch name"),
-    session: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-    github_token: str = Depends(require_github_token),
-) -> Dict[str, Any]:
-    """Fetch complete file tree from GitHub repository using Trees API."""
-    # Verify project ownership
+async def _get_project_or_404(project_id: int, user_id: int, session: AsyncSession) -> Project:
+    """Get project or raise 404."""
     result = await session.execute(
         select(Project).where(
             Project.id == project_id,
-            Project.owner_id == current_user.id,
+            Project.owner_id == user_id,
         )
     )
     project = result.scalar_one_or_none()
-    
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-    
-    github_service = GitHubService(github_token)
-    target_branch = branch or project.github_current_branch or "main"
+    if not project.local_path:
+        raise HTTPException(status_code=400, detail="Project has no local repository")
+    return project
+
+
+@router.get("/{project_id}/files/tree")
+async def get_file_tree(
+    project_id: int,
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Fetch complete file tree from local repository."""
+    project = await _get_project_or_404(project_id, current_user.id, session)
+    git_service = get_git_service(project.local_path)
     
     try:
-        # Get recursive tree from GitHub
-        tree_data = github_service.get_repository_tree(
-            repo_full_name=project.github_repo_full_name,
-            branch=target_branch,
-            recursive=True,
-        )
+        # Get all files recursively
+        all_files = git_service.list_all_files()
+        
+        # Build file info list
+        file_infos = []
+        for file_path in all_files:
+            full_path = os.path.join(project.local_path, file_path)
+            file_infos.append({
+                "path": file_path,
+                "is_file": True,
+                "size": os.path.getsize(full_path) if os.path.exists(full_path) else 0,
+            })
         
         # Build hierarchical structure
-        tree = build_tree_hierarchy(tree_data)
+        tree = build_tree_from_local(file_infos)
         
         return {
             "tree": tree,
             "total_files": count_files(tree),
             "total_size": calculate_total_size(tree),
-            "branch": target_branch,
+            "branch": project.git_branch,
             "last_updated": datetime.utcnow().isoformat(),
         }
     except Exception as e:
@@ -186,46 +192,25 @@ async def get_file_tree(
 async def read_file(
     project_id: int,
     file_path: str = Query(..., description="Path to file"),
-    branch: Optional[str] = Query(None, description="Branch name"),
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-    github_token: str = Depends(require_github_token),
 ) -> Dict[str, Any]:
-    """Read file content from GitHub repository."""
-    result = await session.execute(
-        select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id,
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    github_service = GitHubService(github_token)
-    target_branch = branch or project.github_current_branch or "main"
+    """Read file content from local repository."""
+    project = await _get_project_or_404(project_id, current_user.id, session)
+    git_service = get_git_service(project.local_path)
     
     try:
-        # Get file content and metadata
-        content, sha = github_service.get_file_content_with_sha(
-            repo_full_name=project.github_repo_full_name,
-            file_path=file_path,
-            ref=target_branch,
-        )
-        
-        # Detect language from file extension
+        content = git_service.get_file_content(file_path)
         language = detect_language(file_path)
         
         return {
             "file_path": file_path,
             "content": content,
-            "sha": sha,
             "language": language,
-            "branch": target_branch,
+            "branch": project.git_branch,
         }
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
     except Exception as e:
         logger.error(f"Failed to read file: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to read file: {str(e)}")
@@ -237,43 +222,35 @@ async def update_file(
     request: FileUpdateRequest,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-    github_token: str = Depends(require_github_token),
 ) -> Dict[str, Any]:
-    """Update file content in GitHub repository."""
-    result = await session.execute(
-        select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id,
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    github_service = GitHubService(github_token)
-    branch = request.branch or project.github_current_branch or "main"
+    """Update file content in local repository and commit."""
+    project = await _get_project_or_404(project_id, current_user.id, session)
+    git_service = get_git_service(project.local_path)
     
     try:
-        result = github_service.create_or_update_file(
-            repo_full_name=project.github_repo_full_name,
-            file_path=request.file_path,
-            content=request.content,
-            commit_message=request.message,
-            branch=branch,
+        # Write file
+        git_service.write_file(request.file_path, request.content)
+        
+        # Commit change
+        commit_info = git_service.commit(
+            message=request.message,
+            files=[request.file_path],
         )
+        
+        # Update project commit SHA
+        project.git_commit_sha = commit_info.sha
+        await session.commit()
         
         logger.info(f"Updated file {request.file_path} in project {project_id}")
         
         return {
             "success": True,
             "file_path": request.file_path,
-            "new_sha": result.get("commit_sha"),
-            "branch": branch,
             "commit": {
-                "sha": result.get("commit_sha"),
+                "sha": commit_info.short_sha,
                 "message": request.message,
-            }
+            },
+            "branch": project.git_branch,
         }
     except Exception as e:
         logger.error(f"Failed to update file: {str(e)}")
@@ -283,44 +260,30 @@ async def update_file(
 @router.get("/{project_id}/commits")
 async def get_commit_history(
     project_id: int,
-    page: int = Query(1, ge=1, description="Page number"),
-    per_page: int = Query(20, ge=1, le=100, description="Results per page"),
-    branch: Optional[str] = Query(None, description="Branch name"),
-    file_path: Optional[str] = Query(None, description="Filter by file path"),
+    limit: int = Query(20, ge=1, le=100, description="Number of commits"),
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-    github_token: str = Depends(require_github_token),
 ) -> Dict[str, Any]:
     """Get commit history for the project."""
-    result = await session.execute(
-        select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id,
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    github_service = GitHubService(github_token)
-    target_branch = branch or project.github_current_branch or "main"
+    project = await _get_project_or_404(project_id, current_user.id, session)
+    git_service = get_git_service(project.local_path)
     
     try:
-        commits_data = github_service.get_commits(
-            repo_full_name=project.github_repo_full_name,
-            branch=target_branch,
-            page=page,
-            per_page=per_page,
-            path=file_path,
-        )
+        commits = git_service.get_log(n=limit)
         
         return {
-            "commits": commits_data["commits"],
-            "total_count": commits_data.get("total_count", len(commits_data["commits"])),
-            "page": page,
-            "per_page": per_page,
-            "branch": target_branch,
+            "commits": [
+                {
+                    "sha": c.sha,
+                    "short_sha": c.short_sha,
+                    "message": c.message,
+                    "author": c.author,
+                    "timestamp": c.timestamp.isoformat(),
+                    "files_changed": c.files_changed,
+                }
+                for c in commits
+            ],
+            "branch": project.git_branch,
         }
     except Exception as e:
         logger.error(f"Failed to fetch commits: {str(e)}")
@@ -333,56 +296,44 @@ async def commit_multiple_files(
     request: MultiFileCommitRequest,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-    github_token: str = Depends(require_github_token),
 ) -> Dict[str, Any]:
     """Commit multiple file changes in a single commit."""
-    result = await session.execute(
-        select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id,
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    github_service = GitHubService(github_token)
+    project = await _get_project_or_404(project_id, current_user.id, session)
+    git_service = get_git_service(project.local_path)
     
     try:
         # Create branch if requested
         if request.create_branch:
-            github_service.create_branch(
-                repo_full_name=project.github_repo_full_name,
-                branch_name=request.branch,
-                from_branch=request.base_branch or "main",
-            )
+            git_service.create_branch(request.branch)
+            git_service.checkout(request.branch)
+            project.git_branch = request.branch
         
-        # Prepare files for commit
-        files = [
-            {"path": f.path, "content": f.content}
-            for f in request.files
-        ]
+        # Write all files
+        file_paths = []
+        for file_change in request.files:
+            git_service.write_file(file_change.path, file_change.content)
+            file_paths.append(file_change.path)
         
-        # Commit multiple files
-        commit_result = github_service.commit_multiple_files(
-            repo_full_name=project.github_repo_full_name,
-            files=files,
-            commit_message=request.message,
-            branch=request.branch,
+        # Commit all files
+        commit_info = git_service.commit(
+            message=request.message,
+            files=file_paths,
         )
         
-        logger.info(f"Committed {len(files)} files to project {project_id}")
+        # Update project commit SHA
+        project.git_commit_sha = commit_info.sha
+        await session.commit()
+        
+        logger.info(f"Committed {len(file_paths)} files to project {project_id}")
         
         return {
             "success": True,
             "commit": {
-                "sha": commit_result.get("commit_sha"),
+                "sha": commit_info.short_sha,
                 "message": request.message,
-                "files_changed": len(files),
+                "files_changed": len(file_paths),
             },
-            "branch": request.branch,
-            "files_changed": len(files),
+            "branch": project.git_branch,
         }
     except Exception as e:
         logger.error(f"Failed to commit files: {str(e)}")
@@ -394,27 +345,18 @@ async def list_branches(
     project_id: int,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-    github_token: str = Depends(require_github_token),
 ) -> Dict[str, Any]:
     """List all branches in the repository."""
-    result = await session.execute(
-        select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id,
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    github_service = GitHubService(github_token)
+    project = await _get_project_or_404(project_id, current_user.id, session)
+    git_service = get_git_service(project.local_path)
     
     try:
-        branches = github_service.list_branches(project.github_repo_full_name)
+        branches = git_service.get_branches()
+        current = git_service.get_current_branch()
         return {
             "branches": branches,
-            "default_branch": project.github_current_branch or "main",
+            "current_branch": current,
+            "default_branch": project.git_branch,
         }
     except Exception as e:
         logger.error(f"Failed to list branches: {str(e)}")
@@ -427,37 +369,50 @@ async def create_branch(
     request: CreateBranchRequest,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-    github_token: str = Depends(require_github_token),
 ) -> Dict[str, Any]:
-    """Create a new branch from base branch."""
-    result = await session.execute(
-        select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id,
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    github_service = GitHubService(github_token)
+    """Create a new branch."""
+    project = await _get_project_or_404(project_id, current_user.id, session)
+    git_service = get_git_service(project.local_path)
     
     try:
-        branch_result = github_service.create_branch(
-            repo_full_name=project.github_repo_full_name,
-            branch_name=request.branch_name,
-            from_branch=request.base_branch,
-        )
-        return {"success": True, "branch": branch_result}
+        branch_name = git_service.create_branch(request.branch_name, request.base_ref)
+        return {"success": True, "branch": branch_name}
     except Exception as e:
         logger.error(f"Failed to create branch: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/{project_id}/branches/checkout")
+async def checkout_branch(
+    project_id: int,
+    branch: str = Query(..., description="Branch name to checkout"),
+    session: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Checkout a branch."""
+    project = await _get_project_or_404(project_id, current_user.id, session)
+    git_service = get_git_service(project.local_path)
+    
+    try:
+        commit_sha = git_service.checkout(branch)
+        
+        # Update project branch
+        project.git_branch = branch
+        project.git_commit_sha = commit_sha
+        await session.commit()
+        
+        return {
+            "success": True,
+            "branch": branch,
+            "commit_sha": commit_sha,
+        }
+    except Exception as e:
+        logger.error(f"Failed to checkout branch: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def detect_language(file_path: str) -> str:
     """Detect programming language from file extension."""
-    import os
     extension_map = {
         ".dart": "dart",
         ".py": "python",

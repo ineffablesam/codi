@@ -30,11 +30,8 @@ class NextjsEngineerAgent(BaseAgent):
         @tool
         def read_file(file_path: str) -> str:
             """Read a file from the repository."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                return self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                return self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
@@ -44,32 +41,22 @@ class NextjsEngineerAgent(BaseAgent):
         @tool
         def write_file(file_path: str, content: str, commit_message: str) -> str:
             """Write content to a file in the repository."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                result = self.github_service.create_or_update_file(
-                    repo_full_name=self.context.repo_full_name,
-                    file_path=file_path,
-                    content=content,
-                    commit_message=commit_message,
-                    branch=self.context.current_branch,
-                )
-                return json.dumps(result)
+                self.git_service.write_file(file_path=file_path, content=content)
+                result = self.git_service.commit(message=commit_message, files=[file_path])
+                return json.dumps(result.__dict__, default=str)
             except Exception as e:
                 return f"Error: {e}"
 
         @tool
         def list_directory(path: str = "app") -> str:
             """List files in a directory (defaults to app/ for App Router)."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                files = self.github_service.list_files(
-                    repo_full_name=self.context.repo_full_name,
+                files = self.git_service.list_files(
                     path=path,
                     ref=self.context.current_branch,
                 )
-                return json.dumps(files, indent=2)
+                return json.dumps([f.__dict__ for f in files], indent=2)
             except Exception as e:
                 return f"Error: {e}"
 
@@ -98,18 +85,16 @@ class NextjsEngineerAgent(BaseAgent):
             messages = [HumanMessage(content=prompt)]
             
             # ReAct loop: allow agent to use tools before generating final answer
-            # Limit to 5 turns to prevent infinite loops
+            # Limit to 10 turns to allow more exploration
             final_response = None
+            max_turns = 10
             
-            for i in range(5):
+            for i in range(max_turns):
                 response = await self.invoke(messages)
                 
                 # Check if the model wants to call tools
                 if hasattr(response, 'tool_calls') and response.tool_calls:
                     logger.info(f"Agent requested {len(response.tool_calls)} tool calls in turn {i+1}")
-                    logger.debug(f"Tool calls metadata: {response.tool_calls}")
-                    if hasattr(response, 'additional_kwargs'):
-                        logger.debug(f"Additional kwargs: {response.additional_kwargs}")
                     
                     messages.append(response)  # Add the AI's tool request to history
                     
@@ -139,14 +124,17 @@ class NextjsEngineerAgent(BaseAgent):
                                 name=tool_name
                             ))
                     
-                    # Continue to next iteration to give tool outputs back to LLM
-                    continue
+                    # If this was the last turn, we need one more invoke to get the final answer
+                    if i == max_turns - 1:
+                        logger.warning("Reached max turns with tool calls, performing one last invocation for final answer")
+                        final_response = await self.invoke(messages)
+                    else:
+                        # Continue to next iteration to give tool outputs back to LLM
+                        continue
+                else:
+                    # No tool calls, this is our final response
+                    final_response = response
                 
-                # If no tool calls (or content is present alongside them), treat as final response
-                # Ideally, if tool_calls matches, we loop. If text content, we stop.
-                # However, some models return both. If we have tool calls, we prioritized them above.
-                # So if we are here, we either have no tool calls, or we decided to stop.
-                final_response = response
                 break
             
             if not final_response:
@@ -242,37 +230,49 @@ If you need to create MULTIPLE files, include MULTIPLE code blocks, each with it
 
     def _get_content(self, response) -> str:
         """Extract text content from LLM response."""
-        # Debug logging to see what we're working with
-        logger.debug(f"Response type: {type(response)}")
-        logger.debug(f"Response dir: {[attr for attr in dir(response) if not attr.startswith('_')]}")
+        if not response:
+            return ""
+
+        # Debug logging
+        logger.debug(f"Extracting content from response type: {type(response)}")
         
-        # Handle AIMessage.text property vs method
-        if hasattr(response, 'text'):
-            text = response.text
-            logger.debug(f"response.text type: {type(text)}, value: {str(text)[:200] if text else 'None'}")
-            # If it's a callable (method), call it
-            if callable(text):
-                text = text()
-                logger.debug(f"After calling text(): {str(text)[:200] if text else 'None'}")
-            if text and isinstance(text, str):
-                return text
-        
-        # Handle content as list (e.g., multipart responses)
+        # Priority 1: Direct content attribute (could be str or list of dicts)
         if hasattr(response, 'content'):
             content = response.content
-            logger.debug(f"response.content type: {type(content)}, value: {str(content)[:200] if content else 'None'}")
-            if isinstance(content, list):
-                return "\n".join(
-                    p.get('text', str(p)) if isinstance(p, dict) else str(p) 
-                    for p in content
-                )
             if isinstance(content, str):
                 return content
-            if content:
-                return str(content)
+            if isinstance(content, list):
+                # Filter out non-text parts (like tool calls embedded in content)
+                text_parts = []
+                for part in content:
+                    if isinstance(part, str):
+                        text_parts.append(part)
+                    elif isinstance(part, dict):
+                        if part.get('type') == 'text' and part.get('text'):
+                            text_parts.append(part['text'])
+                        elif 'text' in part and not any(k in part for k in ['tool_calls', 'function_call']):
+                            text_parts.append(part['text'])
+                    elif hasattr(part, 'text') and isinstance(part.text, str):
+                        text_parts.append(part.text)
+                
+                if text_parts:
+                    return "\n".join(text_parts)
         
-        logger.warning(f"Could not extract content from response: {str(response)[:500]}")
-        return ""
+        # Priority 2: text attribute/method
+        if hasattr(response, 'text'):
+            text = response.text
+            if callable(text):
+                try:
+                    text = text()
+                except Exception:
+                    pass
+            if isinstance(text, str):
+                return text
+
+        # Fallback: Stringify but try to be smart
+        res_str = str(response)
+        logger.warning(f"Fallback content extraction for {type(response)}")
+        return res_str
 
     def _extract_code(self, text: str) -> Optional[str]:
         """Extract code from markdown code blocks (legacy single-file extraction)."""

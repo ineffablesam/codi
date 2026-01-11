@@ -30,11 +30,8 @@ class ReactNativeEngineerAgent(BaseAgent):
         @tool
         def read_file(file_path: str) -> str:
             """Read a file from the repository."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                return self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                return self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
@@ -44,32 +41,22 @@ class ReactNativeEngineerAgent(BaseAgent):
         @tool
         def write_file(file_path: str, content: str, commit_message: str) -> str:
             """Write content to a file in the repository."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                result = self.github_service.create_or_update_file(
-                    repo_full_name=self.context.repo_full_name,
-                    file_path=file_path,
-                    content=content,
-                    commit_message=commit_message,
-                    branch=self.context.current_branch,
-                )
-                return json.dumps(result)
+                self.git_service.write_file(file_path=file_path, content=content)
+                result = self.git_service.commit(message=commit_message, files=[file_path])
+                return json.dumps(result.__dict__, default=str)
             except Exception as e:
                 return f"Error: {e}"
 
         @tool
         def list_directory(path: str = "src") -> str:
             """List files in a directory."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                files = self.github_service.list_files(
-                    repo_full_name=self.context.repo_full_name,
+                files = self.git_service.list_files(
                     path=path,
                     ref=self.context.current_branch,
                 )
-                return json.dumps(files, indent=2)
+                return json.dumps([f.__dict__ for f in files], indent=2)
             except Exception as e:
                 return f"Error: {e}"
 

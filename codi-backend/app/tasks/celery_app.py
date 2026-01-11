@@ -56,6 +56,9 @@ def init_worker_db(**kwargs):
     
     logger.info("Initializing database connections for worker process")
     
+    # Ensure event loop exists for this worker
+    get_worker_loop()
+    
     # Create a new engine for this worker process
     db_module.engine = create_async_engine(
         settings.database_url,
@@ -103,8 +106,23 @@ def shutdown_worker_db(**kwargs):
     _worker_db_initialized = False
 
 
+# Worker-level event loop management
+_worker_loop = None
+
+def get_worker_loop():
+    """Get or create a persistent event loop for this worker process."""
+    global _worker_loop
+    if _worker_loop is None or _worker_loop.is_closed():
+        try:
+            _worker_loop = asyncio.get_event_loop()
+        except RuntimeError:
+            _worker_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(_worker_loop)
+    return _worker_loop
+
+
 def run_async(coro: Any) -> Any:
-    """Run an async coroutine in Celery task context.
+    """Run an async coroutine in Celery task context using a persistent loop.
 
     Args:
         coro: Coroutine to run
@@ -112,22 +130,11 @@ def run_async(coro: Any) -> Any:
     Returns:
         Result of the coroutine
     """
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    loop = get_worker_loop()
     
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        # Clean up pending tasks before closing
-        try:
-            pending = asyncio.all_tasks(loop)
-            for task in pending:
-                task.cancel()
-            if pending:
-                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception:
-            pass
-        loop.close()
+    # We use run_until_complete but we DON'T close the loop
+    # because it's shared across all tasks in this worker process.
+    return loop.run_until_complete(coro)
 
 
 @celery_app.task(bind=True, name="tasks.run_agent_workflow")
@@ -137,7 +144,7 @@ def run_agent_workflow_task(
     project_id: int,
     user_id: int,
     user_message: str,
-    github_token_encrypted: str,
+    project_folder: str | None = None,
 ) -> Dict[str, Any]:
     """Celery task to run the agent workflow.
 
@@ -147,12 +154,11 @@ def run_agent_workflow_task(
         project_id: Project ID
         user_id: User ID
         user_message: User's message/command
-        github_token_encrypted: Encrypted GitHub access token
+        project_folder: Local path to project repository
 
     Returns:
         Dictionary with task results
     """
-    from app.services.encryption import encryption_service
     from app.workflows.executor import WorkflowExecutor
 
     logger.info(
@@ -165,15 +171,12 @@ def run_agent_workflow_task(
     start_time = datetime.utcnow()
 
     try:
-        # Decrypt GitHub token
-        github_token = encryption_service.decrypt_token(github_token_encrypted)
-
-        # Create workflow executor
+        # Create workflow executor with local project folder
         executor = WorkflowExecutor(
             project_id=project_id,
             user_id=user_id,
-            github_token=github_token,
             task_id=task_id,
+            project_folder=project_folder,
         )
 
         # Run the workflow (this is async, so we need to run it in the event loop)
@@ -219,123 +222,6 @@ def run_agent_workflow_task(
 
         raise
 
-
-@celery_app.task(bind=True, name="tasks.trigger_build")
-def trigger_build_task(
-    self: Any,
-    project_id: int,
-    repo_full_name: str,
-    github_token_encrypted: str,
-    branch: str = "main",
-) -> Dict[str, Any]:
-    """Celery task to trigger a GitHub Actions build.
-
-    Args:
-        self: Celery task instance
-        project_id: Project ID
-        repo_full_name: Full repository name (owner/repo)
-        github_token_encrypted: Encrypted GitHub access token
-        branch: Branch to build
-
-    Returns:
-        Dictionary with build trigger results
-    """
-    from app.services.encryption import encryption_service
-    from app.services.github import GitHubService
-
-    logger.info(
-        f"Triggering build for {repo_full_name}",
-        project_id=project_id,
-        branch=branch,
-    )
-
-    try:
-        # Decrypt GitHub token
-        github_token = encryption_service.decrypt_token(github_token_encrypted)
-
-        # Create GitHub service
-        github_service = GitHubService(access_token=github_token)
-
-        # Trigger workflow
-        result = github_service.trigger_workflow(
-            repo_full_name=repo_full_name,
-            workflow_file="flutter_web_build.yml",
-            ref=branch,
-        )
-
-        logger.info(
-            f"Build triggered successfully",
-            project_id=project_id,
-            workflow_id=result.get("workflow_id"),
-        )
-
-        return {
-            "status": "triggered",
-            "project_id": project_id,
-            "repo_full_name": repo_full_name,
-            "branch": branch,
-            "workflow": result,
-        }
-
-    except Exception as e:
-        logger.error(
-            f"Failed to trigger build",
-            project_id=project_id,
-            error=str(e),
-        )
-        raise
-
-
-@celery_app.task(bind=True, name="tasks.poll_build_status")
-def poll_build_status_task(
-    self: Any,
-    project_id: int,
-    repo_full_name: str,
-    run_id: int,
-    github_token_encrypted: str,
-) -> Dict[str, Any]:
-    """Celery task to poll build status.
-
-    Args:
-        self: Celery task instance
-        project_id: Project ID
-        repo_full_name: Full repository name (owner/repo)
-        run_id: Workflow run ID
-        github_token_encrypted: Encrypted GitHub access token
-
-    Returns:
-        Dictionary with build status
-    """
-    from app.services.encryption import encryption_service
-    from app.services.github import GitHubService
-
-    try:
-        # Decrypt GitHub token
-        github_token = encryption_service.decrypt_token(github_token_encrypted)
-
-        # Create GitHub service
-        github_service = GitHubService(access_token=github_token)
-
-        # Get run status
-        status = github_service.get_workflow_run_status(
-            repo_full_name=repo_full_name,
-            run_id=run_id,
-        )
-
-        return {
-            "project_id": project_id,
-            "run_id": run_id,
-            "status": status,
-        }
-
-    except Exception as e:
-        logger.error(
-            f"Failed to poll build status",
-            project_id=project_id,
-            run_id=run_id,
-            error=str(e),
-        )
-        raise
 
 
 @celery_app.task(name="tasks.cleanup_old_logs")

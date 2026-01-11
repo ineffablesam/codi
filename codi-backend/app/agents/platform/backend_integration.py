@@ -50,11 +50,8 @@ class BackendIntegrationAgent(BaseAgent):
         @tool
         def read_file(file_path: str) -> str:
             """Read a file from the repository."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                return self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                return self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
@@ -64,17 +61,10 @@ class BackendIntegrationAgent(BaseAgent):
         @tool
         def write_file(file_path: str, content: str, commit_message: str) -> str:
             """Write content to a file in the repository."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                result = self.github_service.create_or_update_file(
-                    repo_full_name=self.context.repo_full_name,
-                    file_path=file_path,
-                    content=content,
-                    commit_message=commit_message,
-                    branch=self.context.current_branch,
-                )
-                return json.dumps(result)
+                self.git_service.write_file(file_path=file_path, content=content)
+                result = self.git_service.commit(message=commit_message, files=[file_path])
+                return json.dumps(result.__dict__, default=str)
             except Exception as e:
                 return f"Error: {e}"
 
@@ -88,22 +78,18 @@ class BackendIntegrationAgent(BaseAgent):
             Returns:
                 Result of the operation
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
                 vars_dict = json.loads(env_vars)
                 content = "# Environment Variables\n# Copy this file to .env and fill in your values\n\n"
                 for key, description in vars_dict.items():
                     content += f"# {description}\n{key}=\n\n"
 
-                result = self.github_service.create_or_update_file(
-                    repo_full_name=self.context.repo_full_name,
-                    file_path=".env.example",
-                    content=content,
-                    commit_message="Add environment variables template",
-                    branch=self.context.current_branch,
+                self.git_service.write_file(file_path=".env.example", content=content)
+                result = self.git_service.commit(
+                    message="Add environment variables template",
+                    files=[".env.example"],
                 )
-                return json.dumps(result)
+                return json.dumps(result.__dict__, default=str)
             except Exception as e:
                 return f"Error: {e}"
 

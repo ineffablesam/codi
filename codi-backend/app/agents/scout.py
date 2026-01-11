@@ -1,16 +1,21 @@
-"""Scout Agent - Fast Codebase Exploration.
+"""Scout Agent - Fast Codebase Exploration (Local Git).
 
 Model: gemini-3-flash (or gemini-3-flash-preview when FORCE_GEMINI_OVERALL=true)
 Role: Blazing-fast codebase exploration, contextual grep, pattern matching
+
+All operations use local project folders. No GitHub API dependency.
 """
 from typing import Any, Dict, List, Optional
+import fnmatch
+import os
+from pathlib import Path
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool, tool
 
 from app.agents.base import AgentContext, BaseAgent
 from app.config import settings
-from app.services.github import GitHubService
+from app.services.git_service import get_git_service
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,14 +41,6 @@ Think like `grep` with context. Your searches should:
 - Use multiple search angles for complex queries
 - Cast a wide net, then narrow down
 - Report what you find, even if partial
-
-### When to Use Scout vs Direct Tools
-| Use Scout | Use Direct grep/glob |
-|-----------|---------------------|
-| Multiple search angles needed | You know exactly what to search |
-| Unfamiliar module structure | Single keyword/pattern suffices |
-| Cross-layer pattern discovery | Known file location |
-| Need contextual understanding | Simple file listing |
 
 ### Response Format
 ```
@@ -84,7 +81,7 @@ when exploring different aspects of the codebase simultaneously.
 
 
 class ScoutAgent(BaseAgent):
-    """Fast Codebase Exploration Agent.
+    """Fast Codebase Exploration Agent (Local Git version).
     
     Optimized for speed: quick searches, pattern matching, file discovery.
     Works well as a parallel background task.
@@ -114,13 +111,12 @@ class ScoutAgent(BaseAgent):
             self._create_search_files_tool(),
             self._create_search_content_tool(),
             self._create_list_files_tool(),
+            self._create_read_file_tool(),
         ]
     
     def _create_search_files_tool(self) -> BaseTool:
         """Create a tool to search for files by name pattern."""
-        github_service = self.github_service
-        repo = self.context.repo_full_name
-        branch = self.context.current_branch
+        context = self.context
         
         @tool
         async def search_files(pattern: str) -> str:
@@ -129,15 +125,18 @@ class ScoutAgent(BaseAgent):
             Args:
                 pattern: File name pattern to search for (e.g., '*.dart', 'test_*.py')
             """
+            if not context.project_folder:
+                return "Error: No project folder configured"
+            
             try:
-                # Use GitHub API to search repository
-                tree = github_service.get_file_tree(repo, ref=branch)
+                git_service = get_git_service(context.project_folder)
+                all_files = git_service.list_all_files()
                 matches = []
                 
-                import fnmatch
-                for item in tree:
-                    if fnmatch.fnmatch(item.get("path", ""), pattern):
-                        matches.append(item["path"])
+                for file_path in all_files:
+                    # Match both full path and just filename
+                    if fnmatch.fnmatch(file_path, pattern) or fnmatch.fnmatch(os.path.basename(file_path), pattern):
+                        matches.append(file_path)
                 
                 if matches:
                     return f"Found {len(matches)} files matching '{pattern}':\n" + "\n".join(f"- {m}" for m in matches[:50])
@@ -149,9 +148,7 @@ class ScoutAgent(BaseAgent):
     
     def _create_search_content_tool(self) -> BaseTool:
         """Create a tool to search file contents."""
-        github_service = self.github_service
-        repo = self.context.repo_full_name
-        branch = self.context.current_branch
+        context = self.context
         
         @tool
         async def search_content(query: str, file_extension: Optional[str] = None) -> str:
@@ -161,18 +158,42 @@ class ScoutAgent(BaseAgent):
                 query: Text to search for
                 file_extension: Optional file extension to filter (e.g., '.dart', '.py')
             """
+            if not context.project_folder:
+                return "Error: No project folder configured"
+            
             try:
-                # Use GitHub search API
-                results = github_service.search_code(
-                    query=query,
-                    repo=repo,
-                    extension=file_extension,
-                )
+                git_service = get_git_service(context.project_folder)
+                all_files = git_service.list_all_files()
+                results = []
+                
+                for file_path in all_files:
+                    # Filter by extension if provided
+                    if file_extension and not file_path.endswith(file_extension):
+                        continue
+                    
+                    try:
+                        content = git_service.get_file_content(file_path)
+                        lines = content.split('\n')
+                        
+                        for i, line in enumerate(lines, 1):
+                            if query.lower() in line.lower():
+                                results.append({
+                                    'path': file_path,
+                                    'line': i,
+                                    'content': line.strip()[:100],
+                                })
+                                if len(results) >= 50:
+                                    break
+                    except:
+                        continue
+                    
+                    if len(results) >= 50:
+                        break
                 
                 if results:
                     output = [f"Found {len(results)} matches for '{query}':"]
                     for r in results[:20]:
-                        output.append(f"- {r.get('path', 'unknown')}:{r.get('line', '?')}")
+                        output.append(f"- {r['path']}:{r['line']} - {r['content'][:60]}...")
                     return "\n".join(output)
                 return f"No matches found for '{query}'"
             except Exception as e:
@@ -182,9 +203,7 @@ class ScoutAgent(BaseAgent):
     
     def _create_list_files_tool(self) -> BaseTool:
         """Create a tool to list files in a directory."""
-        github_service = self.github_service
-        repo = self.context.repo_full_name
-        branch = self.context.current_branch
+        context = self.context
         
         @tool
         async def list_files(path: str = "") -> str:
@@ -193,22 +212,55 @@ class ScoutAgent(BaseAgent):
             Args:
                 path: Directory path to list (empty for root)
             """
+            if not context.project_folder:
+                return "Error: No project folder configured"
+            
             try:
-                contents = github_service.get_contents(repo, path, ref=branch)
+                git_service = get_git_service(context.project_folder)
+                files = git_service.list_files(path=path)
                 
-                if not contents:
+                if not files:
                     return f"No files found in '{path or '/'}'"
                 
                 output = [f"Contents of '{path or '/'}':"]
-                for item in contents:
-                    item_type = "📁" if item.get("type") == "dir" else "📄"
-                    output.append(f"  {item_type} {item.get('name', 'unknown')}")
+                for item in files:
+                    item_type = "📁" if not item.is_file else "📄"
+                    output.append(f"  {item_type} {item.name}")
                 
                 return "\n".join(output)
             except Exception as e:
                 return f"Error listing files: {e}"
         
         return list_files
+    
+    def _create_read_file_tool(self) -> BaseTool:
+        """Create a tool to read a file's contents."""
+        context = self.context
+        
+        @tool
+        async def read_file(file_path: str) -> str:
+            """Read the contents of a file.
+            
+            Args:
+                file_path: Path to the file within the repository
+            """
+            if not context.project_folder:
+                return "Error: No project folder configured"
+            
+            try:
+                git_service = get_git_service(context.project_folder)
+                content = git_service.get_file_content(file_path)
+                
+                # Truncate if too long
+                if len(content) > 10000:
+                    return content[:10000] + f"\n\n... (truncated, {len(content)} total characters)"
+                return content
+            except FileNotFoundError:
+                return f"File not found: {file_path}"
+            except Exception as e:
+                return f"Error reading file: {e}"
+        
+        return read_file
     
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Run the Scout agent for exploration.

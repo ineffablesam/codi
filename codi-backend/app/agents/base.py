@@ -10,7 +10,8 @@ from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel
 
 from app.config import settings
-from app.services.github import GitHubService
+from app.services.git_service import LocalGitService, get_git_service
+from app.services.docker_service import DockerService, get_docker_service
 from app.utils.logging import get_logger
 from app.websocket.connection_manager import connection_manager
 
@@ -22,8 +23,7 @@ class AgentContext(BaseModel):
 
     project_id: int
     user_id: int
-    github_token: str
-    repo_full_name: Optional[str] = None
+    project_folder: Optional[str] = None  # Local path: /var/codi/repos/user_id/project_slug
     current_branch: str = "main"
     task_id: Optional[str] = None
 
@@ -65,7 +65,8 @@ class BaseAgent(ABC):
         """
         self.context = context
         self._llm: Optional[BaseChatModel] = None
-        self._github_service: Optional[GitHubService] = None
+        self._git_service: Optional[LocalGitService] = None
+        self._docker_service: Optional[DockerService] = None
         self._tools: Optional[List[BaseTool]] = None
         self._start_time: Optional[datetime] = None
 
@@ -112,11 +113,21 @@ class BaseAgent(ABC):
         return self._llm
 
     @property
-    def github_service(self) -> GitHubService:
-        """Get the GitHub service instance (lazy initialization)."""
-        if self._github_service is None:
-            self._github_service = GitHubService(access_token=self.context.github_token)
-        return self._github_service
+    def git_service(self) -> LocalGitService:
+        """Get the local Git service instance (lazy initialization)."""
+        if self._git_service is None:
+            if self.context.project_folder:
+                self._git_service = get_git_service(self.context.project_folder)
+            else:
+                self._git_service = get_git_service()
+        return self._git_service
+
+    @property
+    def docker_service(self) -> DockerService:
+        """Get the Docker service instance (lazy initialization)."""
+        if self._docker_service is None:
+            self._docker_service = get_docker_service()
+        return self._docker_service
 
     @property
     def tools(self) -> List[BaseTool]:

@@ -10,20 +10,27 @@ import '../../../core/constants/app_colors.dart';
 import '../models/project_model.dart';
 
 /// Project card widget for list display
+/// Project card widget for list display
 class ProjectCard extends StatelessWidget {
   final ProjectModel project;
   final VoidCallback onTap;
+  final VoidCallback? onArchive;
+  final VoidCallback? onRestore;
   final VoidCallback? onDelete;
 
   const ProjectCard({
     super.key,
     required this.project,
     required this.onTap,
+    this.onArchive,
+    this.onRestore,
     this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
+    bool isArchived = project.status == 'archived';
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -55,8 +62,8 @@ class ProjectCard extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        AppColors.primary.withOpacity(0.8),
-                        AppColors.secondary.withOpacity(0.8),
+                        isArchived ? Colors.grey : AppColors.primary.withOpacity(0.8),
+                        isArchived ? Colors.grey.shade400 : AppColors.secondary.withOpacity(0.8),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12.r),
@@ -114,11 +121,59 @@ class ProjectCard extends StatelessWidget {
                   ),
                 ),
                 
-                // Arrow icon
-                Icon(
-                  Icons.chevron_right,
-                  color: AppColors.textTertiary,
-                  size: 24.r,
+                // Actions Menu
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: AppColors.textTertiary,
+                    size: 24.r,
+                  ),
+                  onSelected: (value) {
+                    if (value == 'archive' && onArchive != null) {
+                      onArchive!();
+                    } else if (value == 'restore' && onRestore != null) {
+                      onRestore!();
+                    } else if (value == 'delete' && onDelete != null) {
+                      onDelete!();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (!isArchived)
+                      PopupMenuItem(
+                        value: 'archive',
+                        child: Row(
+                          children: [
+                            Icon(Icons.archive_outlined, size: 20.r, color: AppColors.textSecondary),
+                            SizedBox(width: 8.w),
+                            Text('Archive', style: TextStyle(color: AppColors.textPrimary)),
+                          ],
+                        ),
+                      ),
+                    if (isArchived)
+                      PopupMenuItem(
+                        value: 'restore',
+                        child: Row(
+                          children: [
+                            Icon(Icons.restore, size: 20.r, color: AppColors.success),
+                            SizedBox(width: 8.w),
+                            Text('Restore', style: TextStyle(color: AppColors.textPrimary)),
+                          ],
+                        ),
+                      ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline, size: 20.r, color: AppColors.error),
+                          SizedBox(width: 8.w),
+                          Text(
+                            isArchived ? 'Delete Permanently' : 'Delete', 
+                            style: TextStyle(color: AppColors.error),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -179,7 +234,7 @@ class ProjectCard extends StatelessWidget {
                   const Spacer(),
                   
                   // Deploy badge
-                  if (project.hasDeployment)
+                  if (project.hasDeployment && !isArchived)
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                       decoration: BoxDecoration(
@@ -218,6 +273,8 @@ class ProjectCard extends StatelessWidget {
     switch (project.status) {
       case 'active':
         return AppColors.success;
+      case 'archived':
+        return Colors.grey;
       case 'building':
         return AppColors.warning;
       case 'deploying':
@@ -233,6 +290,8 @@ class ProjectCard extends StatelessWidget {
     switch (project.status) {
       case 'active':
         return 'Active';
+      case 'archived':
+        return 'Archived';
       case 'building':
         return 'Building...';
       case 'deploying':

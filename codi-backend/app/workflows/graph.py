@@ -131,8 +131,7 @@ async def conductor_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -145,7 +144,6 @@ async def conductor_node(state: WorkflowState) -> WorkflowState:
             "message": state["user_message"],
             "context": {
                 "framework": state.get("detected_framework", "flutter"),
-                "repo": state.get("repo_full_name", ""),
             }
         })
         
@@ -195,8 +193,7 @@ async def sage_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -242,8 +239,7 @@ async def scout_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -291,8 +287,7 @@ async def scholar_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -332,8 +327,7 @@ async def scribe_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -373,8 +367,7 @@ async def strategist_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -415,8 +408,7 @@ async def vision_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -456,8 +448,7 @@ async def analyst_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -499,8 +490,7 @@ async def artisan_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -547,8 +537,7 @@ async def planner_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -648,8 +637,7 @@ async def flutter_engineer_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -709,8 +697,7 @@ async def code_reviewer_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state.get("repo_full_name", ""),
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -775,8 +762,7 @@ async def git_operator_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state["repo_full_name"],
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -833,8 +819,7 @@ async def build_deploy_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state["repo_full_name"],
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -875,8 +860,7 @@ async def react_engineer_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state["repo_full_name"],
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -922,8 +906,7 @@ async def nextjs_engineer_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state["repo_full_name"],
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -968,8 +951,7 @@ async def react_native_engineer_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state["repo_full_name"],
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -1013,8 +995,7 @@ async def backend_integration_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token=state.get("github_token", ""),
-        repo_full_name=state["repo_full_name"],
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )
@@ -1055,8 +1036,7 @@ async def memory_node(state: WorkflowState) -> WorkflowState:
     context = AgentContext(
         project_id=state["project_id"],
         user_id=state["user_id"],
-        github_token="",
-        repo_full_name=state["repo_full_name"],
+        project_folder=state.get("project_folder"),
         current_branch=state["current_branch"],
         task_id=state["task_id"],
     )

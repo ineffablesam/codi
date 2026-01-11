@@ -7,13 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user, require_github_token
+from app.api.dependencies import get_current_user
 from app.database import get_db_session, get_db_context
 from app.models.project import Project
 from app.models.user import User
 from app.models.agent_task import AgentTask
 from app.schemas.agent import AgentTaskRequest, AgentTaskResponse, AgentTaskStatus
-from app.services.encryption import encryption_service
 from app.utils.logging import get_logger
 from app.utils.security import TokenPayload
 from app.websocket.connection_manager import connection_manager
@@ -29,7 +28,6 @@ async def submit_agent_task(
     task_request: AgentTaskRequest,
     session: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-    github_token: str = Depends(require_github_token),
 ) -> AgentTaskResponse:
     """Submit a task for the agent workflow to process.
 
@@ -38,7 +36,6 @@ async def submit_agent_task(
         task_request: Task request with user message
         session: Database session
         current_user: Authenticated user
-        github_token: GitHub access token
 
     Returns:
         Task response with task ID
@@ -72,20 +69,17 @@ async def submit_agent_task(
     session.add(agent_task)
     await session.commit()
 
-    # Queue the task (in production, this goes to Celery)
+    # Queue the task with local project folder
     try:
         from app.tasks.celery_app import run_agent_workflow_task
 
-        # Get encrypted token
-        encrypted_token = current_user.github_access_token_encrypted
-
-        # Submit to Celery
+        # Submit to Celery with local project folder
         celery_result = run_agent_workflow_task.delay(
             task_id=task_id,
             project_id=project_id,
             user_id=current_user.id,
             user_message=task_request.message,
-            github_token_encrypted=encrypted_token,
+            project_folder=project.local_path,
         )
 
         logger.info(
@@ -103,7 +97,6 @@ async def submit_agent_task(
 
     except Exception as e:
         logger.error(f"Failed to submit task: {e}")
-        # Fall back to sync notification
         return AgentTaskResponse(
             task_id=task_id,
             status="error",
@@ -129,17 +122,20 @@ async def submit_agent_task_internal(
     """
     task_id = f"task_{uuid.uuid4().hex[:12]}"
 
-    # Get user's encrypted token
+    # Get project's local path
     async with get_db_context() as session:
         result = await session.execute(
-            select(User).where(User.id == user_id)
+            select(Project).where(
+                Project.id == project_id,
+                Project.owner_id == user_id,
+            )
         )
-        user = result.scalar_one_or_none()
+        project = result.scalar_one_or_none()
 
-        if not user or not user.github_access_token_encrypted:
-            return {"task_id": task_id, "status": "error", "message": "No GitHub token"}
+        if not project:
+            return {"task_id": task_id, "status": "error", "message": "Project not found"}
 
-        encrypted_token = user.github_access_token_encrypted
+        project_folder = project.local_path
 
         # Persist the task in the database
         agent_task = AgentTask(
@@ -160,7 +156,7 @@ async def submit_agent_task_internal(
             project_id=project_id,
             user_id=user_id,
             user_message=message,
-            github_token_encrypted=encrypted_token,
+            project_folder=project_folder,
         )
 
         return {"task_id": task_id, "status": "queued"}

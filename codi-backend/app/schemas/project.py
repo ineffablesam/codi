@@ -22,7 +22,6 @@ class ProjectCreate(ProjectBase):
     platform_type: Optional[str] = Field("mobile", description="Target platform: mobile, web")
     framework: Optional[str] = Field("flutter", description="Framework: flutter, react, nextjs, react_native")
     backend_type: Optional[str] = Field(None, description="Backend: supabase, firebase, serverpod")
-    deployment_platform: Optional[str] = Field(None, description="Deployment: github_pages, vercel, netlify")
 
 
 class ProjectUpdate(BaseModel):
@@ -35,7 +34,6 @@ class ProjectUpdate(BaseModel):
     platform_type: Optional[str] = None
     framework: Optional[str] = None
     backend_type: Optional[str] = None
-    deployment_platform: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
@@ -47,12 +45,10 @@ class ProjectResponse(BaseModel):
     owner_id: int
     name: str
     description: Optional[str] = None
-    github_repo_name: Optional[str] = None
-    github_repo_url: Optional[str] = None
-    github_repo_full_name: Optional[str] = None
-    github_clone_url: Optional[str] = None
-    github_default_branch: Optional[str] = None
-    github_current_branch: Optional[str] = None
+    # Local Git repository (Codi-managed)
+    local_path: Optional[str] = None
+    git_commit_sha: Optional[str] = None
+    git_branch: str = "main"
     is_private: bool = False
     framework_version: Optional[str] = None
     dart_version: Optional[str] = None
@@ -60,7 +56,6 @@ class ProjectResponse(BaseModel):
     platform_type: Optional[str] = None
     framework: Optional[str] = None
     backend_type: Optional[str] = None
-    deployment_platform: Optional[str] = None
     # Deployment info
     deployment_url: Optional[str] = None
     deployment_provider: Optional[str] = None
@@ -89,22 +84,20 @@ class ProjectWithOwner(ProjectResponse):
     owner_avatar_url: Optional[str] = None
 
 
-class GitHubRepoInfo(BaseModel):
-    """Schema for GitHub repository information."""
+class LocalRepoInfo(BaseModel):
+    """Schema for local repository information."""
 
-    name: str
-    full_name: str
-    html_url: str
-    clone_url: str
-    default_branch: str
-    private: bool
+    path: str
+    slug: str
+    branch: str
+    commit_sha: Optional[str] = None
 
 
 class DeploymentInfo(BaseModel):
     """Schema for deployment information."""
 
     url: str
-    provider: str  # 'github_pages' or 'vercel'
+    provider: str  # 'local_docker' or 'external'
     status: str  # 'pending', 'deployed', 'failed'
     deployed_at: Optional[datetime] = None
     build_time_seconds: Optional[int] = None
@@ -115,8 +108,7 @@ class BuildInfo(BaseModel):
     """Schema for build information."""
 
     status: str  # 'pending', 'running', 'success', 'failed'
-    workflow_name: str
-    workflow_url: Optional[str] = None
+    build_type: str  # 'docker', 'local'
     commit_sha: Optional[str] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

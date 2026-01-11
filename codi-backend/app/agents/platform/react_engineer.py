@@ -38,12 +38,8 @@ class ReactEngineerAgent(BaseAgent):
             Returns:
                 File content
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
-
             try:
-                content = self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                content = self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
@@ -63,18 +59,10 @@ class ReactEngineerAgent(BaseAgent):
             Returns:
                 Result of the operation
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
-
             try:
-                result = self.github_service.create_or_update_file(
-                    repo_full_name=self.context.repo_full_name,
-                    file_path=file_path,
-                    content=content,
-                    commit_message=commit_message,
-                    branch=self.context.current_branch,
-                )
-                return json.dumps(result)
+                self.git_service.write_file(file_path=file_path, content=content)
+                result = self.git_service.commit(message=commit_message, files=[file_path])
+                return json.dumps(result.__dict__, default=str)
             except Exception as e:
                 return f"Error: {e}"
 
@@ -88,16 +76,12 @@ class ReactEngineerAgent(BaseAgent):
             Returns:
                 JSON list of files
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
-
             try:
-                files = self.github_service.list_files(
-                    repo_full_name=self.context.repo_full_name,
+                files = self.git_service.list_files(
                     path=path,
                     ref=self.context.current_branch,
                 )
-                return json.dumps(files, indent=2)
+                return json.dumps([f.__dict__ for f in files], indent=2)
             except Exception as e:
                 return f"Error: {e}"
 

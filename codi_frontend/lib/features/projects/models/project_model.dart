@@ -6,9 +6,17 @@ class ProjectModel {
   final int id;
   final String name;
   final String? description;
+  
+  // Local Git repository (new Codi v2)
+  final String? localPath;
+  final String? gitCommitSha;
+  final String gitBranch;
+  
+  // Legacy GitHub fields (kept for compatibility)
   final String? githubRepoFullName;
   final String? githubRepoUrl;
   final String? githubCurrentBranch;
+  
   final String status;
   final String? deploymentUrl;
   final String? lastBuildStatus;
@@ -31,6 +39,9 @@ class ProjectModel {
     required this.id,
     required this.name,
     this.description,
+    this.localPath,
+    this.gitCommitSha,
+    this.gitBranch = 'main',
     this.githubRepoFullName,
     this.githubRepoUrl,
     this.githubCurrentBranch,
@@ -54,6 +65,11 @@ class ProjectModel {
       id: json['id'] as int,
       name: json['name'] as String,
       description: json['description'] as String?,
+      // Local Git fields (Codi v2)
+      localPath: json['local_path'] as String?,
+      gitCommitSha: json['git_commit_sha'] as String?,
+      gitBranch: json['git_branch'] as String? ?? 'main',
+      // Legacy GitHub fields
       githubRepoFullName: json['github_repo_full_name'] as String?,
       githubRepoUrl: json['github_repo_url'] as String?,
       githubCurrentBranch: json['github_current_branch'] as String?,
@@ -80,6 +96,9 @@ class ProjectModel {
       'id': id,
       'name': name,
       'description': description,
+      'local_path': localPath,
+      'git_commit_sha': gitCommitSha,
+      'git_branch': gitBranch,
       'github_repo_full_name': githubRepoFullName,
       'github_repo_url': githubRepoUrl,
       'github_current_branch': githubCurrentBranch,
@@ -96,10 +115,17 @@ class ProjectModel {
     };
   }
 
+  // Helper getters
   bool get hasDeployment => deploymentUrl != null && deploymentUrl!.isNotEmpty;
   bool get isBuilding => status == 'building';
   bool get isDeploying => status == 'deploying';
   bool get isActive => status == 'active';
+  
+  /// Whether this project uses local Git (Codi v2)
+  bool get isLocalGit => localPath != null && localPath!.isNotEmpty;
+  
+  /// Current branch (prefers local Git, falls back to GitHub)
+  String get currentBranch => gitBranch.isNotEmpty ? gitBranch : (githubCurrentBranch ?? 'main');
   
   String get frameworkLabel {
     switch (framework) {
@@ -144,4 +170,3 @@ class CreateProjectRequest {
     };
   }
 }
-

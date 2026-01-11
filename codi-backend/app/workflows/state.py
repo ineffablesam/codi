@@ -45,9 +45,8 @@ class WorkflowState(TypedDict):
     project_id: int
     user_id: int
     task_id: str
-    repo_full_name: Optional[str]
+    project_folder: Optional[str]  # Local path: /var/codi/repos/user_id/project_slug
     current_branch: str
-    github_token: Optional[str]
 
     # User input
     user_message: str
@@ -88,9 +87,8 @@ def create_initial_state(
     user_id: int,
     task_id: str,
     user_message: str,
-    repo_full_name: Optional[str] = None,
+    project_folder: Optional[str] = None,
     current_branch: str = "main",
-    github_token: Optional[str] = None,
     detected_framework: Optional[str] = None,
 ) -> WorkflowState:
     """Create the initial workflow state.
@@ -100,9 +98,8 @@ def create_initial_state(
         user_id: User ID
         task_id: Unique task identifier
         user_message: User's request message
-        repo_full_name: GitHub repository full name
+        project_folder: Local path to project repository
         current_branch: Current git branch
-        github_token: GitHub access token for API operations
         detected_framework: Project framework (flutter, react, nextjs, react_native)
 
     Returns:
@@ -112,9 +109,8 @@ def create_initial_state(
         project_id=project_id,
         user_id=user_id,
         task_id=task_id,
-        repo_full_name=repo_full_name,
+        project_folder=project_folder,
         current_branch=current_branch,
-        github_token=github_token,
         user_message=user_message,
         messages=[],
         plan=None,
