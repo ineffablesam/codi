@@ -128,16 +128,12 @@ Return a JSON execution plan with this structure:
             Returns:
                 JSON string with file listing
             """
-            if not self.context.repo_full_name:
-                return json.dumps({"error": "No repository configured"})
-
             try:
-                files = self.github_service.list_files(
-                    repo_full_name=self.context.repo_full_name,
+                files = self.git_service.list_files(
                     path=path,
                     ref=self.context.current_branch,
                 )
-                return json.dumps(files, indent=2)
+                return json.dumps([f.__dict__ for f in files], indent=2)
             except Exception as e:
                 return json.dumps({"error": str(e)})
 
@@ -151,12 +147,8 @@ Return a JSON execution plan with this structure:
             Returns:
                 File content as string
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
-
             try:
-                content = self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                content = self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
@@ -171,13 +163,9 @@ Return a JSON execution plan with this structure:
             Returns:
                 JSON string with project structure summary
             """
-            if not self.context.repo_full_name:
-                return json.dumps({"error": "No repository configured"})
-
             try:
                 # Get root files
-                root_files = self.github_service.list_files(
-                    repo_full_name=self.context.repo_full_name,
+                root_files = self.git_service.list_files(
                     path="",
                     ref=self.context.current_branch,
                 )
@@ -185,8 +173,7 @@ Return a JSON execution plan with this structure:
                 # Get lib directory if it exists
                 lib_files = []
                 try:
-                    lib_files = self.github_service.list_files(
-                        repo_full_name=self.context.repo_full_name,
+                    lib_files = self.git_service.list_files(
                         path="lib",
                         ref=self.context.current_branch,
                     )
@@ -194,8 +181,8 @@ Return a JSON execution plan with this structure:
                     pass
 
                 structure = {
-                    "root": [f["name"] for f in root_files],
-                    "lib": [f["name"] for f in lib_files],
+                    "root": [f.name for f in root_files],
+                    "lib": [f.name for f in lib_files],
                 }
 
                 return json.dumps(structure, indent=2)
@@ -232,12 +219,10 @@ Return a JSON execution plan with this structure:
             )
 
             # Get project structure
-            project_structure = "{}"
-            if self.context.repo_full_name:
-                project_structure = await self.execute_tool(
-                    "get_project_structure",
-                    {},
-                )
+            project_structure = await self.execute_tool(
+                "get_project_structure",
+                {},
+            )
 
             # Create the planning prompt
             planning_prompt = f"""
@@ -246,7 +231,7 @@ User Request: {user_message}
 Current Project Structure:
 {project_structure}
 
-Repository: {self.context.repo_full_name or "Not configured"}
+Project Path: {self.context.project_folder or "Not configured"}
 Current Branch: {self.context.current_branch}
 
 Create a detailed execution plan to fulfill this request. Consider the existing project structure and determine what files need to be created or modified.

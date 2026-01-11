@@ -4,6 +4,18 @@ from app.models.project import Project
 from app.models.operation_log import OperationLog
 from app.models.agent_task import AgentTask
 from app.models.backend_connection import BackendConnection, ProjectBackendConfig
+from app.models.container import Container, ContainerStatus
+from app.models.deployment import Deployment, DeploymentStatus
 
-__all__ = ["User", "Project", "OperationLog", "AgentTask", "BackendConnection", "ProjectBackendConfig"]
-
+__all__ = [
+    "User",
+    "Project",
+    "OperationLog",
+    "AgentTask",
+    "BackendConnection",
+    "ProjectBackendConfig",
+    "Container",
+    "ContainerStatus",
+    "Deployment",
+    "DeploymentStatus",
+]

@@ -44,6 +44,9 @@ class DioClient {
     return dio;
   }
 
+  /// Get base URL for WebSocket connections
+  static String get baseUrl => Environment.apiBaseUrl;
+
   /// Reset Dio instance (useful for testing)
   static void reset() {
     _dio = null;

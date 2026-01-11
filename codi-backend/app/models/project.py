@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.operation_log import OperationLog
     from app.models.backend_connection import ProjectBackendConfig
+    from app.models.container import Container
+    from app.models.deployment import Deployment
 
 
 class ProjectStatus(str, Enum):
@@ -45,13 +47,10 @@ class Project(Base):
         index=True,
     )
 
-    # GitHub integration
-    github_repo_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    github_repo_full_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, index=True)
-    github_repo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    github_clone_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    github_default_branch: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="main")
-    github_current_branch: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="main")
+    # Local Git repository (Codi-managed)
+    local_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # /var/codi/repos/user_id/project_slug
+    git_commit_sha: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)  # Current HEAD commit
+    git_branch: Mapped[str] = mapped_column(String(100), nullable=False, default="main")  # Current branch
 
     # Project settings
     is_private: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -124,6 +123,18 @@ class Project(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
+    containers: Mapped[List["Container"]] = relationship(
+        "Container",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    deployments: Mapped[List["Deployment"]] = relationship(
+        "Deployment",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         """String representation of Project."""
@@ -136,12 +147,10 @@ class Project(Base):
             "owner_id": self.owner_id,
             "name": self.name,
             "description": self.description,
-            "github_repo_name": self.github_repo_name,
-            "github_repo_url": self.github_repo_url,
-            "github_repo_full_name": self.github_repo_full_name,
-            "github_clone_url": self.github_clone_url,
-            "github_default_branch": self.github_default_branch,
-            "github_current_branch": self.github_current_branch,
+            # Local Git repository
+            "local_path": self.local_path,
+            "git_commit_sha": self.git_commit_sha,
+            "git_branch": self.git_branch,
             "is_private": self.is_private,
             # Multi-platform configuration
             "platform_type": self.platform_type,

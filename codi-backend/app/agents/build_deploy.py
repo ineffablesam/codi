@@ -26,83 +26,97 @@ class BuildDeployAgent(BaseAgent):
 Your role is to manage the build and deployment pipeline.
 
 ## Your Responsibilities:
-1. Trigger GitHub Actions workflows
-2. Monitor build progress
-3. Report build status
-4. Handle deployment to GitHub Pages
-5. Report deployment URLs
+1. Build Docker images for projects
+2. Manage container lifecycle (start, stop, restart)
+3. Monitor build and deployment progress
+4. Report deployment URLs (local Traefik-based)
+5. Provide container logs for debugging
 
-## Build Workflow:
-1. Trigger flutter_web_build.yml workflow
-2. Monitor progress through stages (dependencies, build, test, deploy)
-3. Report final deployment URL"""
+## Local Docker Workflow:
+1. Build image using framework-specific Dockerfile
+2. Create and start container with Traefik labels
+3. Monitor progress through Docker events
+4. Report final local URL (e.g., project-slug.localhost)
+"""
 
     def get_tools(self) -> List[BaseTool]:
         """Get tools available to the Build Deploy agent."""
 
         @tool
-        def trigger_build(workflow_file: str = "flutter_web_build.yml", branch: str = "main") -> str:
-            """Trigger a GitHub Actions build workflow.
+        async def build_and_deploy(image_tag: str, framework: str = "auto") -> str:
+            """Build and deploy a project locally using Docker.
 
             Args:
-                workflow_file: Name of the workflow file
-                branch: Branch to build
+                image_tag: Tag for the Docker image
+                framework: Project framework (flutter, nextjs, react, etc.)
 
             Returns:
-                Result with workflow run information
+                Result of the build and deployment
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
+            if not self.context.project_folder:
+                return "Error: No project folder configured"
 
             try:
-                result = self.github_service.trigger_workflow(
-                    repo_full_name=self.context.repo_full_name,
-                    workflow_file=workflow_file,
-                    ref=branch,
+                # Build image
+                build_result = await self.docker_service.build_image(
+                    project_path=self.context.project_folder,
+                    image_tag=image_tag,
+                    framework=framework,
                 )
-                return str(result)
+
+                if not build_result.success:
+                    return f"Build failed: {build_result.error}"
+
+                # Create and start container
+                container_name = f"codi-{self.context.project_id}"
+                # Simplified Traefik labels for local dev
+                labels = {
+                    "traefik.enable": "true",
+                    f"traefik.http.routers.{container_name}.rule": f"Host(`{container_name}.localhost`)",
+                }
+
+                container_info = await self.docker_service.create_container(
+                    image=image_tag,
+                    name=container_name,
+                    labels=labels,
+                )
+
+                return json.dumps({
+                    "success": True,
+                    "image_id": build_result.image_id,
+                    "container_id": container_info.id,
+                    "url": f"http://{container_name}.localhost",
+                })
             except Exception as e:
                 return f"Error: {e}"
 
         @tool
-        def check_build_status(run_id: int) -> str:
-            """Check the status of a workflow run.
-
-            Args:
-                run_id: Workflow run ID
+        async def get_container_status() -> str:
+            """Check the status of the project container.
 
             Returns:
-                Status information
+                Container status information
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
-
+            container_name = f"codi-{self.context.project_id}"
             try:
-                status = self.github_service.get_workflow_run_status(
-                    repo_full_name=self.context.repo_full_name,
-                    run_id=run_id,
-                )
-                return str(status)
+                info = await self.docker_service.get_container(container_name)
+                if not info:
+                    return "Container not found"
+                return json.dumps(info.__dict__, default=str)
             except Exception as e:
                 return f"Error: {e}"
 
         @tool
-        def get_pages_url() -> str:
-            """Get the GitHub Pages deployment URL.
+        def get_local_url() -> str:
+            """Get the local deployment URL.
 
             Returns:
-                Pages URL for the repository
+                Local Traefik-based URL
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
+            container_name = f"codi-{self.context.project_id}"
+            return f"http://{container_name}.localhost"
 
-            parts = self.context.repo_full_name.split("/")
-            if len(parts) == 2:
-                owner, repo = parts
-                return f"https://{owner}.github.io/{repo}/"
-            return "Error: Invalid repository name"
-
-        return [trigger_build, check_build_status, get_pages_url]
+        return [build_and_deploy, get_container_status, get_local_url]
 
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Execute build and deployment.
@@ -113,13 +127,13 @@ Your role is to manage the build and deployment pipeline.
         Returns:
             Dictionary with build/deployment results
         """
-        branch = input_data.get("branch", self.context.current_branch)
-        workflow = input_data.get("workflow", "flutter_web_build.yml")
+        framework = input_data.get("framework", "auto")
+        image_tag = f"codi/project-{self.context.project_id}:latest"
 
         # Emit start status
         await self.emit_status(
             status="started",
-            message="Triggering GitHub Actions workflow",
+            message="Starting local Docker build and deployment",
         )
 
         try:
@@ -130,59 +144,44 @@ Your role is to manage the build and deployment pipeline.
                     "type": "build_status",
                     "agent": self.name,
                     "status": "triggered",
-                    "workflow": "Flutter Web Build",
-                    "message": "Build workflow started",
+                    "workflow": "Local Docker Build",
+                    "message": "Local build started",
                 },
             )
 
-            # Simulate trigger (in real implementation, call GitHub API)
-            trigger_result = await self.execute_tool(
-                "trigger_build",
-                {"workflow_file": workflow, "branch": branch},
+            # Build and deploy
+            result_str = await self.execute_tool(
+                "build_and_deploy",
+                {"image_tag": image_tag, "framework": framework},
             )
 
-            # Simulate build progress stages
-            stages = [
-                ("dependencies", "Installing Flutter dependencies", 0.2),
-                ("build", "Building Flutter web app", 0.5),
-                ("test", "Running tests", 0.7),
-                ("deploy", "Deploying to GitHub Pages", 0.9),
-            ]
+            if result_str.startswith("Error"):
+                raise ValueError(result_str)
 
-            for stage, message, progress in stages:
-                await connection_manager.send_build_progress(
-                    project_id=self.context.project_id,
-                    stage=stage,
-                    message=message,
-                    progress=progress,
-                )
-                # Small delay to simulate build time
-                await asyncio.sleep(0.5)
-
-            # Get deployment URL
-            deployment_url = await self.execute_tool("get_pages_url", {})
+            result_data = json.loads(result_str)
+            deployment_url = result_data.get("url")
 
             # Emit deployment complete
             await connection_manager.send_deployment_complete(
                 project_id=self.context.project_id,
                 status="success",
-                message="✅ Deployed successfully!",
+                message="✅ Deployed locally to Docker!",
                 deployment_url=deployment_url,
-                build_time="1m 30s",
-                size="2.3 MB",
+                build_time="Local build complete",
+                size="N/A",
             )
 
             # Emit completion
             await self.emit_status(
                 status="completed",
-                message="Deployment complete",
+                message="Local deployment complete",
             )
 
             return {
                 "status": "success",
                 "deployment_url": deployment_url,
-                "branch": branch,
-                "workflow": workflow,
+                "image_id": result_data.get("image_id"),
+                "container_id": result_data.get("container_id"),
             }
 
         except Exception as e:

@@ -203,3 +203,111 @@ Your role is to maintain the complete history of all operations.
 
         except Exception as e:
             logger.error(f"Failed to log operation: {e}")
+
+    async def log_agent_start(
+        self,
+        agent_name: str,
+        task_description: str,
+    ) -> None:
+        """Quick method for agents to log task start.
+        
+        Args:
+            agent_name: Name of the agent
+            task_description: Description of the task being started
+        """
+        try:
+            agent_type = AgentType(agent_name)
+        except ValueError:
+            agent_type = AgentType.SYSTEM
+            
+        await self.log_operation(
+            operation_type=OperationType.AGENT_TASK_STARTED,
+            agent_type=agent_type,
+            message=f"Started: {task_description[:100]}",
+            status="started",
+        )
+
+    async def log_agent_complete(
+        self,
+        agent_name: str,
+        result_summary: str,
+        duration_ms: int | None = None,
+        details: Dict[str, Any] | None = None,
+    ) -> None:
+        """Quick method for agents to log task completion.
+        
+        Args:
+            agent_name: Name of the agent
+            result_summary: Summary of the result
+            duration_ms: Duration in milliseconds
+            details: Additional details
+        """
+        try:
+            agent_type = AgentType(agent_name)
+        except ValueError:
+            agent_type = AgentType.SYSTEM
+            
+        await self.log_operation(
+            operation_type=OperationType.AGENT_TASK_COMPLETED,
+            agent_type=agent_type,
+            message=f"Completed: {result_summary[:100]}",
+            status="completed",
+            duration_ms=duration_ms,
+            details=details,
+        )
+
+    async def log_agent_error(
+        self,
+        agent_name: str,
+        error_message: str,
+        duration_ms: int | None = None,
+    ) -> None:
+        """Quick method for agents to log task failures.
+        
+        Args:
+            agent_name: Name of the agent
+            error_message: Error description
+            duration_ms: Duration in milliseconds
+        """
+        try:
+            agent_type = AgentType(agent_name)
+        except ValueError:
+            agent_type = AgentType.SYSTEM
+            
+        await self.log_operation(
+            operation_type=OperationType.AGENT_TASK_COMPLETED,
+            agent_type=agent_type,
+            message=f"Failed: {error_message[:100]}",
+            status="failed",
+            duration_ms=duration_ms,
+            error_message=error_message,
+        )
+
+    async def get_project_context(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """Get recent operations as context for agents.
+        
+        Provides historical context to help agents understand
+        what has been done previously in the project.
+        
+        Args:
+            limit: Maximum number of operations to return
+            
+        Returns:
+            List of recent operation dictionaries
+        """
+        import json
+        
+        try:
+            async with get_db_context() as session:
+                result = await session.execute(
+                    select(OperationLog)
+                    .where(OperationLog.project_id == self.context.project_id)
+                    .order_by(OperationLog.created_at.desc())
+                    .limit(limit)
+                )
+                logs = result.scalars().all()
+                return [log.to_dict() for log in logs]
+        except Exception as e:
+            logger.error(f"Failed to get project context: {e}")
+            return []
+

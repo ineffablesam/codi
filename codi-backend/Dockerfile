@@ -10,6 +10,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Create non-root user
+RUN groupadd -g 1000 codi && \
+    useradd -u 1000 -g codi -s /bin/bash -m codi
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -32,9 +36,6 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 
 # Production stage
 FROM base as production
-
-# Create non-root user
-RUN groupadd -r codi && useradd -r -g codi codi
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt

@@ -8,10 +8,18 @@ import '../models/project_model.dart';
 /// Project service for API interactions
 class ProjectService {
   /// Get all projects for current user
-  Future<List<ProjectModel>> getProjects({int skip = 0, int limit = 20}) async {
+  Future<List<ProjectModel>> getProjects({
+    int skip = 0,
+    int limit = 20,
+    String status = 'active',
+  }) async {
     final response = await ApiClient.get<Map<String, dynamic>>(
       ApiEndpoints.projects,
-      queryParameters: {'skip': skip, 'limit': limit},
+      queryParameters: {
+        'skip': skip,
+        'limit': limit,
+        'status': status,
+      },
     );
 
     if (response.success && response.data != null) {
@@ -60,8 +68,24 @@ class ProjectService {
     }
     return null;
   }
+  
+  /// Archive a project (soft delete)
+  Future<bool> archiveProject(int id) async {
+    final response = await ApiClient.post<Map<String, dynamic>>(
+      '${ApiEndpoints.projects}/$id/archive',
+    );
+    return response.success;
+  }
+  
+  /// Restore an archived project
+  Future<bool> restoreProject(int id) async {
+    final response = await ApiClient.post<Map<String, dynamic>>(
+      '${ApiEndpoints.projects}/$id/restore',
+    );
+    return response.success;
+  }
 
-  /// Delete (archive) a project
+  /// Delete a project (Hard Delete)
   Future<bool> deleteProject(int id) async {
     final response = await ApiClient.delete<void>(
       ApiEndpoints.projectById(id),

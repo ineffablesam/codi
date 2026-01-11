@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import agents_router, auth_router, health_router, projects_router, files_router, backend_router
+from app.api import agents_router, auth_router, health_router, projects_router, files_router, backend_router, containers_router, deployments_router
 from app.config import settings
 from app.database import init_db
 from app.utils.logging import get_logger, setup_logging
@@ -130,10 +130,10 @@ app.include_router(files_router, prefix="/api/v1")
 app.include_router(projects_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")
 app.include_router(backend_router, prefix="/api/v1")
+app.include_router(containers_router, prefix="/api/v1")
+app.include_router(deployments_router, prefix="/api/v1")
 
-# Webhook router (no auth required - uses signature verification)
-from app.api.webhooks import router as webhooks_router
-app.include_router(webhooks_router, prefix="/api/v1")
+# Webhook router (removed - GitHub webhooks no longer used in local-only environment)
 
 
 

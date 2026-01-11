@@ -1,4 +1,4 @@
-"""Next.js Engineer agent for Next.js App Router development."""
+"""React Native Engineer agent for mobile app development."""
 import json
 import re
 from typing import Any, Dict, List, Optional
@@ -6,35 +6,32 @@ from typing import Any, Dict, List, Optional
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool, tool
 
-from app.agents.base import AgentContext, BaseAgent
-from app.agents.prompts.nextjs_engineer_prompts import SYSTEM_PROMPT
+from app.agents.base import BaseAgent
+from app.agents.prompts.react_native_prompts import SYSTEM_PROMPT
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class NextjsEngineerAgent(BaseAgent):
-    """Agent responsible for writing Next.js code with App Router patterns.
+class ReactNativeEngineerAgent(BaseAgent):
+    """Agent responsible for writing React Native code.
 
-    The Next.js Engineer creates pages, API routes, Server Components,
-    Client Components, and middleware using Next.js 14+ patterns.
+    The React Native Engineer creates cross-platform mobile components
+    using React Native primitives (View, Text, etc.) - never HTML elements.
     """
 
-    name = "nextjs_engineer"
-    description = "Next.js App Router development"
+    name = "react_native_engineer"
+    description = "React Native mobile development"
     system_prompt = SYSTEM_PROMPT
 
     def get_tools(self) -> List[BaseTool]:
-        """Get tools available to the Next.js engineer."""
+        """Get tools available to the React Native engineer."""
 
         @tool
         def read_file(file_path: str) -> str:
             """Read a file from the repository."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                return self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                return self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
@@ -44,45 +41,35 @@ class NextjsEngineerAgent(BaseAgent):
         @tool
         def write_file(file_path: str, content: str, commit_message: str) -> str:
             """Write content to a file in the repository."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
             try:
-                result = self.github_service.create_or_update_file(
-                    repo_full_name=self.context.repo_full_name,
-                    file_path=file_path,
-                    content=content,
-                    commit_message=commit_message,
-                    branch=self.context.current_branch,
-                )
-                return json.dumps(result)
+                self.git_service.write_file(file_path=file_path, content=content)
+                result = self.git_service.commit(message=commit_message, files=[file_path])
+                return json.dumps(result.__dict__, default=str)
             except Exception as e:
                 return f"Error: {e}"
 
         @tool
-        def list_directory(path: str = "app") -> str:
-            """List files in a directory (defaults to app/ for App Router)."""
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
+        def list_directory(path: str = "src") -> str:
+            """List files in a directory."""
             try:
-                files = self.github_service.list_files(
-                    repo_full_name=self.context.repo_full_name,
+                files = self.git_service.list_files(
                     path=path,
                     ref=self.context.current_branch,
                 )
-                return json.dumps(files, indent=2)
+                return json.dumps([f.__dict__ for f in files], indent=2)
             except Exception as e:
                 return f"Error: {e}"
 
         return [read_file, write_file, list_directory]
 
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a Next.js code generation task."""
+        """Execute a React Native code generation task."""
         step = input_data.get("step", {})
         description = step.get("description", "")
         file_path = step.get("file_path", "")
         action = step.get("action", "create")
 
-        await self.emit_status(status="started", message="Starting Next.js code generation")
+        await self.emit_status(status="started", message="Starting React Native code generation")
 
         try:
             existing_content = None
@@ -101,6 +88,13 @@ class NextjsEngineerAgent(BaseAgent):
             if not code:
                 raise ValueError("Failed to extract code from LLM response")
 
+            # Validate no HTML elements
+            html_elements = self._check_html_elements(code)
+            if html_elements:
+                logger.warning(f"HTML elements found in React Native code: {html_elements}")
+                # Try to regenerate
+                code = await self._regenerate_without_html(description, file_path, code, html_elements)
+
             if file_path:
                 msg = f"{'Create' if action == 'create' else 'Update'} {file_path.split('/')[-1]}"
                 await self.execute_tool("write_file", {"file_path": file_path, "content": code, "commit_message": msg})
@@ -110,7 +104,7 @@ class NextjsEngineerAgent(BaseAgent):
             return {"file_path": file_path, "code": code, "action": action, "success": True}
 
         except Exception as e:
-            logger.error(f"Next.js code generation failed: {e}")
+            logger.error(f"React Native code generation failed: {e}")
             await self.emit_error(error=str(e), message="Code generation failed")
             raise
 
@@ -120,11 +114,11 @@ class NextjsEngineerAgent(BaseAgent):
             parts.append(f"\nExisting content:\n```tsx\n{existing}\n```")
         parts.append("""
 Requirements:
-- Use Next.js 14+ App Router patterns
-- Use Server Components by default, Client Components only when needed
+- Use ONLY React Native components (View, Text, Image, etc.)
+- NEVER use HTML elements (div, span, p, img, input, button)
+- Use StyleSheet.create for all styles
 - Include proper TypeScript types
-- Add metadata for SEO on pages
-- Handle loading and error states
+- Handle SafeAreaView for edge devices
 
 Return ONLY the code in ```tsx blocks.""")
         return "\n".join(parts)
@@ -144,3 +138,37 @@ Return ONLY the code in ```tsx blocks.""")
         if "import " in text or "export " in text:
             return text.strip()
         return None
+
+    def _check_html_elements(self, code: str) -> List[str]:
+        """Check for HTML elements that shouldn't be in React Native."""
+        html_patterns = [
+            r'<div\b', r'<span\b', r'<p\b', r'<img\b', r'<input\b',
+            r'<button\b', r'<a\b', r'<ul\b', r'<li\b', r'<form\b',
+        ]
+        found = []
+        for pattern in html_patterns:
+            if re.search(pattern, code, re.IGNORECASE):
+                found.append(pattern.replace(r'<', '').replace(r'\b', ''))
+        return found
+
+    async def _regenerate_without_html(self, description: str, file_path: str, code: str, html_elements: List[str]) -> str:
+        """Regenerate code without HTML elements."""
+        prompt = f"""CRITICAL ERROR: Your previous code contained HTML elements which are NOT valid in React Native.
+
+INVALID ELEMENTS FOUND: {', '.join(html_elements)}
+
+REMEMBER:
+- <div> → <View>
+- <span>/<p> → <Text>
+- <img> → <Image>
+- <input> → <TextInput>
+- <button> → <TouchableOpacity> or <Pressable>
+
+Original task: {description}
+File: {file_path}
+
+Fix the code and return ONLY React Native components in ```tsx blocks."""
+
+        response = await self.invoke([HumanMessage(content=prompt)])
+        new_code = self._extract_code(self._get_content(response))
+        return new_code if new_code else code

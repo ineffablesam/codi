@@ -1,52 +1,95 @@
 # Codi Platform - Complete Setup & Documentation
 
-Commands
+## Quick Commands
 
+```bash
+# Backend
 python -m venv venv
 source venv/bin/activate 
+celery -A app.tasks.celery_app worker --loglevel=debug
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+ngrok http 8000
+```
 
-Celery : celery -A app.tasks.celery_app worker --loglevel=debug
-Uvicorn: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000;
-Ngrok: ngrok http 8000
+---
 
 ## Overview
 
-**Codi** is an AI-powered Flutter development platform with:
-- **Python FastAPI Backend** - 6 LangGraph agents for code generation, review, git ops, and deployment
+**Codi** is an AI-powered development platform with:
+- **Python FastAPI Backend** - Multi-agent orchestration system with 15 specialized agents
 - **Flutter Mobile App** - iOS/Android app with real-time agent chat and embedded preview
+
+---
+
+## 🤖 Multi-Agent Orchestration System
+
+Codi uses a sophisticated multi-agent architecture powered by **Google Gemini 3**.
+
+```
+                    ┌─────────────┐
+                    │  CONDUCTOR  │ ← Master orchestrator (Gemini 3 Pro)
+                    └──────┬──────┘
+                           │
+       ┌───────────────────┼───────────────────┐
+       │                   │                   │
+       ▼                   ▼                   ▼
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  Pre-Planning │    │  Specialized  │    │   Platform   │
+└──────────────┘    └──────────────┘    └──────────────┘
+    Analyst             Sage              FlutterEngineer
+    Strategist          Scholar           ReactEngineer
+                        Scout             NextjsEngineer
+                        Artisan           CodeReviewer
+                        Scribe            GitOperator
+                        Vision            BuildDeploy
+```
+
+### Agent Categories
+
+| Category | Agents | Purpose |
+|----------|--------|---------|
+| **Orchestration** | Conductor, Strategist, Analyst | Task planning & delegation |
+| **Specialized** | Sage, Scholar, Scout, Artisan, Scribe, Vision | Domain expertise |
+| **Platform** | FlutterEngineer, ReactEngineer, NextjsEngineer | Code generation |
+| **Operations** | CodeReviewer, GitOperator, BuildDeploy, Memory | DevOps & quality |
+
+### Key Features
+- **Intelligent Delegation**: Conductor routes tasks to best-fit agents
+- **Background Execution**: Parallel processing with concurrency control
+- **Session Continuity**: Context preserved across interactions
+- **Real-time Streaming**: WebSocket updates for all activities
 
 ---
 
 ## Project Structure
 
 ```
-codi-v2/
-├── codi-backend/          # Python FastAPI backend
+codi/
+├── codi-backend/              # Python FastAPI backend
 │   ├── app/
-│   │   ├── agents/        # 6 LangGraph agents
-│   │   ├── api/           # REST API routes
-│   │   ├── models/        # SQLAlchemy models
-│   │   ├── schemas/       # Pydantic schemas
-│   │   ├── services/      # GitHub, encryption services
-│   │   ├── workflows/     # LangGraph state machine
-│   │   ├── websocket/     # Real-time WebSocket
-│   │   ├── tasks/         # Celery async tasks
-│   │   └── utils/         # Logging, security
-│   ├── alembic/           # Database migrations
-│   ├── tests/
+│   │   ├── agents/            # Multi-agent orchestration
+│   │   │   ├── platform/      # Platform-specific agents
+│   │   │   ├── tools/         # Delegation tools
+│   │   │   ├── conductor.py   # Master orchestrator
+│   │   │   ├── sage.py        # Strategic advisor
+│   │   │   ├── scout.py       # Fast search
+│   │   │   └── ...            # Other agents
+│   │   ├── api/               # REST API routes
+│   │   ├── models/            # SQLAlchemy models
+│   │   ├── schemas/           # Pydantic schemas
+│   │   ├── services/          # GitHub, encryption
+│   │   ├── workflows/         # LangGraph state machine
+│   │   ├── websocket/         # Real-time WebSocket
+│   │   └── tasks/             # Celery async tasks
 │   └── docker-compose.yml
 │
-└── codi_frontend/         # Flutter mobile app
+└── codi_frontend/             # Flutter mobile app
     └── lib/
-        ├── config/        # Theme, routes, env
-        ├── core/          # API, storage, utils
-        ├── features/
-        │   ├── auth/      # GitHub OAuth
-        │   ├── projects/  # Project CRUD
-        │   ├── editor/    # Preview + Chat
-        │   ├── deployments/
-        │   └── settings/
-        └── shared/        # Reusable widgets
+        ├── core/              # API, storage, utils
+        └── features/
+            ├── auth/          # GitHub OAuth
+            ├── projects/      # Project CRUD
+            └── editor/        # Preview + Agent Chat
 ```
 
 ---
@@ -55,42 +98,27 @@ codi-v2/
 
 ### Prerequisites
 - Python 3.11+
-- Node.js 18+ (for npm)
 - Flutter 3.5+
 - PostgreSQL 14+
 - Redis 7+
-- Git
 
 ### 1. Backend Setup
 
 ```bash
 cd codi-backend
-
-# Create virtual environment
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Copy environment file
 cp .env.example .env
+# Edit .env with your GEMINI_API_KEY and other values
 
-# Edit .env with your values:
-# - DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/codi
-# - REDIS_URL=redis://localhost:6379/0
-# - GITHUB_CLIENT_ID=your_github_oauth_app_id
-# - GITHUB_CLIENT_SECRET=your_github_oauth_app_secret
-# - GOOGLE_API_KEY=your_gemini_api_key
-# - SECRET_KEY=your_jwt_secret_key
-
-# Run database migrations
 alembic upgrade head
 
-# Start Celery worker (new terminal)
+# Terminal 1: Celery worker
 celery -A app.tasks.celery_app.celery_app worker --loglevel=info
 
-# Start backend server
+# Terminal 2: API server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -98,21 +126,49 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 cd codi_frontend
-
-# Get dependencies
 flutter pub get
-
-# Copy environment file
 cp .env.example .env
-
-# Edit .env with your values:
-# - API_BASE_URL=http://localhost:8000
-# - WS_BASE_URL=ws://localhost:8000
-# - GITHUB_CLIENT_ID=your_github_oauth_app_id
-
-# Run on simulator/device
 flutter run
 ```
+
+---
+
+## AI Model Configuration
+
+Codi supports **Gemini 3** with flexible configuration:
+
+```bash
+# .env
+GEMINI_API_KEY=your_gemini_api_key
+FORCE_GEMINI_OVERALL=true  # Use Gemini 3 for all agents
+```
+
+### Model Assignment
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| Conductor, Sage | `gemini-3-pro-preview` | Advanced reasoning |
+| All others | `gemini-3-flash-preview` | Fast execution |
+
+> ⚠️ **Important**: Gemini 3 requires `temperature=1.0` (default). Lower values cause looping.
+
+---
+
+## WebSocket Protocol
+
+Connect: `wss://your-api/agents/{project_id}/ws?token={jwt}`
+
+### Message Types
+
+| Type | Direction | Description |
+|------|-----------|-------------|
+| `agent_status` | → Client | Agent started/completed |
+| `file_operation` | → Client | File created/updated |
+| `llm_stream` | → Client | Streaming LLM response |
+| `background_task_started` | → Client | Parallel task launched |
+| `background_task_progress` | → Client | Task progress update |
+| `background_task_completed` | → Client | Task finished |
+| `delegation_status` | → Client | Agent→Agent delegation |
+| `user_message` | → Server | User chat message |
 
 ---
 
@@ -122,71 +178,21 @@ flutter run
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/auth/github` | Get GitHub OAuth URL |
-| GET | `/auth/github/callback` | OAuth callback, returns JWT |
+| GET | `/auth/github/callback` | OAuth callback |
 | GET | `/auth/me` | Get current user |
-| POST | `/auth/logout` | Logout (client discards token) |
 
 ### Projects
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/projects` | List user projects |
-| POST | `/projects` | Create project + GitHub repo |
-| GET | `/projects/{id}` | Get project details |
-| PATCH | `/projects/{id}` | Update project |
-| DELETE | `/projects/{id}` | Delete project (soft) |
-| GET | `/projects/{id}/files` | List repository files |
-| GET | `/projects/{id}/files/{path}` | Get file content |
+| GET | `/projects` | List projects |
+| POST | `/projects` | Create project |
+| GET | `/projects/{id}/files` | List files |
 
 ### Agents
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/agents/{project_id}/task` | Submit agent task |
-| GET | `/agents/{project_id}/task/{id}` | Get task status |
-| GET | `/agents/{project_id}/history` | Get operation history |
-| WS | `/agents/{project_id}/ws` | WebSocket for real-time updates |
-
----
-
-## WebSocket Protocol
-
-Connect to: `wss://your-api/agents/{project_id}/ws?token={jwt}`
-
-### Message Types (Backend → Frontend)
-
-| Type | Description |
-|------|-------------|
-| `agent_status` | Agent started/completed/failed |
-| `file_operation` | File created/updated/deleted |
-| `tool_execution` | Agent using a tool |
-| `git_operation` | Branch/commit/push |
-| `build_progress` | Build percentage |
-| `build_status` | Build triggered/complete |
-| `deployment_complete` | Deployment success with URL |
-| `review_progress` | Code review status |
-| `review_issue` | Review found issue |
-| `agent_error` | Agent error occurred |
-| `user_input_required` | Agent needs user input |
-
-### Message Types (Frontend → Backend)
-
-| Type | Description |
-|------|-------------|
-| `user_message` | User chat message |
-| `user_input_response` | Reply to input request |
-| `ping` | Keep-alive ping |
-
----
-
-## Agents
-
-| Agent | Responsibility |
-|-------|----------------|
-| **Planner** | Breaks user request into steps |
-| **Flutter Engineer** | Writes Dart/Flutter code |
-| **Code Reviewer** | Reviews code quality |
-| **Git Operator** | Git branch/commit/push |
-| **Build & Deploy** | Triggers CI/CD, deploys |
-| **Memory** | Logs operation history |
+| POST | `/agents/{project_id}/task` | Submit task |
+| WS | `/agents/{project_id}/ws` | Real-time updates |
 
 ---
 
@@ -200,28 +206,25 @@ DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/codi
 # Redis
 REDIS_URL=redis://localhost:6379/0
 
-# GitHub OAuth App
-GITHUB_CLIENT_ID=your_github_oauth_client_id
-GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
+# GitHub OAuth
+GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_secret
 
-# LLM (Google Gemini)
-GOOGLE_API_KEY=your_gemini_api_key
-LLM_MODEL=gemini-2.0-flash
+# AI (Gemini 3)
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-3-flash-preview
+FORCE_GEMINI_OVERALL=true
 
 # Security
-SECRET_KEY=your-256-bit-secret-key
-ENCRYPTION_KEY=your-32-byte-fernet-key
-
-# App
-APP_ENV=development
-DEBUG=true
+SECRET_KEY=your-256-bit-secret
+ENCRYPTION_KEY=your-fernet-key
 ```
 
 ### Frontend (.env)
 ```env
 API_BASE_URL=http://localhost:8000
 WS_BASE_URL=ws://localhost:8000
-GITHUB_CLIENT_ID=your_github_oauth_client_id
+GITHUB_CLIENT_ID=your_client_id
 ```
 
 ---
@@ -230,47 +233,10 @@ GITHUB_CLIENT_ID=your_github_oauth_client_id
 
 ```bash
 cd codi-backend
-
-# Build and start all services
 docker-compose up -d --build
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
 ```
 
-Services started:
-- `api` - FastAPI backend on port 8000
-- `celery` - Celery worker
-- `postgres` - PostgreSQL database
-- `redis` - Redis cache
-
----
-
-## Testing
-
-### Backend Tests
-```bash
-cd codi-backend
-pytest tests/ -v
-```
-
-### Frontend Tests
-```bash
-cd codi_frontend
-flutter test
-```
-
-### Verify Build
-```bash
-# Backend
-cd codi-backend && python -c "from app.main import app; print('Backend OK')"
-
-# Frontend
-cd codi_frontend && flutter analyze
-```
+Services: `api`, `celery`, `postgres`, `redis`
 
 ---
 
@@ -279,50 +245,43 @@ cd codi_frontend && flutter analyze
 ```
 ┌─────────────────────┐      ┌──────────────────────────────────┐
 │   Flutter Mobile    │◄────►│         FastAPI Backend          │
-│   (iOS/Android)     │ HTTP │                                  │
-│                     │ WS   │  ┌─────────────────────────────┐ │
-│ ┌─────────────────┐ │      │  │     LangGraph Workflow      │ │
-│ │  Agent Chat     │ │      │  │  ┌────────┐ ┌────────────┐  │ │
-│ │  (WebSocket)    │ │      │  │  │Planner │→│Flutter Eng │  │ │
-│ └─────────────────┘ │      │  │  └────────┘ └────────────┘  │ │
-│                     │      │  │       ↓           ↓         │ │
-│ ┌─────────────────┐ │      │  │  ┌────────┐ ┌────────────┐  │ │
-│ │ WebView Preview │ │      │  │  │Reviewer│→│Git Operator│  │ │
-│ │ (Deployed URL)  │ │      │  │  └────────┘ └────────────┘  │ │
-│ └─────────────────┘ │      │  │       ↓           ↓         │ │
-└─────────────────────┘      │  │  ┌────────────────────────┐ │ │
-                             │  │  │   Build & Deploy       │ │ │
-                             │  │  └────────────────────────┘ │ │
-                             │  └─────────────────────────────┘ │
+│   (iOS/Android)     │ WS   │                                  │
+│                     │      │  ┌─────────────────────────────┐ │
+│ ┌─────────────────┐ │      │  │   Multi-Agent Orchestrator  │ │
+│ │  Agent Chat     │ │      │  │                             │ │
+│ │  (WebSocket)    │ │      │  │  Conductor → Specialized    │ │
+│ └─────────────────┘ │      │  │      ↓          Agents      │ │
+│                     │      │  │  Strategist    (Sage,       │ │
+│ ┌─────────────────┐ │      │  │  Analyst       Scout, etc.) │ │
+│ │ WebView Preview │ │      │  │      ↓                      │ │
+│ │ (Deployed URL)  │ │      │  │  Platform Engineers         │ │
+│ └─────────────────┘ │      │  │  (Flutter, React, Next.js)  │ │
+└─────────────────────┘      │  └─────────────────────────────┘ │
                              │                                  │
-                             │  ┌──────┐  ┌───────┐  ┌───────┐ │
-                             │  │Celery│  │Postgres│  │ Redis │ │
-                             │  └──────┘  └───────┘  └───────┘ │
+                             │  ┌──────┐ ┌───────┐ ┌────────┐  │
+                             │  │Celery│ │Postgres│ │ Redis  │  │
+                             │  └──────┘ └───────┘ └────────┘  │
                              └──────────────────────────────────┘
                                            │
                                            ▼
                              ┌──────────────────────────────────┐
                              │           GitHub API             │
-                             │  (OAuth, Repos, Files, Actions)  │
+                             │  (OAuth, Repos, Actions, Pages)  │
                              └──────────────────────────────────┘
 ```
 
 ---
 
-## File Count Summary
+## Documentation
 
-| Component | Files |
-|-----------|-------|
-| Backend Python | 40+ |
-| Frontend Dart | 53 |
-| **Total** | **93+** |
+- **Backend API**: http://localhost:8000/docs
+- **Agent Architecture**: `codi-backend/app/agents/AGENT_README.md`
 
 ---
 
 ## Support
 
-For issues: Check logs at:
-- Backend: `uvicorn` terminal output
-- Celery: `celery` worker terminal
+Check logs at:
+- Backend: `uvicorn` terminal
+- Celery: `celery` worker terminal  
 - Frontend: `flutter run` console
-

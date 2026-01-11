@@ -65,6 +65,13 @@ class AgentChatController extends GetxController {
         _handleStreamingChunk(message);
         break;
 
+      case MessageType.conversationalResponse:
+        // Instant chat response - no workflow, just display
+        addMessage(message);
+        isTyping.value = false;  // Stop typing indicator if showing
+        isAgentWorking.value = false;  // Not a full workflow
+        break;
+
       case MessageType.agentStatus:
         addMessage(message);
         if (message.status == 'started') {
@@ -160,6 +167,15 @@ class AgentChatController extends GetxController {
       case MessageType.user:
         // User messages are added directly by sendMessage()
         break;
+
+      // Multi-agent orchestration messages
+      case MessageType.backgroundTaskStarted:
+      case MessageType.backgroundTaskProgress:
+      case MessageType.backgroundTaskCompleted:
+      case MessageType.delegationStatus:
+      case MessageType.batchComplete:
+        addMessage(message);
+        break;
     }
   }
 
@@ -170,18 +186,38 @@ class AgentChatController extends GetxController {
         messages.last.agent == message.agent) {
       // Create a replacement message with accumulated text
       final lastMsg = messages.last;
+      
       final updatedMsg = AgentMessage(
         text: lastMsg.text + message.text,
         timestamp: message.timestamp,
         type: MessageType.llmStream,
         agent: message.agent,
+        // Preserve crucial UI state
+        status: message.status ?? lastMsg.status ?? 'streaming',
+        isWorking: message.isWorking ?? lastMsg.isWorking ?? true,
+        details: message.details ?? lastMsg.details,
+        // Preserve other potentially relevant fields
+        taskId: lastMsg.taskId,
+        sessionId: lastMsg.sessionId,
       );
       
       // Replace the last message to trigger UI update
       messages[messages.length - 1] = updatedMsg;
     } else {
       // First chunk from this agent, add as a new message
-      addMessage(message);
+      // Ensure status is set for UI
+      final newMessage = AgentMessage(
+        text: message.text,
+        timestamp: message.timestamp,
+        type: MessageType.llmStream,
+        agent: message.agent,
+        status: message.status ?? 'streaming',
+        isWorking: message.isWorking ?? true,
+        details: message.details,
+        taskId: message.taskId,
+        sessionId: message.sessionId,
+      );
+      addMessage(newMessage);
     }
   }
 

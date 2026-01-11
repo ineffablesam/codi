@@ -1,13 +1,36 @@
-"""Starter template service for initializing new Flutter projects."""
+"""Starter template service for initializing new Flutter projects.
+
+All templates are now created locally. No GitHub API dependency.
+"""
 import base64
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.services.github import GitHubService
+from app.services.git_service import get_git_service
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def slugify(name: str) -> str:
+    """Create a URL-safe slug from a project name.
+    
+    Args:
+        name: Project name to slugify
+        
+    Returns:
+        URL-safe slug
+    """
+    # Convert to lowercase and replace spaces with hyphens
+    slug = name.lower().strip()
+    slug = re.sub(r'[^a-z0-9-]', '-', slug)
+    slug = re.sub(r'-+', '-', slug)  # Remove consecutive hyphens
+    slug = slug.strip('-')  # Remove leading/trailing hyphens
+    return slug or "project"
+
+
 
 # Directory patterns to exclude when reading the template
 EXCLUDE_DIRS = {
@@ -423,15 +446,13 @@ class StarterTemplateService:
         },
     }
 
-    def __init__(self, github_service: Optional[GitHubService] = None, framework: str = "flutter", deployment_platform: str = "github_pages") -> None:
+    def __init__(self, framework: str = "flutter", deployment_platform: str = "github_pages") -> None:
         """Initialize starter template service.
 
         Args:
-            github_service: Optional GitHubService instance for pushing to GitHub
             framework: Framework type (flutter, react, nextjs)
             deployment_platform: Target deployment platform (github_pages, vercel)
         """
-        self.github_service = github_service
         self.framework = framework
         self.deployment_platform = deployment_platform
         self._validate_framework()
@@ -501,7 +522,7 @@ class StarterTemplateService:
         if project_title is None:
             project_title = project_name.replace("_", " ").replace("-", " ").title()
 
-        repo_name = GitHubService.slugify(project_name)
+        repo_name = slugify(project_name)
         
         # Framework-specific name processing
         import re
@@ -626,69 +647,58 @@ class StarterTemplateService:
 
     async def push_template_to_repo(
         self,
-        repo_full_name: str,
+        project_path: str,
         project_name: str,
         project_title: Optional[str] = None,
         branch: str = "main",
-        vercel_config: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
-        """Push starter template to a GitHub repository.
+        """Initialize local repository with starter template.
 
         Args:
-            repo_full_name: Full repository name (owner/repo)
+            project_path: Path to local project repository
             project_name: Name of the project
             project_title: Human-readable project title
-            branch: Branch to push to
-            vercel_config: Optional dictionary of Vercel secrets (VERCEL_TOKEN, etc.)
+            branch: Branch to initialize
 
         Returns:
             Dictionary with commit information
         """
-        if not self.github_service:
-            raise ValueError("GitHub service not configured")
-
         template_files = self.get_template_files(project_name, project_title)
-
-        # Convert to list of dicts for GitHub API
-        files_list = []
+        
+        # Format files for git_service
+        files_dict = {}
         for path, file_info in template_files.items():
-            if file_info["is_binary"]:
-                # Encode binary content as base64 for the API
-                content = base64.b64encode(file_info["content"]).decode("utf-8")
-                files_list.append({"path": path, "content": content, "encoding": "base64"})
-            else:
-                files_list.append({"path": path, "content": file_info["content"]})
+            files_dict[path] = file_info["content"]
 
-        # Commit all files at once
+        git_service = get_git_service(project_path)
+        
+        # Initialize and commit
+        # If repo doesn't exist, this might need to call init_repository first
+        # But usually we call this from projects.py which has the flow
+        
         project_label = project_title or project_name
         commit_msg = f"Initial commit: {self.framework.capitalize()} starter template for {project_label} from Codi"
         
-        result = self.github_service.commit_multiple_files(
-            repo_full_name=repo_full_name,
-            files=files_list,
-            commit_message=commit_msg,
-            branch=branch,
-        )
+        # Assuming we use git_service.init_repository pattern
+        # or we just write files and commit if already initialized
+        for rel_path, content in files_dict.items():
+            full_path = Path(project_path) / rel_path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(content, bytes):
+                full_path.write_bytes(content)
+            else:
+                full_path.write_text(content)
+        
+        git_service.commit_all(commit_msg)
+        sha = git_service.get_current_commit()
 
         logger.info(
-            f"Pushed starter template to {repo_full_name}",
-            files_count=len(files_list),
-            commit_sha=result.get("commit_sha"),
+            f"Initialized local template at {project_path}",
+            files_count=len(template_files),
+            commit_sha=sha,
         )
         
-        # Configure Vercel secrets if provided
-        if vercel_config:
-            logger.info(f"Configuring Vercel secrets for {repo_full_name}")
-            try:
-                for key, value in vercel_config.items():
-                    if value:
-                        self.github_service.create_repo_secret(repo_full_name, key, value)
-                logger.info("Successfully configured Vercel secrets")
-            except Exception as e:
-                logger.error(f"Failed to configure Vercel secrets: {e}")
-                # Don't fail the whole operation, but log the error
-
-        return result
+        return {"commit_sha": sha, "branch": branch}
 
     def create_local_template(
         self,

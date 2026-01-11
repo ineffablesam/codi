@@ -34,11 +34,18 @@ class ConnectionManager:
         # Map of websocket -> project_id for reverse lookup
         self._websocket_to_project: Dict[WebSocket, int] = {}
 
-        # Lock for thread-safe operations
-        self._lock = asyncio.Lock()
+        # Lock for thread-safe operations - properly initialized lazily
+        self._lock_internal: Optional[asyncio.Lock] = None
 
         self._initialized = True
         logger.info("WebSocket ConnectionManager initialized")
+
+    @property
+    def _lock(self) -> asyncio.Lock:
+        """Get or create the lock for the current event loop."""
+        if self._lock_internal is None:
+            self._lock_internal = asyncio.Lock()
+        return self._lock_internal
 
     async def connect(self, websocket: WebSocket, project_id: int) -> None:
         """Register a new WebSocket connection for a project.

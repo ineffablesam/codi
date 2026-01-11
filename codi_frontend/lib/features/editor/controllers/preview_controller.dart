@@ -3,12 +3,14 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/api/api_service.dart';
 import '../../../core/utils/logger.dart';
 import 'editor_controller.dart';
 
 /// Controller for preview WebView panel using InAppWebView
 class PreviewController extends GetxController {
   late final EditorController _editorController;
+  final ApiService _apiService = Get.find<ApiService>();
   InAppWebViewController? webViewController;
   PullToRefreshController? pullToRefreshController;
 
@@ -20,10 +22,16 @@ class PreviewController extends GetxController {
   final isScrollingDown = false.obs;
   int _lastScrollY = 0;
 
-  // Build state (GitHub Actions workflow running)
+  // Build state (container building/deploying)
   final isBuilding = false.obs;
   final buildStage = ''.obs;
   final buildProgress = 0.0.obs;
+
+  // Deployment state
+  final containerId = RxnString();
+  final deploymentId = RxnString();
+  final currentBranch = 'main'.obs;
+  final isPreviewDeployment = false.obs;
 
   @override
   void onInit() {
@@ -129,10 +137,21 @@ class PreviewController extends GetxController {
   /// Refresh preview
   void refreshPreview() {
     if (webViewController != null) {
-      isLoading.value = true;
-      hasError.value = false;
-      webViewController!.reload();
+      try {
+        isLoading.value = true;
+        hasError.value = false;
+        webViewController!.reload();
+      } catch (e) {
+        AppLogger.error('Failed to reload WebView', error: e);
+        webViewController = null;
+      }
     }
+  }
+
+  @override
+  void onClose() {
+    webViewController = null;
+    super.onClose();
   }
 
   /// Open in external browser
@@ -166,5 +185,83 @@ class PreviewController extends GetxController {
         await webViewController!.goForward();
       }
     }
+  }
+
+  /// Create a new deployment (container-based)
+  Future<bool> createDeployment(
+      {String branch = 'main', bool isPreview = false}) async {
+    final projectId = _editorController.currentProject.value?.id;
+    if (projectId == null) return false;
+
+    try {
+      isBuilding.value = true;
+      buildStage.value = 'Creating deployment...';
+      buildProgress.value = 0.1;
+
+      final response = await _apiService.post(
+        '/deployments',
+        data: {
+          'project_id': projectId,
+          'branch': branch,
+          'is_preview': isPreview,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        deploymentId.value = data['id'] as String?;
+        containerId.value = data['container_id'] as String?;
+        currentBranch.value = branch;
+        isPreviewDeployment.value = isPreview;
+
+        // Update preview URL
+        final url = data['url'] as String?;
+        if (url != null) {
+          deploymentUrl.value = url;
+          loadUrl(url);
+        }
+
+        buildStage.value = 'Deployment active';
+        buildProgress.value = 1.0;
+        AppLogger.info('Deployment created: $url');
+        return true;
+      }
+    } catch (e) {
+      debugPrint("=============$e");
+      AppLogger.error('Failed to create deployment', error: e);
+      buildStage.value = 'Deployment failed';
+    } finally {
+      isBuilding.value = false;
+    }
+    return false;
+  }
+
+  /// Redeploy current deployment
+  Future<bool> redeploy() async {
+    if (deploymentId.value == null) return false;
+
+    try {
+      isBuilding.value = true;
+      buildStage.value = 'Redeploying...';
+
+      final response = await _apiService.post(
+        '/deployments/${deploymentId.value}/redeploy',
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data as Map<String, dynamic>;
+        final url = data['url'] as String?;
+        if (url != null) {
+          deploymentUrl.value = url;
+          loadUrl(url);
+        }
+        return true;
+      }
+    } catch (e) {
+      AppLogger.error('Failed to redeploy', error: e);
+    } finally {
+      isBuilding.value = false;
+    }
+    return false;
   }
 }

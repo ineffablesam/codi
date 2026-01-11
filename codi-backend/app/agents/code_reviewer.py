@@ -109,12 +109,8 @@ Only return "approved": false if there are error-level issues."""
             Returns:
                 File content
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
-
             try:
-                content = self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                content = self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
@@ -132,12 +128,8 @@ Only return "approved": false if there are error-level issues."""
             Returns:
                 JSON analysis
             """
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
-
             try:
-                content = self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                content = self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
@@ -159,12 +151,8 @@ Only return "approved": false if there are error-level issues."""
             """
             # For simplicity, we'll return the current content
             # A full implementation would use GitHub's compare API
-            if not self.context.repo_full_name:
-                return "Error: No repository configured"
-
             try:
-                content = self.github_service.get_file_content(
-                    repo_full_name=self.context.repo_full_name,
+                content = self.git_service.get_file_content(
                     file_path=file_path,
                     ref=self.context.current_branch,
                 )
