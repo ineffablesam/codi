@@ -79,6 +79,7 @@ class ProjectsController extends GetxController {
     String framework = 'flutter',
     String? backendType,
     String? deploymentPlatform,
+    String? appIdea,
   }) async {
     isCreating.value = true;
     errorMessage.value = null;
@@ -92,6 +93,7 @@ class ProjectsController extends GetxController {
         framework: framework,
         backendType: backendType,
         deploymentPlatform: deploymentPlatform,
+        appIdea: appIdea,
       );
 
       final result = await _projectService.createProject(request);

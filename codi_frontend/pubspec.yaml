@@ -71,6 +71,12 @@ dependencies:
   iconsax_flutter: ^1.0.1
   fading_edge_scrollview: ^4.1.1
 
+  # Markdown rendering (for implementation plans)
+  flutter_markdown: ^0.6.18
+  
+  # Confetti animation (for completion celebrations)
+  confetti: ^0.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

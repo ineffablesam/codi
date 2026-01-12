@@ -10,14 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 
-from app.config import settings
-from app.database import Base, get_db_session
+from app.core.config import settings
+from app.core.database import Base, get_db_session
 from app.main import app
 
-# Test database URL
-TEST_DATABASE_URL = settings.database_url.replace(
-    "codi_db", "codi_test_db"
-) if "codi_db" in settings.database_url else "sqlite+aiosqlite:///./test.db"
+# Test database URL (pointing to host-mapped port 5433)
+TEST_DATABASE_URL = "postgresql+asyncpg://codi:codi_password@localhost:5433/codi_test_db"
 
 # Create test engine
 test_engine = create_async_engine(
@@ -271,7 +269,8 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db_session] = override_get_db
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    from httpx import ASGITransport
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()

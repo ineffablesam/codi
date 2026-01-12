@@ -147,6 +147,7 @@ class CreateProjectRequest {
   final String framework;
   final String? backendType;
   final String? deploymentPlatform;
+  final String? appIdea; 
 
   CreateProjectRequest({
     required this.name,
@@ -156,10 +157,11 @@ class CreateProjectRequest {
     this.framework = 'flutter',
     this.backendType,
     this.deploymentPlatform,
+    this.appIdea,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final json = <String, dynamic>{
       'name': name,
       'description': description,
       'is_private': isPrivate,
@@ -168,5 +170,10 @@ class CreateProjectRequest {
       'backend_type': backendType,
       'deployment_platform': deploymentPlatform,
     };
+    // Only include app_idea if it's not empty
+    if (appIdea != null && appIdea!.trim().isNotEmpty) {
+      json['app_idea'] = appIdea;
+    }
+    return json;
   }
 }

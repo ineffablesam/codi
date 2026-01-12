@@ -25,6 +25,7 @@ class ProjectWizardController extends GetxController {
   final projectName = ''.obs;
   final projectDescription = ''.obs;
   final isPrivate = false.obs;
+  final appIdea = ''.obs; 
 
   // Serverpod manual config
   final serverpodServerUrl = ''.obs;
@@ -299,6 +300,7 @@ class ProjectWizardController extends GetxController {
     selectedDeployment.value = 'github_pages';
     projectName.value = '';
     projectDescription.value = '';
+    appIdea.value = '';
     isPrivate.value = false;
   }
 }

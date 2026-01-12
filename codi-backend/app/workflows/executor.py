@@ -7,12 +7,12 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.agents.base import AgentContext
-from app.config import settings
-from app.database import get_db_context
+from app.core.config import settings
+from app.core.database import get_db_context
 from app.models.project import Project
 from app.models.agent_task import AgentTask
 from app.utils.logging import get_logger
-from app.websocket.connection_manager import connection_manager
+from app.api.websocket.connection_manager import connection_manager
 from app.workflows.graph import create_workflow_graph
 from app.workflows.state import WorkflowState, create_initial_state
 

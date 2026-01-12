@@ -6,6 +6,7 @@ from app.models.agent_task import AgentTask
 from app.models.backend_connection import BackendConnection, ProjectBackendConfig
 from app.models.container import Container, ContainerStatus
 from app.models.deployment import Deployment, DeploymentStatus
+from app.models.plan import ImplementationPlan, PlanTask, PlanStatus
 
 __all__ = [
     "User",
@@ -18,4 +19,7 @@ __all__ = [
     "ContainerStatus",
     "Deployment",
     "DeploymentStatus",
+    "ImplementationPlan",
+    "PlanTask",
+    "PlanStatus",
 ]

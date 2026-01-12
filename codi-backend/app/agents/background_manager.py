@@ -8,9 +8,9 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from app.config import settings
+from app.core.config import settings
 from app.utils.logging import get_logger
-from app.websocket.connection_manager import connection_manager
+from app.api.websocket.connection_manager import connection_manager
 from app.agents.types import (
     BackgroundTask,
     LaunchInput,

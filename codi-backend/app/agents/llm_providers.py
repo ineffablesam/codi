@@ -10,7 +10,7 @@ from typing import Any, Optional
 from langchain_core.language_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from app.config import settings
+from app.core.config import settings
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)

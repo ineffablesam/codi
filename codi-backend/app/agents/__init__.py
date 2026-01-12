@@ -13,24 +13,33 @@ Multi-Model Support:
 """
 from app.agents.base import BaseAgent
 from app.agents.llm_providers import get_llm, get_llm_for_agent, AGENT_MODEL_CONFIG
-from app.agents.planner import PlannerAgent
-from app.agents.code_reviewer import CodeReviewerAgent
-from app.agents.git_operator import GitOperatorAgent
-from app.agents.build_deploy import BuildDeployAgent
-from app.agents.memory import MemoryAgent
 
 # Orchestration agents
-from app.agents.conductor import ConductorAgent
-from app.agents.strategist import StrategistAgent
-from app.agents.analyst import AnalystAgent
+from app.agents.orchestration import (
+    ConductorAgent,
+    StrategistAgent,
+    AnalystAgent,
+)
 
 # Specialized agents
-from app.agents.sage import SageAgent
-from app.agents.scholar import ScholarAgent
-from app.agents.scout import ScoutAgent
-from app.agents.artisan import ArtisanAgent
-from app.agents.scribe import ScribeAgent
-from app.agents.vision import VisionAgent
+from app.agents.specialized import (
+    SageAgent,
+    ScholarAgent,
+    ScoutAgent,
+    ArtisanAgent,
+    ScribeAgent,
+    VisionAgent,
+    PlannerAgent,
+    ImplementationPlannerAgent,
+)
+
+# Operations agents
+from app.agents.operations import (
+    CodeReviewerAgent,
+    GitOperatorAgent,
+    BuildDeployAgent,
+    MemoryAgent,
+)
 
 # Platform agents (from subdirectory)
 from app.agents.platform import (
@@ -55,12 +64,6 @@ from app.agents.session_manager import session_manager, SessionManager
 __all__ = [
     # Base
     "BaseAgent",
-    # Operations
-    "PlannerAgent",
-    "CodeReviewerAgent",
-    "GitOperatorAgent",
-    "BuildDeployAgent",
-    "MemoryAgent",
     # Orchestration
     "ConductorAgent",
     "StrategistAgent",
@@ -72,6 +75,13 @@ __all__ = [
     "ArtisanAgent",
     "ScribeAgent",
     "VisionAgent",
+    "PlannerAgent",
+    "ImplementationPlannerAgent",
+    # Operations
+    "CodeReviewerAgent",
+    "GitOperatorAgent",
+    "BuildDeployAgent",
+    "MemoryAgent",
     # Platform
     "FlutterEngineerAgent",
     "ReactEngineerAgent",

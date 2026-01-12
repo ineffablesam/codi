@@ -23,6 +23,8 @@ class ProjectCreate(ProjectBase):
     framework: Optional[str] = Field("flutter", description="Framework: flutter, react, nextjs, react_native")
     backend_type: Optional[str] = Field(None, description="Backend: supabase, firebase, serverpod")
 
+    app_idea: Optional[str] = Field(None, description="App idea to auto-generate code from")
+
 
 class ProjectUpdate(BaseModel):
     """Schema for updating project information."""

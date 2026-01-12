@@ -14,9 +14,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import END, StateGraph
 
-from app.config import settings
+from app.core.config import settings
 from app.utils.logging import get_logger
-from app.websocket.connection_manager import connection_manager
+from app.api.websocket.connection_manager import connection_manager
 from app.workflows.state import (
     WorkflowState,
     get_next_executable_step,
@@ -122,7 +122,7 @@ async def conductor_node(state: WorkflowState) -> WorkflowState:
     an execution plan. This is the new entry point for the workflow.
     """
     from app.agents.base import AgentContext
-    from app.agents.conductor import ConductorAgent
+    from app.agents.orchestration.conductor import ConductorAgent
     
     project_id = state["project_id"]
     
@@ -184,7 +184,7 @@ async def sage_node(state: WorkflowState) -> WorkflowState:
     Called when architecture decisions or debugging after 2+ attempts is needed.
     """
     from app.agents.base import AgentContext
-    from app.agents.sage import SageAgent
+    from app.agents.specialized.sage import SageAgent
     
     project_id = state["project_id"]
     
@@ -230,7 +230,7 @@ async def scout_node(state: WorkflowState) -> WorkflowState:
     Used for search, pattern matching, and file discovery.
     """
     from app.agents.base import AgentContext
-    from app.agents.scout import ScoutAgent
+    from app.agents.specialized.scout import ScoutAgent
     
     project_id = state["project_id"]
     
@@ -275,7 +275,7 @@ async def scholar_node(state: WorkflowState) -> WorkflowState:
     Searches official docs, OSS repos for examples and best practices.
     """
     from app.agents.base import AgentContext
-    from app.agents.scholar import ScholarAgent
+    from app.agents.specialized.scholar import ScholarAgent
     
     project_id = state["project_id"]
     step = get_next_executable_step(state)
@@ -315,7 +315,7 @@ async def scribe_node(state: WorkflowState) -> WorkflowState:
     Creates README, API docs, technical guides.
     """
     from app.agents.base import AgentContext
-    from app.agents.scribe import ScribeAgent
+    from app.agents.specialized.scribe import ScribeAgent
     
     project_id = state["project_id"]
     step = get_next_executable_step(state)
@@ -355,7 +355,7 @@ async def strategist_node(state: WorkflowState) -> WorkflowState:
     Creates detailed execution plans for complex tasks.
     """
     from app.agents.base import AgentContext
-    from app.agents.strategist import StrategistAgent
+    from app.agents.orchestration.strategist import StrategistAgent
     
     project_id = state["project_id"]
     step = get_next_executable_step(state)
@@ -396,7 +396,7 @@ async def vision_node(state: WorkflowState) -> WorkflowState:
     Analyzes images, screenshots, PDFs, diagrams.
     """
     from app.agents.base import AgentContext
-    from app.agents.vision import VisionAgent
+    from app.agents.specialized.vision import VisionAgent
     
     project_id = state["project_id"]
     step = get_next_executable_step(state)
@@ -436,7 +436,7 @@ async def analyst_node(state: WorkflowState) -> WorkflowState:
     Identifies hidden requirements and potential failure points.
     """
     from app.agents.base import AgentContext
-    from app.agents.analyst import AnalystAgent
+    from app.agents.orchestration.analyst import AnalystAgent
     
     project_id = state["project_id"]
     step = get_next_executable_step(state)
@@ -478,7 +478,7 @@ async def artisan_node(state: WorkflowState) -> WorkflowState:
     Creates beautiful, polished user interfaces.
     """
     from app.agents.base import AgentContext
-    from app.agents.artisan import ArtisanAgent
+    from app.agents.specialized.artisan import ArtisanAgent
     
     project_id = state["project_id"]
     step = get_next_executable_step(state)
@@ -524,7 +524,7 @@ async def planner_node(state: WorkflowState) -> WorkflowState:
     Delegates to PlannerAgent.run() which has the complete prompt and logic.
     """
     from app.agents.base import AgentContext
-    from app.agents.planner import PlannerAgent
+    from app.agents.specialized.planner import PlannerAgent
     
     project_id = state["project_id"]
     
@@ -577,6 +577,7 @@ async def planner_node(state: WorkflowState) -> WorkflowState:
                 {"id": 1, "description": state["user_message"], "agent": primary_agent, "action": "implement", "status": "pending", "result": None, "dependencies": [], "file_path": None},
                 {"id": 2, "description": "Review code changes", "agent": "code_reviewer", "action": "review", "status": "pending", "result": None, "dependencies": [], "file_path": None},
                 {"id": 3, "description": "Commit changes", "agent": "git_operator", "action": "commit", "status": "pending", "result": None, "dependencies": [], "file_path": None},
+                {"id": 4, "description": "Build and deploy app", "agent": "build_deploy", "action": "create", "status": "pending", "result": None, "dependencies": [3], "file_path": None},
             ]
         
         # Ensure code_reviewer and git_operator steps
@@ -587,6 +588,11 @@ async def planner_node(state: WorkflowState) -> WorkflowState:
             plan_steps.append({"id": len(plan_steps) + 1, "description": "Review code changes", "agent": "code_reviewer", "action": "review", "status": "pending", "result": None, "dependencies": [], "file_path": None})
         if not has_git:
             plan_steps.append({"id": len(plan_steps) + 1, "description": "Commit changes", "agent": "git_operator", "action": "commit", "status": "pending", "result": None, "dependencies": [], "file_path": None})
+        
+        # Ensure build_deploy step if it was requested
+        has_build = any(s["agent"] == "build_deploy" for s in plan_steps)
+        if not has_build and ("build" in state["user_message"].lower()):
+            plan_steps.append({"id": len(plan_steps) + 1, "description": "Build and deploy app", "agent": "build_deploy", "action": "create", "status": "pending", "result": None, "dependencies": [], "file_path": None})
         
         await broadcast_status(project_id, "planner", "completed", f"Plan created with {len(plan_steps)} steps")
         
@@ -681,7 +687,7 @@ async def flutter_engineer_node(state: WorkflowState) -> WorkflowState:
 async def code_reviewer_node(state: WorkflowState) -> WorkflowState:
     """Code Reviewer agent node - reviews code changes using CodeReviewerAgent."""
     from app.agents.base import AgentContext
-    from app.agents.code_reviewer import CodeReviewerAgent
+    from app.agents.operations.code_reviewer import CodeReviewerAgent
     
     step = get_next_executable_step(state)
     if not step or step["agent"] != "code_reviewer":
@@ -749,7 +755,7 @@ async def git_operator_node(state: WorkflowState) -> WorkflowState:
     Uses the GitOperatorAgent class since it needs GitHub API access.
     """
     from app.agents.base import AgentContext
-    from app.agents.git_operator import GitOperatorAgent
+    from app.agents.operations.git_operator import GitOperatorAgent
     
     step = get_next_executable_step(state)
     if not step or step["agent"] != "git_operator":
@@ -806,7 +812,7 @@ async def git_operator_node(state: WorkflowState) -> WorkflowState:
 async def build_deploy_node(state: WorkflowState) -> WorkflowState:
     """Build Deploy agent node - handles CI/CD."""
     from app.agents.base import AgentContext
-    from app.agents.build_deploy import BuildDeployAgent
+    from app.agents.operations.build_deploy import BuildDeployAgent
     
     step = get_next_executable_step(state)
     if not step or step["agent"] != "build_deploy":
@@ -1029,7 +1035,7 @@ async def backend_integration_node(state: WorkflowState) -> WorkflowState:
 async def memory_node(state: WorkflowState) -> WorkflowState:
     """Memory agent node - logs operations to database."""
     from app.agents.base import AgentContext
-    from app.agents.memory import MemoryAgent
+    from app.agents.operations.memory import MemoryAgent
     
     project_id = state["project_id"]
     

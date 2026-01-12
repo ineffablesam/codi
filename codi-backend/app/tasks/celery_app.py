@@ -6,7 +6,7 @@ from typing import Any, Dict
 from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown
 
-from app.config import settings
+from app.core.config import settings
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -52,7 +52,7 @@ def init_worker_db(**kwargs):
         return
     
     from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-    import app.database as db_module
+    import app.core.database as db_module
     
     logger.info("Initializing database connections for worker process")
     
@@ -90,7 +90,7 @@ def shutdown_worker_db(**kwargs):
     if not _worker_db_initialized:
         return
     
-    import app.database as db_module
+    import app.core.database as db_module
     
     logger.info("Closing worker database connections")
     
@@ -238,7 +238,7 @@ def cleanup_old_logs_task(days_to_keep: int = 30) -> Dict[str, Any]:
 
     from sqlalchemy import delete
 
-    from app.database import get_db_context
+    from app.core.database import get_db_context
     from app.models.operation_log import OperationLog
 
     async def do_cleanup() -> int:

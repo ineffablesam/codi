@@ -7,7 +7,7 @@ from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, ForeignKey, Integer, 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.backend_connection import ProjectBackendConfig
     from app.models.container import Container
     from app.models.deployment import Deployment
+    from app.models.plan import ImplementationPlan
 
 
 class ProjectStatus(str, Enum):
@@ -131,6 +132,12 @@ class Project(Base):
     )
     deployments: Mapped[List["Deployment"]] = relationship(
         "Deployment",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    plans: Mapped[List["ImplementationPlan"]] = relationship(
+        "ImplementationPlan",
         back_populates="project",
         cascade="all, delete-orphan",
         lazy="selectin",

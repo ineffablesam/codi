@@ -172,8 +172,6 @@ codi-backend/
   │   ├── api/
   │   │   ├── containers.py        # Container endpoints
   │   │   └── deployments.py       # Deployment endpoints
-  │   └── agents/
-  │       └── container_manager.py # ContainerManagerAgent
   └── docker-compose.yml           # Infrastructure
 ```
 

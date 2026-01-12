@@ -6,7 +6,7 @@ from typing import Any, Dict
 import structlog
 from structlog.types import Processor
 
-from app.config import settings
+from app.core.config import settings
 
 
 def setup_logging() -> None:

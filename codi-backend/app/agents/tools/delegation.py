@@ -158,20 +158,20 @@ def _populate_agent_registry():
     global AGENT_REGISTRY
     
     try:
-        from app.agents.conductor import ConductorAgent
-        from app.agents.sage import SageAgent
-        from app.agents.scholar import ScholarAgent
-        from app.agents.scout import ScoutAgent
-        from app.agents.artisan import ArtisanAgent
-        from app.agents.scribe import ScribeAgent
-        from app.agents.vision import VisionAgent
-        from app.agents.strategist import StrategistAgent
-        from app.agents.analyst import AnalystAgent
-        from app.agents.planner import PlannerAgent
-        from app.agents.code_reviewer import CodeReviewerAgent
-        from app.agents.git_operator import GitOperatorAgent
-        from app.agents.build_deploy import BuildDeployAgent
-        from app.agents.memory import MemoryAgent
+        from app.agents.orchestration.conductor import ConductorAgent
+        from app.agents.specialized.sage import SageAgent
+        from app.agents.specialized.scholar import ScholarAgent
+        from app.agents.specialized.scout import ScoutAgent
+        from app.agents.specialized.artisan import ArtisanAgent
+        from app.agents.specialized.scribe import ScribeAgent
+        from app.agents.specialized.vision import VisionAgent
+        from app.agents.orchestration.strategist import StrategistAgent
+        from app.agents.orchestration.analyst import AnalystAgent
+        from app.agents.specialized.planner import PlannerAgent
+        from app.agents.operations.code_reviewer import CodeReviewerAgent
+        from app.agents.operations.git_operator import GitOperatorAgent
+        from app.agents.operations.build_deploy import BuildDeployAgent
+        from app.agents.operations.memory import MemoryAgent
         
         AGENT_REGISTRY.update({
             "conductor": ConductorAgent,

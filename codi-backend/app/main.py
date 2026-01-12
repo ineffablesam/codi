@@ -6,9 +6,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import agents_router, auth_router, health_router, projects_router, files_router, backend_router, containers_router, deployments_router
-from app.config import settings
-from app.database import init_db
+from app.api import agents_router, auth_router, health_router, projects_router, files_router, backend_router, containers_router, deployments_router, plans_router
+from app.core.config import settings
+from app.core.database import init_db
 from app.utils.logging import get_logger, setup_logging
 
 # Initialize logging
@@ -37,8 +37,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Start Redis subscriber for cross-process WebSocket messaging
     # This receives messages from Celery workers and broadcasts to WebSocket connections
     try:
-        from app.websocket.redis_broadcaster import redis_broadcaster
-        from app.websocket.connection_manager import connection_manager
+        from app.api.websocket.redis_broadcaster import redis_broadcaster
+        from app.api.websocket.connection_manager import connection_manager
         
         async def on_redis_message(project_id: int, message: dict):
             """Callback when a message is received from Redis.
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     # Clean up Redis broadcaster
     try:
-        from app.websocket.redis_broadcaster import redis_broadcaster
+        from app.api.websocket.redis_broadcaster import redis_broadcaster
         await redis_broadcaster.disconnect()
         logger.info("Redis broadcaster disconnected")
     except Exception as e:
@@ -132,9 +132,7 @@ app.include_router(agents_router, prefix="/api/v1")
 app.include_router(backend_router, prefix="/api/v1")
 app.include_router(containers_router, prefix="/api/v1")
 app.include_router(deployments_router, prefix="/api/v1")
-
-# Webhook router (removed - GitHub webhooks no longer used in local-only environment)
-
+app.include_router(plans_router, prefix="/api/v1")
 
 
 @app.get("/")

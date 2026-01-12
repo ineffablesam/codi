@@ -15,8 +15,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
-from app.database import Base
-from app.services.encryption import encryption_service
+from app.core.database import Base
+from app.services.domain.encryption import encryption_service
 
 
 class BackendConnection(Base):

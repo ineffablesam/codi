@@ -8,7 +8,7 @@ from langchain_core.tools import BaseTool, tool
 from app.agents.base import AgentContext, BaseAgent
 from app.agents.prompts.flutter_engineer_prompts import SYSTEM_PROMPT as ENHANCED_SYSTEM_PROMPT
 from app.agents.tools.dart_analyzer import DartAnalyzer
-from app.services.flutter import (
+from app.services.domain.flutter import (
     analyze_dart_code,
     extract_widgets_from_code,
     generate_getx_controller_template,

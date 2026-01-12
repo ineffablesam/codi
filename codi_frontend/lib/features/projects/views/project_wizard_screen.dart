@@ -31,6 +31,7 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
 
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _appIdeaController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   // Backend connection tracking
@@ -121,6 +122,7 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
     _slideController.dispose();
     _nameController.dispose();
     _descriptionController.dispose();
+    _appIdeaController.dispose();
     Get.delete<ProjectWizardController>();
     super.dispose();
   }
@@ -443,6 +445,35 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
           ),
           SizedBox(height: 24.h),
 
+          // App Idea
+          Text(
+            'App Idea (Optional)',
+            style: GoogleFonts.inter(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          TextFormField(
+            controller: _appIdeaController,
+            decoration: InputDecoration(
+              hintText: 'e.g., A church app with events calendar, sermon videos, and donation features',
+              prefixIcon: Icon(Icons.lightbulb_outline, size: 20.r),
+            ),
+            maxLines: 4,
+            onChanged: (value) => _wizard.appIdea.value = value,
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'Provide an idea and the AI will automatically build your app',
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: 24.h),
+
           // Private toggle
           _buildPrivateToggle(),
           SizedBox(height: 40.h),
@@ -706,6 +737,7 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
       framework: _wizard.selectedFramework.value,
       backendType: _wizard.selectedBackend.value,
       deploymentPlatform: _wizard.selectedDeployment.value,
+      appIdea: _wizard.appIdea.value.trim().isEmpty ? null : _wizard.appIdea.value.trim(),
     );
   }
 }

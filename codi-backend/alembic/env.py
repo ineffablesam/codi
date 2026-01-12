@@ -8,7 +8,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.config import settings
-from app.database import Base
+from app.core.database import Base
 from app.models import user, project, operation_log  # noqa: F401 - Import all models
 
 # Alembic Config object

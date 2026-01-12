@@ -9,11 +9,11 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel
 
-from app.config import settings
-from app.services.git_service import LocalGitService, get_git_service
-from app.services.docker_service import DockerService, get_docker_service
+from app.core.config import settings
+from app.services.infrastructure.git import LocalGitService, get_git_service
+from app.services.infrastructure.docker import DockerService, get_docker_service
 from app.utils.logging import get_logger
-from app.websocket.connection_manager import connection_manager
+from app.api.websocket.connection_manager import connection_manager
 
 logger = get_logger(__name__)
 
@@ -395,7 +395,7 @@ class BaseAgent(ABC):
             error_message: Error message if failed
         """
         try:
-            from app.agents.memory import MemoryAgent
+            from app.agents.operations.memory import MemoryAgent
             from app.models.operation_log import AgentType, OperationType
             
             memory = MemoryAgent(self.context)
