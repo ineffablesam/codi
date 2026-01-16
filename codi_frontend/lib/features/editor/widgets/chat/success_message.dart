@@ -95,9 +95,8 @@ class SuccessMessage extends StatelessWidget {
                         color: AppColors.success,
                       ),
                     ),
-                    if (message.buildTime != null)
                     Text(
-                      'Deployed successfully in ${message.buildTime}',
+                      'Deployed successfully',
                       style: GoogleFonts.inter(
                         fontSize: 11.sp,
                         color: AppColors.textSecondary,

@@ -1,4 +1,9 @@
-"""API endpoints for implementation plan management."""
+"""API endpoints for implementation plan management.
+
+NOTE: This has been simplified to work with the new baby-code style agent.
+Plans are now created directly via the simple coding agent rather than
+a dedicated PlannerAgent.
+"""
 from datetime import datetime
 from typing import List
 
@@ -7,8 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user
-from app.agents.base import AgentContext
-from app.agents.specialized.implementation_planner import ImplementationPlannerAgent
+from app.agent.tools import AgentContext
 from app.core.database import get_db
 from app.models.plan import ImplementationPlan, PlanStatus, PlanTask
 from app.models.project import Project
@@ -39,8 +43,8 @@ async def create_plan(
     """
     Create a new implementation plan from user request.
 
-    This triggers the Planning Agent to analyze the request and generate
-    a detailed TODO-driven implementation plan.
+    This creates a simple plan record. The actual implementation
+    is now handled by the unified coding agent via chat.
     """
     # Verify project exists and user has access
     result = await db.execute(
@@ -56,31 +60,21 @@ async def create_plan(
             detail="Project not found or access denied",
         )
 
-    # Create agent context
-    context = AgentContext(
-        project_id=project.id,
-        user_id=current_user.id,
-        project_folder=project.local_path,
-        current_branch=project.git_branch or "main",
-    )
-
-    # Initialize planning agent
-    planner = ImplementationPlannerAgent(context)
-
     try:
-        # Create plan
-        result = await planner.create_plan(
+        # Create a simple plan record
+        plan = ImplementationPlan(
+            project_id=project.id,
+            title=f"Plan: {request.user_request[:50]}...",
             user_request=request.user_request,
-            db=db,
+            status=PlanStatus.PENDING_REVIEW,
+            estimated_time="Estimated by agent",
+            total_tasks=0,
+            completed_tasks=0,
+            markdown_content=f"# Implementation Plan\n\n{request.user_request}\n\n*Use the chat to implement this request.*",
         )
-
-        # Fetch created plan with tasks
-        plan_result = await db.execute(
-            select(ImplementationPlan).where(
-                ImplementationPlan.id == result["plan_id"]
-            )
-        )
-        plan = plan_result.scalar_one()
+        db.add(plan)
+        await db.commit()
+        await db.refresh(plan)
 
         return PlanResponse(
             id=plan.id,
@@ -98,7 +92,7 @@ async def create_plan(
             approved_at=plan.approved_at,
             rejected_at=plan.rejected_at,
             completed_at=plan.completed_at,
-            tasks=[TaskResponse.model_validate(t) for t in plan.tasks],
+            tasks=[],
         )
 
     except Exception as e:
@@ -212,12 +206,7 @@ async def approve_plan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PlanResponse:
-    """
-    Approve an implementation plan and start execution.
-
-    This changes the plan status to 'approved' and triggers the
-    Conductor agent to begin executing tasks.
-    """
+    """Approve an implementation plan."""
     result = await db.execute(
         select(ImplementationPlan).where(ImplementationPlan.id == plan_id)
     )
@@ -261,7 +250,7 @@ async def approve_plan(
         {
             "type": "plan_approved",
             "plan_id": plan_id,
-            "message": request.comment or "Plan approved. Starting implementation...",
+            "message": request.comment or "Plan approved.",
             "timestamp": datetime.utcnow().isoformat(),
         },
     )
@@ -293,12 +282,7 @@ async def reject_plan(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PlanResponse:
-    """
-    Reject an implementation plan.
-
-    This softly declines the plan and allows the user to request
-    a new plan with modified requirements.
-    """
+    """Reject an implementation plan."""
     result = await db.execute(
         select(ImplementationPlan).where(ImplementationPlan.id == plan_id)
     )
@@ -342,7 +326,7 @@ async def reject_plan(
         {
             "type": "plan_rejected",
             "plan_id": plan_id,
-            "message": request.comment or "Plan declined. Feel free to request changes.",
+            "message": request.comment or "Plan declined.",
             "timestamp": datetime.utcnow().isoformat(),
         },
     )
@@ -415,12 +399,7 @@ async def update_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TaskResponse:
-    """
-    Update task completion status.
-
-    This is called by agents after completing a task to tick the
-    checkbox in the markdown file and update progress.
-    """
+    """Update task completion status."""
     # Verify access
     plan_result = await db.execute(
         select(ImplementationPlan).where(ImplementationPlan.id == plan_id)
@@ -445,37 +424,26 @@ async def update_task(
             detail="Access denied",
         )
 
-    # Create agent context for planner
-    context = AgentContext(
-        project_id=project.id,
-        user_id=current_user.id,
-        project_folder=project.local_path,
-        current_branch=project.git_branch or "main",
-    )
-
-    planner = ImplementationPlannerAgent(context)
-
     try:
-        await planner.update_task_status(
-            plan_id=plan_id,
-            task_id=task_id,
-            completed=request.completed,
-            db=db,
-        )
-
-        # Refresh task
+        # Update task status
         task_result = await db.execute(
             select(PlanTask).where(PlanTask.id == task_id)
         )
-        task = task_result.scalar_one()
+        task = task_result.scalar_one_or_none()
+        if not task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Task {task_id} not found",
+            )
+        
+        task.is_completed = request.completed
+        await db.commit()
+        await db.refresh(task)
 
         return TaskResponse.model_validate(task)
 
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to update task: {e}")
         raise HTTPException(

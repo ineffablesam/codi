@@ -37,32 +37,11 @@ class Settings(BaseSettings):
     github_app_id: str = ""
     github_app_private_key_path: str = ""
 
-    # Google Gemini
+    # =========================================================================
+    # AI Configuration - Simplified to use Gemini 3 Flash
+    # =========================================================================
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3-flash-preview"  # Default model (Gemini 3)
-
-    # Multi-Model Agent Configuration
-    force_gemini_overall: bool = False  # Set to True for cost-efficient Gemini-only mode
-    
-    # Gemini 3 Model Configuration
-    gemini_thinking_model: str = "gemini-3-pro-preview"  # For orchestration/reasoning
-    gemini_fast_model: str = "gemini-3-flash-preview"    # For fast tasks
-    gemini_creative_model: str = "gemini-3-pro-high"     # For creative/UI work
-    
-    # Additional API Keys (required when force_gemini_overall=False)
-    openai_api_key: str = ""
-    anthropic_api_key: str = ""
-    
-    # Agent Model Configuration (latest models only - no fallbacks)
-    conductor_model: str = "claude-opus-4-5"  # Master orchestrator
-    sage_model: str = "gpt-5.2"  # Strategic advisor
-    scholar_model: str = "claude-sonnet-4-5"  # Research specialist
-    scout_model: str = "gemini-3-flash-preview"  # Fast codebase search
-    artisan_model: str = "gemini-3-pro-high"  # UI/UX specialist (creative)
-    scribe_model: str = "gemini-3-flash-preview"  # Technical writing
-    vision_model: str = "gemini-3-flash-preview"  # Multimodal analysis
-    strategist_model: str = "claude-sonnet-4-5"  # Work planner
-    analyst_model: str = "claude-sonnet-4-5"  # Pre-planning
+    gemini_model: str = "gemini-3-flash-preview"  # Primary model for all agent tasks
 
     # Encryption
     encryption_key: str = ""
@@ -93,7 +72,7 @@ class Settings(BaseSettings):
     github_pages_enabled: bool = True
     
     # GitHub Webhook
-    github_webhook_secret: str = ""  # Optional secret for webhook signature verification
+    github_webhook_secret: str = ""
 
     # Vercel OAuth
     vercel_client_id: str = ""

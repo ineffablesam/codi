@@ -79,7 +79,7 @@ class WebSocketHandler:
         )
 
         # Import here to avoid circular imports
-        from app.api.agents import submit_agent_task_internal
+        from app.api.v1.routes.agents import submit_agent_task_internal
 
         try:
             # Submit the task

@@ -26,7 +26,7 @@ services:
     build:
       context: .
       target: development
-    user: "1000:1000"
+    user: root
     ports:
       - "8000:8000"
     volumes:
@@ -94,7 +94,7 @@ services:
     build:
       context: .
       target: development
-    user: "1000:1000"
+    user: root
     command: celery -A app.tasks.celery_app worker --loglevel=info
     volumes:
       - .:/app

@@ -78,6 +78,7 @@ class StatusIcons {
   static const activity = LucideIcons.activity;
   static const plus = LucideIcons.plus;
   static const palette = LucideIcons.palette;
+  static const tool = LucideIcons.wrench;
 }
 
 class AgentAvatarIcons {

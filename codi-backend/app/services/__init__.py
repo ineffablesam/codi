@@ -3,7 +3,6 @@
 from app.services.domain import (
     EncryptionService,
     StarterTemplateService,
-    DeploymentService,
     FrameworkDetector,
     detect_framework,
 )
@@ -22,7 +21,6 @@ __all__ = [
     # Domain
     "EncryptionService",
     "StarterTemplateService",
-    "DeploymentService",
     "FrameworkDetector",
     "detect_framework",
     # Infrastructure

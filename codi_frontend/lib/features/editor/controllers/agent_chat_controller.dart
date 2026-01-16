@@ -1,4 +1,4 @@
-/// Agent chat controller
+/// Agent chat controller - simplified
 library;
 
 import 'dart:async';
@@ -30,6 +30,7 @@ class AgentChatController extends GetxController {
   final isAgentWorking = false.obs;
   final isTyping = false.obs;
   final isSending = false.obs;
+  final currentTaskId = RxnString();
 
   @override
   void onInit() {
@@ -61,20 +62,17 @@ class AgentChatController extends GetxController {
 
     // Update controller states based on message type
     switch (message.type) {
-      case MessageType.llmStream:
-        _handleStreamingChunk(message);
-        break;
-
+      case MessageType.agentResponse:
       case MessageType.conversationalResponse:
-        // Instant chat response - no workflow, just display
+        // Chat response - display and stop working
         addMessage(message);
-        isTyping.value = false;  // Stop typing indicator if showing
-        isAgentWorking.value = false;  // Not a full workflow
+        isTyping.value = false;
+        isAgentWorking.value = false;
         break;
 
       case MessageType.agentStatus:
         addMessage(message);
-        if (message.status == 'started') {
+        if (message.status == 'started' || message.status == 'thinking') {
           isAgentWorking.value = true;
           isTyping.value = true;
           _editorController.setAgentWorking(true);
@@ -85,12 +83,11 @@ class AgentChatController extends GetxController {
         }
         break;
 
-      case MessageType.fileOperation:
       case MessageType.toolExecution:
+      case MessageType.toolResult:
+      case MessageType.fileOperation:
       case MessageType.gitOperation:
-      case MessageType.reviewProgress:
-      case MessageType.reviewIssue:
-        // All operation messages should display in chat
+        // Operation messages display in chat
         addMessage(message);
         break;
 
@@ -106,10 +103,6 @@ class AgentChatController extends GetxController {
             _editorController.updateBuildProgress(message.progress!);
           }
         } catch (_) {}
-        break;
-
-      case MessageType.buildStatus:
-        addMessage(message);
         break;
 
       case MessageType.deploymentComplete:
@@ -148,6 +141,9 @@ class AgentChatController extends GetxController {
 
       case MessageType.error:
         addMessage(message);
+        isAgentWorking.value = false;
+        isTyping.value = false;
+        _editorController.setAgentWorking(false);
         Get.snackbar(
           'Agent Error',
           message.text,
@@ -159,65 +155,9 @@ class AgentChatController extends GetxController {
         );
         break;
 
-      case MessageType.userInputRequired:
-        addMessage(message);
-        _showUserInputDialog(message);
-        break;
-
       case MessageType.user:
         // User messages are added directly by sendMessage()
         break;
-
-      // Multi-agent orchestration messages
-      case MessageType.backgroundTaskStarted:
-      case MessageType.backgroundTaskProgress:
-      case MessageType.backgroundTaskCompleted:
-      case MessageType.delegationStatus:
-      case MessageType.batchComplete:
-        addMessage(message);
-        break;
-    }
-  }
-
-  /// Handle streaming chunks by appending to the last message or creating a new one
-  void _handleStreamingChunk(AgentMessage message) {
-    if (messages.isNotEmpty &&
-        messages.last.type == MessageType.llmStream &&
-        messages.last.agent == message.agent) {
-      // Create a replacement message with accumulated text
-      final lastMsg = messages.last;
-      
-      final updatedMsg = AgentMessage(
-        text: lastMsg.text + message.text,
-        timestamp: message.timestamp,
-        type: MessageType.llmStream,
-        agent: message.agent,
-        // Preserve crucial UI state
-        status: message.status ?? lastMsg.status ?? 'streaming',
-        isWorking: message.isWorking ?? lastMsg.isWorking ?? true,
-        details: message.details ?? lastMsg.details,
-        // Preserve other potentially relevant fields
-        taskId: lastMsg.taskId,
-        sessionId: lastMsg.sessionId,
-      );
-      
-      // Replace the last message to trigger UI update
-      messages[messages.length - 1] = updatedMsg;
-    } else {
-      // First chunk from this agent, add as a new message
-      // Ensure status is set for UI
-      final newMessage = AgentMessage(
-        text: message.text,
-        timestamp: message.timestamp,
-        type: MessageType.llmStream,
-        agent: message.agent,
-        status: message.status ?? 'streaming',
-        isWorking: message.isWorking ?? true,
-        details: message.details,
-        taskId: message.taskId,
-        sessionId: message.sessionId,
-      );
-      addMessage(newMessage);
     }
   }
 
@@ -257,11 +197,8 @@ class AgentChatController extends GetxController {
         throw Exception('No project loaded');
       }
 
-      // Send via WebSocket
+      // Send via WebSocket (this triggers the agent workflow)
       _webSocketClient.sendUserMessage(trimmedText);
-
-      // Also submit via API for task tracking
-      await _editorService.submitTask(projectId, trimmedText);
 
     } catch (e) {
       AppLogger.error('Failed to send message', error: e);
@@ -277,36 +214,29 @@ class AgentChatController extends GetxController {
     }
   }
 
-  /// Show dialog for user input required
-  void _showUserInputDialog(AgentMessage message) {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Agent needs your input'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(message.question ?? message.text),
-            if (message.options != null && message.options!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              ...message.options!.map((option) => ListTile(
-                    title: Text(option),
-                    onTap: () {
-                      Get.back();
-                      _webSocketClient.sendUserInputResponse(option);
-                    },
-                  )),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
+  /// Stop the current running task
+  Future<void> stopTask() async {
+    if (!isAgentWorking.value || currentTaskId.value == null) return;
+
+    try {
+      final projectId = _editorController.currentProject.value?.id;
+      if (projectId == null) return;
+
+      final taskId = currentTaskId.value!;
+      AppLogger.info('Stopping task: $taskId');
+
+      // Call high-level API to stop task
+      // We'll use editorService since it handles REST calls
+      await _editorService.stopTask(projectId.toString(), taskId);
+      
+      // Update local state proactively
+      isAgentWorking.value = false;
+      isTyping.value = false;
+      _editorController.setAgentWorking(false);
+
+    } catch (e) {
+      AppLogger.error('Failed to stop task', error: e);
+    }
   }
 
   /// Clear chat history

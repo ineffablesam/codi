@@ -130,7 +130,7 @@ async def create_project(
     Returns:
         Created project
     """
-    # Determine framework - default to flutter for backward compatibility
+    # Determine framework - default to flutter
     framework = getattr(project_data, 'framework', 'flutter') or 'flutter'
     platform_type = getattr(project_data, 'platform_type', 'mobile') or 'mobile'
     backend_type = getattr(project_data, 'backend_type', None)

@@ -1,0 +1,14 @@
+name: nextjs
+version: 14.0.0
+pack_type: frontend
+description: "Next.js - The React Framework for Production with App Router, Server Components, and Streaming"
+
+compatibility:
+  node: ">=18.0.0"
+  react: "^18.2.0"
+
+tags:
+  - react
+  - frontend
+  - ssr
+  - app-router

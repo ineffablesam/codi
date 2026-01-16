@@ -19,16 +19,16 @@ import '../utils/logger.dart';
 class WebSocketClient extends GetxService {
   WebSocketChannel? _channel;
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
-  
+
   /// Stream of incoming WebSocket messages
   Stream<Map<String, dynamic>> get messageStream => _messageController.stream;
-  
+
   /// Connection status
   final isConnected = false.obs;
-  
+
   /// Current project ID
   String? _currentProjectId;
-  
+
   Timer? _reconnectTimer;
   Timer? _heartbeatTimer;
   int _reconnectAttempts = 0;
@@ -58,7 +58,8 @@ class WebSocketClient extends GetxService {
         return;
       }
 
-      final wsUrl = '${Environment.wsBaseUrl}/api/v1/agents/$_currentProjectId/ws?token=$token';
+      final wsUrl =
+          '${Environment.wsBaseUrl}/api/v1/agents/$_currentProjectId/ws?token=$token';
       AppLogger.debug('Connecting to WebSocket: $wsUrl');
 
       _channel = IOWebSocketChannel.connect(
@@ -78,12 +79,12 @@ class WebSocketClient extends GetxService {
       );
 
       AppLogger.info('WebSocket connected to project $_currentProjectId');
-      
-      _showSnackbar(
-        'Connected',
-        'Real-time updates enabled',
-        backgroundColor: AppColors.success,
-      );
+
+      // _showSnackbar(
+      //   'Connected',
+      //   'Real-time updates enabled',
+      //   backgroundColor: AppColors.success,
+      // );
     } catch (e) {
       AppLogger.error('WebSocket connection failed', error: e);
       _attemptReconnect();
@@ -94,12 +95,12 @@ class WebSocketClient extends GetxService {
     try {
       final data = jsonDecode(message as String) as Map<String, dynamic>;
       AppLogger.debug('WebSocket message: ${data['type']}');
-      
+
       // Handle pong messages internally
       if (data['type'] == 'pong') {
         return;
       }
-      
+
       // Broadcast message to listeners
       _messageController.add(data);
     } catch (e) {
@@ -116,7 +117,7 @@ class WebSocketClient extends GetxService {
     AppLogger.info('WebSocket connection closed');
     isConnected.value = false;
     _heartbeatTimer?.cancel();
-    
+
     if (_currentProjectId != null) {
       _attemptReconnect();
     }
@@ -150,7 +151,8 @@ class WebSocketClient extends GetxService {
       seconds: min(30, pow(2, _reconnectAttempts).toInt()),
     );
 
-    AppLogger.info('Reconnecting in ${delay.inSeconds}s (attempt $_reconnectAttempts)');
+    AppLogger.info(
+        'Reconnecting in ${delay.inSeconds}s (attempt $_reconnectAttempts)');
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(delay, () {
@@ -196,12 +198,12 @@ class WebSocketClient extends GetxService {
     _currentProjectId = null;
     _reconnectTimer?.cancel();
     _heartbeatTimer?.cancel();
-    
+
     if (_channel != null) {
       await _channel!.sink.close();
       _channel = null;
     }
-    
+
     isConnected.value = false;
     AppLogger.info('WebSocket disconnected');
   }

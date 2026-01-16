@@ -14,13 +14,29 @@ WORKDIR /app
 RUN groupadd -g 1000 codi && \
     useradd -u 1000 -g codi -s /bin/bash -m codi
 
-# Install system dependencies
+# Install system dependencies including Docker CLI and buildx for container builds
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    pkg-config \
+    libssl-dev \
     git \
     curl \
+    apt-transport-https \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    # Install Docker CLI and buildx for BuildKit support (detect arch)
+    && ARCH=$(dpkg --print-architecture) \
+    && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
+    && echo "deb [arch=${ARCH} signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && apt-get update && apt-get install -y docker-ce-cli docker-buildx-plugin \
     && rm -rf /var/lib/apt/lists/*
+
+# Create repos directory and set permissions
+RUN mkdir -p /var/codi/repos && chown 1000:1000 /var/codi/repos
 
 # Development stage
 FROM base as development

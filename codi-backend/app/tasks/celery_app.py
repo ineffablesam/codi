@@ -8,8 +8,10 @@ from celery.signals import worker_process_init, worker_process_shutdown
 
 from app.core.config import settings
 from app.utils.logging import get_logger
+from app.utils.serialization import sanitize_for_json
 
 logger = get_logger(__name__)
+
 
 # Create Celery app
 celery_app = Celery(
@@ -195,9 +197,10 @@ def run_agent_workflow_task(
         return {
             "task_id": task_id,
             "status": "completed",
-            "result": result,
+            "result": sanitize_for_json(result),
             "duration_seconds": duration,
         }
+
 
     except Exception as e:
         end_time = datetime.utcnow()
@@ -213,12 +216,13 @@ def run_agent_workflow_task(
         # Update task state to failure
         self.update_state(
             state="FAILURE",
-            meta={
+            meta=sanitize_for_json({
                 "task_id": task_id,
                 "error": str(e),
                 "duration_seconds": duration,
-            },
+            }),
         )
+
 
         raise
 

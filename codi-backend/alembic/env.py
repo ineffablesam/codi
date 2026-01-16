@@ -7,9 +7,9 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.config import settings
+from app.core.config import settings
 from app.core.database import Base
-from app.models import user, project, operation_log  # noqa: F401 - Import all models
+from app.models import user, project, operation_log, agent_task, container, deployment, plan, backend_connection  # noqa: F401
 
 # Alembic Config object
 config = context.config

@@ -29,6 +29,8 @@ class ApiEndpoints {
   static String agentTask(int projectId) => '/agents/$projectId/task';
   static String agentTaskStatus(int projectId, String taskId) =>
       '/agents/$projectId/task/$taskId';
+  static String agentTaskStop(String projectId, String taskId) =>
+      '/agents/$projectId/task/$taskId/stop';
   static String agentHistory(int projectId) => '/agents/$projectId/history';
   static String agentWebSocket(int projectId) => '/agents/$projectId/ws';
 

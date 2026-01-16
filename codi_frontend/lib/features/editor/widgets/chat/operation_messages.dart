@@ -276,7 +276,7 @@ class ErrorMessage extends StatelessWidget {
                 color: AppColors.textPrimary,
               ),
             ),
-            if (message.errorDetails != null) ...[
+            if (message.error != null) ...[
               SizedBox(height: 8.h),
               Container(
                 padding: EdgeInsets.all(8.r),
@@ -294,7 +294,7 @@ class ErrorMessage extends StatelessWidget {
                     SizedBox(width: 6.w),
                     Expanded(
                       child: Text(
-                        message.errorDetails!,
+                        message.error!,
                         style: GoogleFonts.jetBrainsMono(
                           fontSize: 9.sp,
                           color: AppColors.textSecondary,

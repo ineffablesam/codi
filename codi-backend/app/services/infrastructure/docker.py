@@ -5,13 +5,14 @@ Uses docker-py for container management.
 """
 import asyncio
 import os
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import docker
-from docker.errors import DockerException, ImageNotFound, NotFound, APIError
+from docker.errors import DockerException, ImageNotFound, NotFound, APIError, BuildError
 from docker.models.containers import Container
 from docker.models.images import Image
 
@@ -94,6 +95,7 @@ class DockerService:
         try:
             self.client = docker.from_env()
             self._verify_connection()
+            self._verify_buildx()
         except DockerException as e:
             logger.error(f"Failed to initialize Docker client: {e}")
             raise RuntimeError(f"Docker not available: {e}")
@@ -107,15 +109,65 @@ class DockerService:
             logger.error(f"Docker daemon not responding: {e}")
             raise RuntimeError("Docker daemon not responding")
     
-    def _get_dockerfile_for_framework(self, framework: str) -> str:
-        """Get Dockerfile content for a framework.
+    def _verify_buildx(self) -> None:
+        """Verify Docker buildx is available."""
+        try:
+            result = subprocess.run(
+                ["docker", "buildx", "version"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                logger.info(f"Docker buildx available: {result.stdout.strip()}")
+            else:
+                logger.warning("Docker buildx not available, falling back to regular build")
+        except Exception as e:
+            logger.warning(f"Could not verify buildx: {e}")
+    
+    def _get_dockerfile_for_framework(self, framework: str, project_path: Optional[str] = None) -> str:
+        """Get the default Dockerfile content for a given framework.
         
-        Args:
-            framework: Framework type (flutter, nextjs, react, etc.)
-            
-        Returns:
-            Dockerfile content as string
+        Uses "Turbo" detection to bypass full builds if artifacts already exist on host.
         """
+        # Turbo check logic - if artifacts exist on host, we can do a lightning fast copy-only build.
+        # This is safe because both api and runner are Debian-based (glibc).
+        is_turbo = False
+        if project_path:
+            if framework == "nextjs" and os.path.exists(os.path.join(project_path, ".next", "standalone")):
+                is_turbo = True
+            elif framework == "react" and os.path.exists(os.path.join(project_path, "dist", "index.html")):
+                is_turbo = True
+            elif framework == "flutter" and os.path.exists(os.path.join(project_path, "build", "web", "index.html")):
+                is_turbo = True
+
+        if is_turbo:
+            logger.info(f"Turbo boost enabled: reusing host-built artifacts for {framework}")
+            if framework == "nextjs":
+                return '''FROM node:20-slim
+WORKDIR /app
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+# Copy standalone build and static files from host
+COPY .next/standalone ./
+COPY .next/static ./.next/static
+COPY public ./public
+EXPOSE 3000
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 CMD curl -f http://localhost:3000/ || exit 1
+CMD ["node", "server.js"]
+'''
+            else: # react, flutter
+                dist_dir = "build/web" if framework == "flutter" else "dist"
+                return f'''FROM nginx:stable
+COPY {dist_dir} /usr/share/nginx/html
+EXPOSE 80
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+HEALTHCHECK --interval=5s --timeout=3s --start-period=3s --retries=3 CMD curl -f http://localhost/ || exit 1
+CMD ["nginx", "-g", "daemon off;"]
+'''
+
+        # Standard Multi-stage Fallback (Switch to Debian images for compatibility and speed)
         dockerfiles = {
             "flutter": '''FROM ghcr.io/cirruslabs/flutter:stable AS builder
 WORKDIR /app
@@ -124,50 +176,65 @@ RUN flutter pub get
 COPY . .
 RUN flutter build web --release
 
-FROM nginx:alpine
+FROM nginx:stable
 COPY --from=builder /app/build/web /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf 2>/dev/null || true
 EXPOSE 80
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+HEALTHCHECK --interval=5s --timeout=3s --start-period=3s --retries=3 CMD curl -f http://localhost/ || exit 1
 CMD ["nginx", "-g", "daemon off;"]
 ''',
-            "nextjs": '''FROM node:20-alpine AS builder
+            "nextjs": '''FROM node:20-slim AS builder
 WORKDIR /app
+# Use cache mount for npm
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit
 COPY . .
-RUN npm run build
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV NEXT_CPU_COUNT=1
+# Use cache mount for Next.js build cache
+RUN --mount=type=cache,target=/app/.next/cache \
+    npm run build
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 EXPOSE 3000
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 CMD curl -f http://localhost:3000/ || exit 1
 CMD ["node", "server.js"]
 ''',
-            "react": '''FROM node:20-alpine AS builder
+            "react": '''FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit
 COPY . .
 RUN npm run build
 
-FROM nginx:alpine
+FROM nginx:stable
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+HEALTHCHECK --interval=5s --timeout=3s --start-period=3s --retries=3 CMD curl -f http://localhost/ || exit 1
 CMD ["nginx", "-g", "daemon off;"]
 ''',
-            "react_native": '''FROM node:20-alpine AS builder
+            "react_native": '''FROM node:20-slim AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --prefer-offline --no-audit
 COPY . .
 RUN npx expo export -p web
 
-FROM nginx:alpine  
+FROM nginx:stable
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+HEALTHCHECK --interval=5s --timeout=3s --start-period=3s --retries=3 CMD curl -f http://localhost/ || exit 1
 CMD ["nginx", "-g", "daemon off;"]
 ''',
         }
@@ -180,8 +247,9 @@ CMD ["nginx", "-g", "daemon off;"]
         framework: str = "auto",
         dockerfile_path: Optional[str] = None,
         build_args: Optional[Dict[str, str]] = None,
+        nocache: bool = False,
     ) -> BuildResult:
-        """Build a Docker image from project source.
+        """Build a Docker image from project source using buildx.
         
         Args:
             project_path: Path to project source code
@@ -189,59 +257,154 @@ CMD ["nginx", "-g", "daemon off;"]
             framework: Framework type for Dockerfile selection
             dockerfile_path: Optional custom Dockerfile path
             build_args: Optional build arguments
+            nocache: Do not use cache when building the image
             
         Returns:
             BuildResult with image info and logs
         """
-        logger.info(f"Building image {image_tag} from {project_path}")
+        logger.info(f"Building image {image_tag} from {project_path} (nocache={nocache})")
         
         build_logs: List[str] = []
         dockerfile_content = None
         
         try:
-            # Check if Dockerfile exists, otherwise create one
+            # Ensure .dockerignore exists to prevent copying node_modules
+            dockerignore_path = os.path.join(project_path, ".dockerignore")
+            if not os.path.exists(dockerignore_path):
+                dockerignore_content = """# Auto-generated by Codi
+node_modules
+.next
+.git
+*.log
+.env*
+.DS_Store
+"""
+                with open(dockerignore_path, "w") as f:
+                    f.write(dockerignore_content)
+                build_logs.append("Created .dockerignore to exclude node_modules")
+            
+            # Check if Dockerfile exists, otherwise create one in .codi/ to avoid cache invalidation
+            codi_dir = os.path.join(project_path, ".codi")
+            dockerfile_in_codi = os.path.join(codi_dir, "Dockerfile")
             dockerfile_in_project = os.path.join(project_path, "Dockerfile")
-            if not os.path.exists(dockerfile_in_project) and not dockerfile_path:
+            
+            # Use existing Dockerfile in project root, or create one in .codi/
+            if os.path.exists(dockerfile_in_project):
+                # User has their own Dockerfile, use it
+                dockerfile_path = dockerfile_path or "Dockerfile"
+            elif not dockerfile_path:
                 # Auto-detect framework if needed
                 if framework == "auto":
-                    framework = self._detect_framework(project_path)
+                    framework = self.detect_framework(project_path)
                 
-                dockerfile_content = self._get_dockerfile_for_framework(framework)
+                dockerfile_content = self._get_dockerfile_for_framework(framework, project_path)
                 
-                # Write temporary Dockerfile
-                with open(dockerfile_in_project, "w") as f:
+                # Write Dockerfile to .codi/ directory to prevent cache invalidation
+                os.makedirs(codi_dir, exist_ok=True)
+                with open(dockerfile_in_codi, "w") as f:
                     f.write(dockerfile_content)
-                build_logs.append(f"Created Dockerfile for {framework} framework")
+                dockerfile_path = ".codi/Dockerfile"
+                build_logs.append(f"Created .codi/Dockerfile for {framework} framework")
             
-            # Build the image
-            loop = asyncio.get_event_loop()
-            image, logs = await loop.run_in_executor(
-                None,
-                lambda: self.client.images.build(
-                    path=project_path,
-                    tag=image_tag,
-                    dockerfile=dockerfile_path or "Dockerfile",
-                    buildargs=build_args or {},
-                    rm=True,  # Remove intermediate containers
-                    forcerm=True,  # Force remove on failure
+            # Compute build hashes for smart cache invalidation
+            deps_hash, src_hash = self._compute_build_hashes(project_path)
+            hash_labels = {
+                "codi.deps_hash": deps_hash,
+                "codi.src_hash": src_hash,
+                "codi.built_at": datetime.utcnow().isoformat(),
+            }
+            
+            # Build using docker build (standard) - less likely to crash dockerd than raw buildx in some envs
+            cmd = [
+                "docker", "build",
+                "-t", image_tag,
+                "-f", dockerfile_path or "Dockerfile",
+            ]
+            
+            # Add no-cache flag if requested
+            if nocache:
+                cmd.append("--no-cache")
+            
+            # Add build arguments
+            if build_args:
+                for key, value in build_args.items():
+                    cmd.extend(["--build-arg", f"{key}={value}"])
+            
+            # Add labels for cache tracking
+            for key, value in hash_labels.items():
+                cmd.extend(["--label", f"{key}={value}"])
+            
+            # Add project path as build context
+            cmd.append(project_path)
+            
+            logger.debug(f"Build command: {' '.join(cmd)}")
+            
+            # Enable BuildKit for cache mounts and faster builds
+            env = os.environ.copy()
+            env["DOCKER_BUILDKIT"] = "1"
+            
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                env=env,
+                cwd=project_path,
+            )
+            
+            # Capture output
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                log_line = line.decode('utf-8', errors='replace').strip()
+                if log_line:
+                    build_logs.append(log_line)
+            
+            await process.wait()
+            
+            if process.returncode != 0:
+                # If build fails, allow one retry with --no-cache
+                if not nocache:
+                    logger.warning(f"Build failed (code {process.returncode}). Retrying with --no-cache...")
+                    return await self.build_image(
+                        project_path=project_path,
+                        image_tag=image_tag,
+                        framework=framework,
+                        dockerfile_path=dockerfile_path,
+                        build_args=build_args,
+                        nocache=True,
+                    )
+
+                error_msg = f"Build failed with exit code {process.returncode}"
+                logger.error(error_msg)
+                return BuildResult(
+                    image_id="",
+                    image_tag=image_tag,
+                    build_logs=build_logs,
+                    success=False,
+                    error=error_msg,
                 )
-            )
             
-            # Collect build logs
-            for log_entry in logs:
-                if "stream" in log_entry:
-                    log_line = log_entry["stream"].strip()
-                    if log_line:
-                        build_logs.append(log_line)
-            
-            logger.info(f"Successfully built image {image_tag}, id={image.short_id}")
-            
-            return BuildResult(
-                image_id=image.id,
-                image_tag=image_tag,
-                build_logs=build_logs,
-                success=True,
-            )
+            # Get the built image
+            try:
+                image = self.client.images.get(image_tag)
+                logger.info(f"Successfully built image {image_tag}, id={image.short_id}")
+                return BuildResult(
+                    image_id=image.id,
+                    image_tag=image_tag,
+                    build_logs=build_logs,
+                    success=True,
+                )
+            except ImageNotFound:
+                error_msg = f"Image {image_tag} was built but not found"
+                logger.error(error_msg)
+                return BuildResult(
+                    image_id="",
+                    image_tag=image_tag,
+                    build_logs=build_logs,
+                    success=False,
+                    error=error_msg,
+                )
             
         except Exception as e:
             error_msg = str(e)
@@ -256,7 +419,7 @@ CMD ["nginx", "-g", "daemon off;"]
                 error=error_msg,
             )
     
-    def _detect_framework(self, project_path: str) -> str:
+    def detect_framework(self, project_path: str) -> str:
         """Auto-detect project framework from files.
         
         Args:
@@ -278,6 +441,95 @@ CMD ["nginx", "-g", "daemon off;"]
             # Generic React/Vite
             return "react"
         return "react"  # Default fallback
+    
+    def _compute_file_hash(self, file_path: str) -> str:
+        """Compute SHA256 hash of a file."""
+        import hashlib
+        if not os.path.exists(file_path):
+            return ""
+        try:
+            with open(file_path, "rb") as f:
+                return hashlib.sha256(f.read()).hexdigest()[:16]
+        except Exception:
+            return ""
+    
+    def _compute_build_hashes(self, project_path: str) -> tuple[str, str]:
+        """Compute dependency and source hashes for smart cache invalidation.
+        
+        Args:
+            project_path: Path to project
+            
+        Returns:
+            Tuple of (deps_hash, src_hash)
+        """
+        import hashlib
+        
+        # Dependency hash: based on lock files
+        deps_files = [
+            "package-lock.json",
+            "yarn.lock", 
+            "pnpm-lock.yaml",
+            "pubspec.lock",
+        ]
+        deps_hash = hashlib.sha256()
+        for f in deps_files:
+            file_path = os.path.join(project_path, f)
+            if os.path.exists(file_path):
+                deps_hash.update(self._compute_file_hash(file_path).encode())
+        
+        # Source hash: based on key source files (fast approximation)
+        src_hash = hashlib.sha256()
+        key_files = ["package.json", "pubspec.yaml", "tsconfig.json", "next.config.js", "vite.config.ts"]
+        for f in key_files:
+            file_path = os.path.join(project_path, f)
+            if os.path.exists(file_path):
+                src_hash.update(self._compute_file_hash(file_path).encode())
+        
+        # Also hash .codi/Dockerfile if it exists
+        codi_dockerfile = os.path.join(project_path, ".codi", "Dockerfile")
+        if os.path.exists(codi_dockerfile):
+            src_hash.update(self._compute_file_hash(codi_dockerfile).encode())
+        
+        return deps_hash.hexdigest()[:16], src_hash.hexdigest()[:16]
+    
+    def _get_image_hashes(self, image_tag: str) -> tuple[str, str]:
+        """Get stored build hashes from image labels.
+        
+        Returns:
+            Tuple of (deps_hash, src_hash) or ("", "") if image doesn't exist
+        """
+        try:
+            image = self.client.images.get(image_tag)
+            labels = image.labels or {}
+            return labels.get("codi.deps_hash", ""), labels.get("codi.src_hash", "")
+        except ImageNotFound:
+            return "", ""
+        except Exception:
+            return "", ""
+    
+    def should_skip_build(self, project_path: str, image_tag: str) -> tuple[bool, str]:
+        """Check if build can be skipped based on hash comparison.
+        
+        Args:
+            project_path: Path to project
+            image_tag: Target image tag
+            
+        Returns:
+            Tuple of (should_skip, reason)
+        """
+        current_deps, current_src = self._compute_build_hashes(project_path)
+        stored_deps, stored_src = self._get_image_hashes(image_tag)
+        
+        if not stored_deps and not stored_src:
+            return False, "no previous build found"
+        
+        if current_deps == stored_deps and current_src == stored_src:
+            return True, "no changes detected (deps and src unchanged)"
+        
+        if current_deps != stored_deps:
+            return False, "dependency files changed - full rebuild needed"
+        
+        return False, "source files changed - incremental rebuild"
     
     async def create_container(
         self,
@@ -330,6 +582,7 @@ CMD ["nginx", "-g", "daemon off;"]
                     memswap_limit=self.DEFAULT_MEMORY_SWAP,
                     detach=True,
                     restart_policy={"Name": "unless-stopped"},
+                    log_config={"Type": "json-file", "Config": {}},
                 )
             )
             
@@ -477,6 +730,57 @@ CMD ["nginx", "-g", "daemon off;"]
         except NotFound:
             logger.warning(f"Container not found: {container_id}")
             return False
+    
+    async def wait_for_container_healthy(self, container_id: str, timeout: int = 60) -> bool:
+        """Wait for container to become healthy.
+        
+        Args:
+            container_id: Container ID or name
+            timeout: Maximum seconds to wait
+            
+        Returns:
+            True if healthy, False if timed out or failed
+        """
+        logger.info(f"Waiting for container {container_id} to be healthy (timeout={timeout}s)")
+        
+        start_time = datetime.utcnow()
+        while (datetime.utcnow() - start_time).total_seconds() < timeout:
+            try:
+                loop = asyncio.get_event_loop()
+                container = await loop.run_in_executor(
+                    None, 
+                    lambda: self.client.containers.get(container_id)
+                )
+                
+                # Check for health status if defined
+                health = container.attrs.get('State', {}).get('Health', {})
+                if health:
+                    status = health.get('Status')
+                    if status == 'healthy':
+                        logger.info(f"Container {container_id} is healthy")
+                        return True
+                    if status == 'unhealthy':
+                        logger.error(f"Container {container_id} is unhealthy")
+                        return False
+                    # Still starting...
+                else:
+                    # No health check defined, fallback to running status
+                    if container.status == 'running':
+                        logger.info(f"Container {container_id} is running (no health check defined)")
+                        # Wait a bit more to be sure
+                        await asyncio.sleep(2)
+                        return True
+                
+            except NotFound:
+                logger.error(f"Container {container_id} not found while waiting for health")
+                return False
+            except Exception as e:
+                logger.warning(f"Error checking container health: {e}")
+            
+            await asyncio.sleep(1)
+            
+        logger.warning(f"Timed out waiting for container {container_id} to be healthy")
+        return False
     
     async def get_container(self, container_id: str) -> Optional[ContainerInfo]:
         """Get container information.

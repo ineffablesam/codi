@@ -41,13 +41,13 @@ class AgentTask(Base):
     )  # queued, processing, completed, failed
     message: Mapped[str] = mapped_column(Text, nullable=False)
     
-    # Execution metadata
-    current_agent: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    progress: Mapped[float] = mapped_column(Integer, default=0) # 0 to 100
+    # Progress tracking (simplified - no multi-agent)
+    progress: Mapped[float] = mapped_column(Integer, default=0)  # 0 to 100
     
     # Results and errors
     result: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    celery_task_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
@@ -78,7 +78,6 @@ class AgentTask(Base):
             "user_id": self.user_id,
             "status": self.status,
             "message": self.message,
-            "current_agent": self.current_agent,
             "progress": self.progress / 100.0 if self.progress is not None else 0.0,
             "result": self.result,
             "error": self.error,

@@ -1,6 +1,11 @@
-"""Workflows package for LangGraph agent orchestration."""
-from app.workflows.state import WorkflowState
-from app.workflows.graph import create_workflow_graph
-from app.workflows.executor import WorkflowExecutor
+"""Workflows package - simplified agent execution.
 
-__all__ = ["WorkflowState", "create_workflow_graph", "WorkflowExecutor"]
+This package now uses the simple baby-code style agent instead of
+the complex LangGraph workflow graph.
+"""
+from app.workflows.executor import WorkflowExecutor, run_workflow
+
+__all__ = [
+    "WorkflowExecutor",
+    "run_workflow",
+]

@@ -1,4 +1,4 @@
-"""Starter template service for initializing new Flutter projects.
+"""Starter template service for initializing new Flutter, React, and Next.js projects.
 
 All templates are now created locally. No GitHub API dependency.
 """
@@ -421,7 +421,10 @@ class StarterTemplateService:
     """
 
     # Base path to the templates directory
-    TEMPLATES_BASE = Path(__file__).parent.parent.parent / "codi-starter-templates"
+    # __file__ = /app/app/services/domain/starter_template.py
+    # Going up 4 levels: domain -> services -> app -> app -> root
+    # This resolves to /app/codi-starter-templates in Docker
+    TEMPLATES_BASE = Path(__file__).parent.parent.parent.parent / "codi-starter-templates"
     
     # Framework to template directory mapping
     FRAMEWORK_DIRS = {
@@ -438,11 +441,11 @@ class StarterTemplateService:
         },
         "react": {
             "dirs": {"node_modules", ".git", "dist", ".cache"},
-            "files": {"package-lock.json", ".DS_Store"},
+            "files": {".DS_Store"},
         },
         "nextjs": {
             "dirs": {"node_modules", ".git", ".next", "out", ".cache"},
-            "files": {"package-lock.json", ".DS_Store"},
+            "files": {".DS_Store"},
         },
     }
 
@@ -617,13 +620,11 @@ class StarterTemplateService:
             elif file_path.name == "index.html":
                 content = content.replace("{{PROJECT_TITLE}}", project_title)
         
-        # Next.js specific configuration for GitHub Pages
+        # Next.js specific configuration for GitHub Pages (static export)
+        # Note: For Docker/local deployment we keep "standalone" mode
         if self.framework == "nextjs" and self.deployment_platform == "github_pages" and file_path.name in ("next.config.js", "next.config.ts", "next.config.mjs"):
-            # Inject output: 'export' for static export required by GitHub Pages
-            if "const nextConfig = {" in content:
-                content = content.replace("const nextConfig = {", "const nextConfig = {\n  output: 'export',")
-            elif "const nextConfig: NextConfig = {" in content:
-                content = content.replace("const nextConfig: NextConfig = {", "const nextConfig: NextConfig = {\n  output: 'export',")
+            # Replace standalone with export for static GitHub Pages deployment
+            content = content.replace('output: "standalone"', "output: 'export'")
 
         return content
     
@@ -689,7 +690,7 @@ class StarterTemplateService:
             else:
                 full_path.write_text(content)
         
-        git_service.commit_all(commit_msg)
+        git_service.commit(commit_msg, all_changes=True)
         sha = git_service.get_current_commit()
 
         logger.info(

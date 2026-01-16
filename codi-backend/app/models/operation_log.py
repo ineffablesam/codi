@@ -17,41 +17,25 @@ if TYPE_CHECKING:
 class OperationType(str, Enum):
     """Types of operations that can be logged."""
 
-    # Agent operations
-    AGENT_TASK_STARTED = "agent_task_started"
-    AGENT_TASK_COMPLETED = "agent_task_completed"
-    AGENT_TASK_FAILED = "agent_task_failed"
+    # Agent operations (simplified)
+    AGENT_STARTED = "agent_started"
+    AGENT_COMPLETED = "agent_completed"
+    AGENT_FAILED = "agent_failed"
+    TOOL_EXECUTION = "tool_execution"
 
-    # Planner operations
-    PLAN_CREATED = "plan_created"
-    PLAN_STEP_STARTED = "plan_step_started"
-    PLAN_STEP_COMPLETED = "plan_step_completed"
-
-    # Code operations
+    # File operations
     FILE_READ = "file_read"
     FILE_CREATED = "file_created"
     FILE_UPDATED = "file_updated"
     FILE_DELETED = "file_deleted"
 
-    # Code review
-    CODE_REVIEW_STARTED = "code_review_started"
-    CODE_REVIEW_COMPLETED = "code_review_completed"
-    CODE_REVIEW_ISSUE = "code_review_issue"
-
     # Git operations
-    BRANCH_CREATED = "branch_created"
     COMMIT_CREATED = "commit_created"
-    PUSH_COMPLETED = "push_completed"
-    PR_CREATED = "pr_created"
-    PR_MERGED = "pr_merged"
 
-    # Build operations
+    # Build/Deploy operations
     BUILD_STARTED = "build_started"
-    BUILD_PROGRESS = "build_progress"
     BUILD_COMPLETED = "build_completed"
     BUILD_FAILED = "build_failed"
-
-    # Deployment operations
     DEPLOYMENT_STARTED = "deployment_started"
     DEPLOYMENT_COMPLETED = "deployment_completed"
     DEPLOYMENT_FAILED = "deployment_failed"
@@ -59,29 +43,22 @@ class OperationType(str, Enum):
     # Project operations
     PROJECT_CREATED = "project_created"
     PROJECT_UPDATED = "project_updated"
-    PROJECT_ARCHIVED = "project_archived"
 
-    # User messages
+    # Messages
     USER_MESSAGE = "user_message"
     AGENT_RESPONSE = "agent_response"
 
 
 class AgentType(str, Enum):
-    """Types of agents that can perform operations."""
+    """Agent types - simplified to single agent."""
 
-    PLANNER = "planner"
-    FLUTTER_ENGINEER = "flutter_engineer"
-    CODE_REVIEWER = "code_reviewer"
-    GIT_OPERATOR = "git_operator"
-    BUILD_DEPLOY = "build_deploy"
-    MEMORY = "memory"
-    BACKEND_ENGINEER = "backend_engineer"
+    CODI = "codi"  # Main coding agent
     SYSTEM = "system"
     USER = "user"
 
 
 class OperationLog(Base):
-    """Operation log model for tracking all agent and system operations."""
+    """Operation log model for tracking agent and system operations."""
 
     __tablename__ = "operation_logs"
 
@@ -103,7 +80,6 @@ class OperationLog(Base):
     )
 
     # Operation metadata
-    # Use values_callable to ensure enum VALUES are sent to DB, not names
     operation_type: Mapped[OperationType] = mapped_column(
         SQLEnum(
             OperationType,
@@ -127,21 +103,21 @@ class OperationLog(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, default="completed"
-    )  # started, in_progress, completed, failed
+    )  # started, completed, failed
 
     # Flexible metadata storage
     details: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
-    # File-specific fields (if applicable)
+    # File-specific fields
     file_path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     lines_added: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     lines_removed: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    # Git-specific fields (if applicable)
+    # Git-specific fields
     commit_sha: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
     branch_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    # Error information (if failed)
+    # Error information
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Duration tracking
@@ -198,7 +174,6 @@ class OperationLog(Base):
             "status": self.status,
         }
 
-        # Determine message type based on operation type
         operation_value = self.operation_type.value
 
         if operation_value in ["file_created", "file_updated", "file_deleted"]:
@@ -208,42 +183,19 @@ class OperationLog(Base):
             if self.lines_added is not None or self.lines_removed is not None:
                 base_message["stats"] = f"+{self.lines_added or 0}/-{self.lines_removed or 0}"
 
-        elif operation_value in [
-            "branch_created",
-            "commit_created",
-            "push_completed",
-            "pr_created",
-            "pr_merged",
-        ]:
+        elif operation_value == "commit_created":
             base_message["type"] = "git_operation"
             base_message["operation"] = operation_value
             base_message["branch_name"] = self.branch_name
             base_message["commit_sha"] = self.commit_sha
 
-        elif operation_value == "build_progress":
-            base_message["type"] = "build_progress"
-            base_message["progress"] = self.details.get("progress", 0) if self.details else 0
-            base_message["stage"] = self.details.get("stage", "building") if self.details else "building"
+        elif operation_value == "tool_execution":
+            base_message["type"] = "tool_execution"
+            base_message["tool"] = self.details.get("tool") if self.details else None
 
         elif operation_value == "deployment_completed":
             base_message["type"] = "deployment_complete"
             base_message["deployment_url"] = self.details.get("deployment_url") if self.details else None
-            if self.details:
-                base_message["details"] = {
-                    "build_time": self.details.get("build_time"),
-                    "size": self.details.get("size"),
-                }
-
-        elif operation_value in ["code_review_started", "code_review_completed"]:
-            base_message["type"] = "review_progress"
-            base_message["file_path"] = self.file_path
-            base_message["progress"] = self.details.get("progress", 0) if self.details else 0
-
-        elif operation_value == "code_review_issue":
-            base_message["type"] = "review_issue"
-            base_message["file_path"] = self.file_path
-            base_message["severity"] = self.details.get("severity", "warning") if self.details else "warning"
-            base_message["line"] = self.details.get("line") if self.details else None
 
         elif self.status == "failed" or operation_value.endswith("_failed"):
             base_message["type"] = "agent_error"

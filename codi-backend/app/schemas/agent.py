@@ -1,4 +1,4 @@
-"""Agent and WebSocket message Pydantic schemas."""
+"""Agent and WebSocket message Pydantic schemas - Simplified."""
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
@@ -6,24 +6,12 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 
-class AgentType(str, Enum):
-    """Agent type enumeration."""
-
-    PLANNER = "planner"
-    FLUTTER_ENGINEER = "flutter_engineer"
-    CODE_REVIEWER = "code_reviewer"
-    GIT_OPERATOR = "git_operator"
-    BUILD_DEPLOY = "build_deploy"
-    MEMORY = "memory"
-    BACKEND_ENGINEER = "backend_engineer"
-
-
 class AgentStatus(str, Enum):
     """Agent status enumeration."""
 
     STARTED = "started"
-    IN_PROGRESS = "in_progress"
-    PLANNING = "planning"
+    THINKING = "thinking"
+    WORKING = "working"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -32,23 +20,21 @@ class MessageType(str, Enum):
     """WebSocket message type enumeration."""
 
     AGENT_STATUS = "agent_status"
+    AGENT_RESPONSE = "agent_response"
     TOOL_EXECUTION = "tool_execution"
     FILE_OPERATION = "file_operation"
     GIT_OPERATION = "git_operation"
-    BUILD_STATUS = "build_status"
     BUILD_PROGRESS = "build_progress"
     DEPLOYMENT_COMPLETE = "deployment_complete"
-    REVIEW_PROGRESS = "review_progress"
-    REVIEW_ISSUE = "review_issue"
     AGENT_ERROR = "agent_error"
-    USER_INPUT_REQUIRED = "user_input_required"
+    CONVERSATIONAL_RESPONSE = "conversational_response"
     USER_MESSAGE = "user_message"
     PING = "ping"
     PONG = "pong"
 
 
 class AgentTaskRequest(BaseModel):
-    """Schema for submitting a task to the agent system."""
+    """Schema for submitting a task to the agent."""
 
     message: str = Field(..., min_length=1, max_length=10000)
     project_id: int
@@ -60,15 +46,15 @@ class AgentTaskResponse(BaseModel):
     task_id: str
     status: str = "queued"
     message: str = "Task submitted successfully"
+    created_at: Optional[datetime] = None
 
 
 class AgentTaskStatus(BaseModel):
     """Schema for agent task status."""
 
     task_id: str
-    status: str  # 'queued', 'running', 'completed', 'failed'
+    status: str  # 'queued', 'processing', 'completed', 'failed'
     progress: Optional[float] = None
-    current_agent: Optional[str] = None
     message: Optional[str] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -88,7 +74,7 @@ class AgentStatusMessage(WebSocketMessageBase):
     """Schema for agent status WebSocket messages."""
 
     type: MessageType = MessageType.AGENT_STATUS
-    agent: AgentType
+    agent: str = "codi"
     status: AgentStatus
     message: str
     details: Optional[Dict[str, Any]] = None
@@ -98,9 +84,8 @@ class ToolExecutionMessage(WebSocketMessageBase):
     """Schema for tool execution WebSocket messages."""
 
     type: MessageType = MessageType.TOOL_EXECUTION
-    agent: AgentType
+    agent: str = "codi"
     tool: str
-    file_path: Optional[str] = None
     message: str
 
 
@@ -108,35 +93,21 @@ class FileOperationMessage(WebSocketMessageBase):
     """Schema for file operation WebSocket messages."""
 
     type: MessageType = MessageType.FILE_OPERATION
-    agent: AgentType
+    agent: str = "codi"
     operation: str  # 'create', 'update', 'delete'
     file_path: str
     message: str
-    details: Optional[Dict[str, Any]] = None  # lines_of_code, widgets, dependencies
+    stats: Optional[str] = None
 
 
 class GitOperationMessage(WebSocketMessageBase):
     """Schema for git operation WebSocket messages."""
 
     type: MessageType = MessageType.GIT_OPERATION
-    agent: AgentType = AgentType.GIT_OPERATOR
-    operation: str  # 'create_branch', 'commit', 'push', 'merge'
+    agent: str = "codi"
+    operation: str  # 'commit'
     branch_name: Optional[str] = None
     commit_sha: Optional[str] = None
-    message: str
-    files_changed: Optional[int] = None
-    insertions: Optional[int] = None
-    deletions: Optional[int] = None
-
-
-class BuildStatusMessage(WebSocketMessageBase):
-    """Schema for build status WebSocket messages."""
-
-    type: MessageType = MessageType.BUILD_STATUS
-    agent: AgentType = AgentType.BUILD_DEPLOY
-    status: str  # 'triggered', 'queued', 'in_progress', 'success', 'failed'
-    workflow: str
-    workflow_url: Optional[str] = None
     message: str
 
 
@@ -144,8 +115,8 @@ class BuildProgressMessage(WebSocketMessageBase):
     """Schema for build progress WebSocket messages."""
 
     type: MessageType = MessageType.BUILD_PROGRESS
-    agent: AgentType = AgentType.BUILD_DEPLOY
-    stage: str  # 'dependencies', 'build', 'test', 'deploy'
+    agent: str = "codi"
+    stage: str
     message: str
     progress: float = Field(..., ge=0.0, le=1.0)
 
@@ -154,31 +125,9 @@ class DeploymentCompleteMessage(WebSocketMessageBase):
     """Schema for deployment complete WebSocket messages."""
 
     type: MessageType = MessageType.DEPLOYMENT_COMPLETE
-    agent: AgentType = AgentType.BUILD_DEPLOY
+    agent: str = "codi"
     status: str  # 'success', 'failed'
     deployment_url: Optional[str] = None
-    message: str
-    details: Optional[Dict[str, Any]] = None  # build_time, size
-
-
-class ReviewProgressMessage(WebSocketMessageBase):
-    """Schema for code review progress WebSocket messages."""
-
-    type: MessageType = MessageType.REVIEW_PROGRESS
-    agent: AgentType = AgentType.CODE_REVIEWER
-    file_path: str
-    message: str
-    progress: float = Field(..., ge=0.0, le=1.0)
-
-
-class ReviewIssueMessage(WebSocketMessageBase):
-    """Schema for code review issue WebSocket messages."""
-
-    type: MessageType = MessageType.REVIEW_ISSUE
-    agent: AgentType = AgentType.CODE_REVIEWER
-    severity: str  # 'error', 'warning', 'info'
-    file_path: str
-    line: Optional[int] = None
     message: str
 
 
@@ -186,19 +135,24 @@ class AgentErrorMessage(WebSocketMessageBase):
     """Schema for agent error WebSocket messages."""
 
     type: MessageType = MessageType.AGENT_ERROR
-    agent: AgentType
+    agent: str = "codi"
     error: str
     message: str
-    details: Optional[Dict[str, Any]] = None
 
 
-class UserInputRequiredMessage(WebSocketMessageBase):
-    """Schema for user input required WebSocket messages."""
+class AgentResponseMessage(WebSocketMessageBase):
+    """Schema for final agent response."""
 
-    type: MessageType = MessageType.USER_INPUT_REQUIRED
-    agent: AgentType
-    question: str
-    options: Optional[List[str]] = None
+    type: MessageType = MessageType.AGENT_RESPONSE
+    message: str
+
+
+class ConversationalResponseMessage(WebSocketMessageBase):
+    """Schema for conversational (non-task) responses."""
+
+    type: MessageType = MessageType.CONVERSATIONAL_RESPONSE
+    message: str
+    needs_clarification: Optional[bool] = None
 
 
 class UserMessageWebSocket(WebSocketMessageBase):
@@ -209,44 +163,16 @@ class UserMessageWebSocket(WebSocketMessageBase):
     project_id: int
 
 
-class UserInputResponse(BaseModel):
-    """Schema for user input response via WebSocket."""
-
-    type: str = "user_input_response"
-    response: str
-
-
 # Union type for all WebSocket messages
 WebSocketMessage = Union[
     AgentStatusMessage,
     ToolExecutionMessage,
     FileOperationMessage,
     GitOperationMessage,
-    BuildStatusMessage,
     BuildProgressMessage,
     DeploymentCompleteMessage,
-    ReviewProgressMessage,
-    ReviewIssueMessage,
     AgentErrorMessage,
-    UserInputRequiredMessage,
+    AgentResponseMessage,
+    ConversationalResponseMessage,
     UserMessageWebSocket,
 ]
-
-
-class PlanStep(BaseModel):
-    """Schema for a single step in an execution plan."""
-
-    id: int
-    description: str
-    agent: AgentType
-    status: str = "pending"  # 'pending', 'in_progress', 'completed', 'failed'
-    dependencies: List[int] = Field(default_factory=list)
-    output: Optional[Dict[str, Any]] = None
-
-
-class ExecutionPlan(BaseModel):
-    """Schema for the complete execution plan."""
-
-    steps: List[PlanStep]
-    total_steps: int
-    estimated_time_seconds: Optional[int] = None

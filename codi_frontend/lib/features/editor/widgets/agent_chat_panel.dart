@@ -1,9 +1,7 @@
-/// Rich agent chat panel with professional icons and animations
+/// Simplified agent chat panel
 library;
 
 import 'package:codi_frontend/features/editor/widgets/chat/operation_messages.dart';
-import 'package:codi_frontend/features/editor/widgets/chat/progressive_action_message.dart';
-import 'package:codi_frontend/features/editor/widgets/chat/streaming_code_message.dart';
 import 'package:codi_frontend/features/editor/widgets/chat/success_message.dart';
 import 'package:codi_frontend/features/editor/widgets/chat/thinking_message.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +9,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:heroicons/heroicons.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
@@ -26,7 +26,7 @@ class AgentChatPanel extends StatelessWidget {
     final controller = Get.find<AgentChatController>();
 
     return Container(
-      color: Colors.white, // Clean white background for professional look
+      color: Colors.white,
       child: Column(
         children: [
           Expanded(child: _buildMessageList(controller)),
@@ -45,13 +45,8 @@ class AgentChatPanel extends StatelessWidget {
       return ListView.builder(
         controller: controller.scrollController,
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
-        itemCount:
-            controller.messages.length + (controller.isTyping.value ? 1 : 0),
+        itemCount: controller.messages.length,
         itemBuilder: (context, index) {
-          if (index == controller.messages.length) {
-            // Typing indicator at the end if needed (though usually handled by ThinkingMessage)
-            return SizedBox.shrink();
-          }
           final message = controller.messages[index];
           return _buildMessage(message);
         },
@@ -60,7 +55,6 @@ class AgentChatPanel extends StatelessWidget {
   }
 
   Widget _buildMessage(AgentMessage message) {
-    // Determine which widget to show based on message type
     Widget messageWidget;
 
     switch (message.type) {
@@ -68,54 +62,51 @@ class AgentChatPanel extends StatelessWidget {
         messageWidget = _buildUserMessage(message);
         break;
 
-      // Thinking & Planning
       case MessageType.agentStatus:
-        if (message.status == 'thinking' || message.status == 'planning') {
+        if (message.status == 'thinking' || message.status == 'started') {
           messageWidget = ThinkingMessage(message: message);
         } else {
           messageWidget = _buildAgentStatusMessage(message);
         }
         break;
 
-      // Progressive Action (Main Agent Work)
-      case MessageType.backgroundTaskStarted:
-      case MessageType.backgroundTaskProgress:
-      case MessageType.backgroundTaskCompleted:
-        messageWidget = ProgressiveActionMessage(message: message);
+      case MessageType.agentResponse:
+      case MessageType.conversationalResponse:
+        messageWidget = _buildAgentResponseMessage(message);
         break;
 
-      // Code Generation
-      case MessageType.llmStream:
-        messageWidget = StreamingCodeMessage(message: message);
+      case MessageType.toolExecution:
+        messageWidget = _buildToolExecutionMessage(message);
         break;
 
-      // Completion & Success
-      case MessageType.deploymentComplete:
-      case MessageType.batchComplete: // Assuming a batch completion type
-        messageWidget = SuccessMessage(message: message);
+      case MessageType.toolResult:
+        messageWidget = _buildToolResultMessage(message);
         break;
 
-      // Operations
       case MessageType.fileOperation:
         messageWidget = FileOperationMessage(message: message);
         break;
+
       case MessageType.gitOperation:
         messageWidget = GitOperationMessage(message: message);
         break;
+
       case MessageType.buildProgress:
         messageWidget = BuildProgressMessage(message: message);
         break;
+
+      case MessageType.deploymentComplete:
+        messageWidget = SuccessMessage(message: message);
+        break;
+
       case MessageType.error:
         messageWidget = ErrorMessage(message: message);
         break;
 
-      // Fallback/Legacy
       default:
         messageWidget = _buildGenericMessage(message);
     }
 
-    // Wrap in common layout if needed (e.g. avatar for some)
-    // But most custom widgets handle their own layout
     return messageWidget;
   }
 
@@ -166,7 +157,6 @@ class AgentChatPanel extends StatelessWidget {
     ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0);
   }
 
-  // Legacy status message backup
   Widget _buildAgentStatusMessage(AgentMessage message) {
     return Padding(
       padding: EdgeInsets.only(bottom: 12.h),
@@ -194,8 +184,158 @@ class AgentChatPanel extends StatelessWidget {
     );
   }
 
+  Widget _buildAgentResponseMessage(AgentMessage message) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16.r,
+            backgroundColor: AppColors.primary.withOpacity(0.1),
+            child:
+                Icon(AgentAvatarIcons.ai, size: 20.r, color: AppColors.primary),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.all(16.r),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(4.r),
+                  topRight: Radius.circular(16.r),
+                  bottomLeft: Radius.circular(16.r),
+                  bottomRight: Radius.circular(16.r),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                message.text,
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  color: AppColors.textPrimary,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0);
+  }
+
+  Widget _buildToolExecutionMessage(AgentMessage message) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h, left: 40.w),
+      child: Row(
+        children: [
+          Icon(StatusIcons.tool, size: 16.r, color: AppColors.info),
+          SizedBox(width: 8.w),
+          Text(
+            message.text.isNotEmpty
+                ? message.text
+                : 'Using ${message.tool ?? "tool"}...',
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToolResultMessage(AgentMessage message) {
+    if (message.toolResult == null || message.toolResult!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final toolResult = message.toolResult!;
+
+    // For list_files, we might want to show a more compact view
+    if (message.tool == 'list_files') {
+      final files =
+          toolResult.split('\n').where((f) => f.trim().isNotEmpty).toList();
+      if (files.isNotEmpty) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: 8.h, left: 60.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Found ${files.length} items:',
+                style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary),
+              ),
+              SizedBox(height: 4.h),
+              ...files.take(5).map((f) => Padding(
+                    padding: EdgeInsets.only(bottom: 2.h),
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.file, size: 10.r, color: Colors.grey),
+                        SizedBox(width: 4.w),
+                        Expanded(
+                          child: Text(
+                            f.trim(),
+                            style: GoogleFonts.jetBrainsMono(
+                                fontSize: 10.sp, color: AppColors.textPrimary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+              if (files.length > 5)
+                Text(
+                  '...and ${files.length - 5} more',
+                  style: GoogleFonts.inter(
+                      fontSize: 10.sp,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey),
+                ),
+            ],
+          ),
+        );
+      }
+    }
+
+    // Generic tool result (truncated)
+    final displayResult = toolResult.length > 200
+        ? '${toolResult.substring(0, 200)}...'
+        : toolResult;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h, left: 60.w),
+      child: Container(
+        padding: EdgeInsets.all(8.r),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Text(
+          displayResult,
+          style: GoogleFonts.jetBrainsMono(
+            fontSize: 10.sp,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildGenericMessage(AgentMessage message) {
-    // Similar to status message but simpler
     return Padding(
       padding: EdgeInsets.only(bottom: 12.h, left: 36.w),
       child: Text(
@@ -273,13 +413,15 @@ class AgentChatPanel extends StatelessWidget {
                   height: 48.r,
                   decoration: BoxDecoration(
                     gradient: controller.isAgentWorking.value
-                        ? LinearGradient(
-                            colors: [Colors.grey[400]!, Colors.grey[400]!])
+                        ? LinearGradient(colors: [
+                            AppColors.error,
+                            AppColors.error.withOpacity(0.8)
+                          ])
                         : LinearGradient(
                             colors: [
                               AppColors.primary,
                               const Color(0xFF6366F1)
-                            ], // Modern gradients
+                            ],
                           ),
                     shape: BoxShape.circle,
                     boxShadow: controller.isAgentWorking.value
@@ -297,22 +439,21 @@ class AgentChatPanel extends StatelessWidget {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(24.r),
                       onTap: controller.isAgentWorking.value
-                          ? null
+                          ? () => controller.stopTask()
                           : () => controller
                               .sendMessage(controller.textController.text),
                       child: Center(
                         child: Icon(
                           controller.isAgentWorking.value
-                              ? StatusIcons.processing
-                              : StatusIcons.send,
+                              ? LucideIcons.square
+                              : LucideIcons.send,
                           color: Colors.white,
                           size: 20.r,
                         ),
                       ),
                     ),
                   ),
-                )
-                    .animate(target: controller.isAgentWorking.value ? 1 : 0)
+                ).animate(target: controller.isAgentWorking.value ? 1 : 0)
                     .scale(
                         begin: Offset(1, 1),
                         end: Offset(0.9, 0.9),
@@ -401,7 +542,6 @@ class AgentChatPanel extends StatelessWidget {
       ),
       onPressed: () {
         controller.textController.text = label;
-        // Optionally auto-send or just fill
       },
       backgroundColor: Colors.white,
       shadowColor: Colors.black.withOpacity(0.05),

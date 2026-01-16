@@ -16,13 +16,21 @@ class EditorService {
     return response.success ? response.data : null;
   }
 
-  /// Get task status
   Future<Map<String, dynamic>?> getTaskStatus(int projectId, String taskId) async {
     final response = await ApiClient.get<Map<String, dynamic>>(
       ApiEndpoints.agentTaskStatus(projectId, taskId),
     );
 
     return response.success ? response.data : null;
+  }
+
+  /// Stop a running task
+  Future<bool> stopTask(String projectId, String taskId) async {
+    final response = await ApiClient.post<Map<String, dynamic>>(
+      ApiEndpoints.agentTaskStop(projectId, taskId),
+    );
+
+    return response.success;
   }
 
   /// Get agent operation history

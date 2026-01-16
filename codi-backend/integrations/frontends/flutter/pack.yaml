@@ -1,0 +1,12 @@
+name: flutter
+version: 3.0.0
+pack_type: frontend
+description: "Flutter - Google's UI toolkit for building beautiful, natively compiled applications"
+
+compatibility:
+  dart: ">=3.0.0 <4.0.0"
+
+tags:
+  - dart
+  - mobile
+  - cross-platform

@@ -89,6 +89,5 @@ async def close_db() -> None:
     await engine.dispose()
 
 
-# Alias for backward compatibility
+# Alias for dependency injection in routes
 get_db_session = get_db
-

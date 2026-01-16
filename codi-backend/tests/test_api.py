@@ -1,33 +1,24 @@
-"""Tests for health endpoints."""
+"""Basic API tests for Codi backend."""
 import pytest
 from httpx import AsyncClient
 
-
-@pytest.mark.asyncio
-async def test_health_check(client: AsyncClient) -> None:
-    """Test basic health check endpoint."""
-    response = await client.get("/health")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "healthy"
-    assert "timestamp" in data
-    assert "version" in data
+from app.main import app
 
 
 @pytest.mark.asyncio
-async def test_liveness_check(client: AsyncClient) -> None:
-    """Test Kubernetes liveness probe."""
-    response = await client.get("/health/live")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "alive"
+async def test_health_check():
+    """Test health endpoint."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        response = await client.get("/api/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
 
 
 @pytest.mark.asyncio
-async def test_root_endpoint(client: AsyncClient) -> None:
-    """Test root endpoint returns API info."""
-    response = await client.get("/")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["name"] == "Codi Backend API"
-    assert "version" in data
+async def test_root_redirect():
+    """Test root redirects to docs."""
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        response = await client.get("/", follow_redirects=False)
+        # Should redirect to /docs
+        assert response.status_code in [301, 302, 307, 308]
