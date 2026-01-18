@@ -26,7 +26,7 @@ class AgentChatPanel extends StatelessWidget {
     final controller = Get.find<AgentChatController>();
 
     return Container(
-      color: Colors.white,
+      color: Get.theme.cardTheme.color,
       child: Column(
         children: [
           Expanded(child: _buildMessageList(controller)),
@@ -169,13 +169,13 @@ class AgentChatPanel extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(12.r),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: Get.theme.canvasColor,
                 borderRadius: BorderRadius.circular(12.r),
               ),
               child: Text(
                 message.text,
                 style: GoogleFonts.inter(
-                    fontSize: 13.sp, color: AppColors.textPrimary),
+                    fontSize: 13.sp, color: Get.textTheme.bodyMedium?.color),
               ),
             ),
           ),
@@ -201,8 +201,8 @@ class AgentChatPanel extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(16.r),
               decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: AppColors.border),
+                color: Get.theme.cardTheme.color,
+                border: Border.all(color: Get.theme.dividerColor),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(4.r),
                   topRight: Radius.circular(16.r),
@@ -221,7 +221,7 @@ class AgentChatPanel extends StatelessWidget {
                 message.text,
                 style: GoogleFonts.inter(
                   fontSize: 14.sp,
-                  color: AppColors.textPrimary,
+                  color: Get.textTheme.bodyLarge?.color,
                   height: 1.5,
                 ),
               ),
@@ -320,9 +320,8 @@ class AgentChatPanel extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(8.r),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(8.r),
-          border: Border.all(color: Colors.grey[200]!),
+          color: Get.theme.canvasColor,
+          border: Border.all(color: Get.theme.dividerColor),
         ),
         child: Text(
           displayResult,
@@ -352,8 +351,8 @@ class AgentChatPanel extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.border)),
+        color: Get.theme.cardTheme.color,
+        border: Border(top: BorderSide(color: Get.theme.dividerColor)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -369,9 +368,9 @@ class AgentChatPanel extends StatelessWidget {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: AppColors.inputBackground,
+                  color: Get.theme.inputDecorationTheme.fillColor,
                   borderRadius: BorderRadius.circular(24.r),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: Get.theme.dividerColor),
                 ),
                 child: Row(
                   children: [
@@ -497,7 +496,7 @@ class AgentChatPanel extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Get.textTheme.titleLarge?.color,
               ),
             ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
             SizedBox(height: 8.h),
@@ -505,7 +504,7 @@ class AgentChatPanel extends StatelessWidget {
               AppStrings.startConversationSubtitle,
               style: GoogleFonts.inter(
                 fontSize: 14.sp,
-                color: AppColors.textSecondary,
+                color: Get.textTheme.bodyMedium?.color,
                 height: 1.5,
               ),
               textAlign: TextAlign.center,
@@ -538,18 +537,18 @@ class AgentChatPanel extends StatelessWidget {
         style: GoogleFonts.inter(
             fontSize: 13.sp,
             fontWeight: FontWeight.w500,
-            color: AppColors.textPrimary),
+            color: Get.textTheme.bodyMedium?.color),
       ),
       onPressed: () {
         controller.textController.text = label;
       },
-      backgroundColor: Colors.white,
+      backgroundColor: Get.theme.cardTheme.color,
       shadowColor: Colors.black.withOpacity(0.05),
       elevation: 2,
       padding: EdgeInsets.all(8.r),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24.r),
-          side: BorderSide(color: AppColors.border, width: 1.0)),
+          side: BorderSide(color: Get.theme.dividerColor, width: 1.0)),
     );
   }
 }

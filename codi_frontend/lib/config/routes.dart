@@ -7,6 +7,7 @@ import '../bindings/deployments_binding.dart';
 import '../bindings/editor_binding.dart';
 import '../bindings/planning_binding.dart';
 import '../bindings/projects_binding.dart';
+import '../bindings/layout_binding.dart';
 import '../features/auth/views/login_screen.dart';
 import '../features/auth/views/splash_screen.dart';
 import '../features/deployments/views/deployments_screen.dart';
@@ -16,6 +17,8 @@ import '../features/planning/views/walkthrough_screen.dart';
 import '../features/projects/views/project_wizard_screen.dart';
 import '../features/projects/views/project_detail_screen.dart';
 import '../features/projects/views/projects_list_screen.dart';
+import '../features/layout/views/layout_view.dart';
+import '../features/layout/controllers/layout_controller.dart';
 import '../features/settings/views/settings_screen.dart';
 
 /// Application route definitions
@@ -26,6 +29,7 @@ class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
   static const String projects = '/projects';
+  static const String layout = '/layout';
   static const String createProject = '/projects/create';
   static const String projectDetail = '/projects/:id';
   static const String editor = '/editor/:id';
@@ -55,6 +59,14 @@ class AppRoutes {
           name: projects,
           page: () => const ProjectsListScreen(),
           binding: ProjectsBinding(),
+          transition: Transition.fadeIn,
+        ),
+
+        // Layout (Master View)
+        GetPage(
+          name: layout,
+          page: () => const LayoutView(),
+          binding: LayoutBinding(),
           transition: Transition.fadeIn,
         ),
 

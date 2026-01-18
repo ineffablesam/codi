@@ -56,7 +56,7 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
       height: MediaQuery.of(context).size.height * 0.8,
       constraints: BoxConstraints(maxHeight: 500.h),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Get.theme.cardTheme.color,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
       ),
       child: Column(
@@ -68,7 +68,7 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
             width: 40.w,
             height: 4.h,
             decoration: BoxDecoration(
-              color: AppColors.textSecondary.withOpacity(0.3),
+              color: Get.textTheme.bodyMedium!.color!.withOpacity(0.3),
               borderRadius: BorderRadius.circular(2.r),
             ),
           ),
@@ -86,7 +86,7 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
                   style: TextStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: Get.textTheme.titleLarge?.color,
                   ),
                 ),
                 const Spacer(),
@@ -119,7 +119,7 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
                   child: Text(
                     'No branches found',
                     style: TextStyle(
-                      color: AppColors.textSecondary,
+                      color: Get.textTheme.bodyMedium?.color,
                       fontSize: 14.sp,
                     ),
                   ),
@@ -155,9 +155,9 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
               controller: _newBranchController,
               decoration: InputDecoration(
                 hintText: 'New branch name...',
-                hintStyle: TextStyle(color: AppColors.textSecondary),
+                hintStyle: TextStyle(color: Get.textTheme.bodyMedium?.color),
                 filled: true,
-                fillColor: AppColors.background,
+                fillColor: Get.theme.inputDecorationTheme.fillColor ?? Get.theme.scaffoldBackgroundColor,
                 contentPadding: EdgeInsets.symmetric(
                   horizontal: 16.w,
                   vertical: 12.h,
@@ -167,7 +167,7 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              style: TextStyle(color: AppColors.textPrimary),
+              style: TextStyle(color: Get.textTheme.bodyLarge?.color),
             ),
           ),
           SizedBox(width: 12.w),
@@ -208,7 +208,7 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
       decoration: BoxDecoration(
         color: isCurrent
             ? AppColors.primary.withOpacity(0.1)
-            : AppColors.background,
+            : Get.theme.canvasColor,
         borderRadius: BorderRadius.circular(12.r),
         border: isCurrent
             ? Border.all(color: AppColors.primary.withOpacity(0.3))
@@ -217,18 +217,18 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
       child: ListTile(
         leading: Icon(
           isCurrent ? Iconsax.tick_circle : Iconsax.code_circle,
-          color: isCurrent ? AppColors.primary : AppColors.textSecondary,
+          color: isCurrent ? AppColors.primary : Get.textTheme.bodyMedium?.color,
         ),
         title: Text(
           branch,
           style: TextStyle(
-            color: AppColors.textPrimary,
+            color: Get.textTheme.bodyLarge?.color,
             fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
         trailing: PopupMenuButton<String>(
-          icon: Icon(Iconsax.more, color: AppColors.textSecondary),
-          color: AppColors.surface,
+          icon: Icon(Iconsax.more, color: Get.textTheme.bodyMedium?.color),
+          color: Get.theme.cardTheme.color,
           itemBuilder: (context) => [
             if (!isCurrent)
               PopupMenuItem(
@@ -236,10 +236,10 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
                 child: Row(
                   children: [
                     Icon(Iconsax.arrow_swap_horizontal,
-                        size: 18.sp, color: AppColors.textPrimary),
+                        size: 18.sp, color: Get.textTheme.bodyLarge?.color),
                     SizedBox(width: 8.w),
                     Text('Switch to branch',
-                        style: TextStyle(color: AppColors.textPrimary)),
+                        style: TextStyle(color: Get.textTheme.bodyLarge?.color)),
                   ],
                 ),
               ),
@@ -250,7 +250,7 @@ class _BranchSwitcherSheetState extends State<BranchSwitcherSheet> {
                   Icon(Iconsax.eye, size: 18.sp, color: AppColors.primary),
                   SizedBox(width: 8.w),
                   Text('Create Preview',
-                      style: TextStyle(color: AppColors.textPrimary)),
+                      style: TextStyle(color: Get.textTheme.bodyLarge?.color)),
                 ],
               ),
             ),

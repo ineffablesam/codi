@@ -64,6 +64,8 @@ class ProjectResponse(BaseModel):
     last_deployment_at: Optional[datetime] = None
     last_build_status: Optional[str] = None
     last_build_at: Optional[datetime] = None
+    # Active container for logs access
+    active_container_id: Optional[str] = None
     status: str
     created_at: datetime
     updated_at: datetime

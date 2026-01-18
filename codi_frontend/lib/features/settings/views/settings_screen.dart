@@ -22,7 +22,7 @@ class SettingsScreen extends StatelessWidget {
     final authController = Get.find<AuthController>();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Get.theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           AppStrings.settings,
@@ -104,9 +104,9 @@ class SettingsScreen extends StatelessWidget {
       return Container(
         padding: EdgeInsets.all(16.r),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Get.theme.cardTheme.color,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: Get.theme.dividerColor),
         ),
         child: Row(
           children: [
@@ -129,7 +129,7 @@ class SettingsScreen extends StatelessWidget {
                     style: GoogleFonts.inter(
                       fontSize: 18.sp,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: Get.textTheme.titleLarge?.color,
                     ),
                   ),
                   SizedBox(height: 4.h),
@@ -137,7 +137,7 @@ class SettingsScreen extends StatelessWidget {
                     '@${user?.githubUsername ?? 'unknown'}',
                     style: GoogleFonts.inter(
                       fontSize: 14.sp,
-                      color: AppColors.textSecondary,
+                      color: Get.textTheme.bodyMedium?.color,
                     ),
                   ),
                 ],
@@ -145,7 +145,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             Icon(
               Icons.verified,
-              color: AppColors.primary,
+              color: Get.theme.primaryColor,
               size: 24.r,
             ),
           ],
@@ -160,7 +160,7 @@ class SettingsScreen extends StatelessWidget {
       style: GoogleFonts.inter(
         fontSize: 13.sp,
         fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
+        color: Get.textTheme.bodySmall?.color,
       ),
     );
   }
@@ -168,9 +168,9 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildSettingsCard(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Get.theme.cardTheme.color,
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: Get.theme.dividerColor),
       ),
       child: Column(children: children),
     );
@@ -185,7 +185,7 @@ class SettingsScreen extends StatelessWidget {
     return StatefulBuilder(
       builder: (context, setState) {
         return ListTile(
-          leading: Icon(icon, color: AppColors.textSecondary),
+          leading: Icon(icon, color: Get.textTheme.bodyMedium?.color),
           title: Text(
             title,
             style: GoogleFonts.inter(fontSize: 15.sp),
@@ -196,7 +196,7 @@ class SettingsScreen extends StatelessWidget {
               setState(() {});
               onChanged(newValue);
             },
-            activeColor: AppColors.primary,
+            activeColor: Get.theme.primaryColor,
           ),
         );
       },
@@ -209,7 +209,7 @@ class SettingsScreen extends StatelessWidget {
     required String subtitle,
   }) {
     return ListTile(
-      leading: Icon(icon, color: AppColors.textSecondary),
+      leading: Icon(icon, color: Get.textTheme.bodyMedium?.color),
       title: Text(
         title,
         style: GoogleFonts.inter(fontSize: 15.sp),
@@ -218,7 +218,7 @@ class SettingsScreen extends StatelessWidget {
         subtitle,
         style: GoogleFonts.inter(
           fontSize: 14.sp,
-          color: AppColors.textSecondary,
+          color: Get.textTheme.bodyMedium?.color,
         ),
       ),
     );
@@ -230,21 +230,21 @@ class SettingsScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     return ListTile(
-      leading: Icon(icon, color: AppColors.textSecondary),
+      leading: Icon(icon, color: Get.textTheme.bodyMedium?.color),
       title: Text(
         title,
         style: GoogleFonts.inter(fontSize: 15.sp),
       ),
       trailing: Icon(
         Icons.chevron_right,
-        color: AppColors.textTertiary,
+        color: Get.textTheme.bodySmall?.color,
       ),
       onTap: onTap,
     );
   }
 
   Widget _buildDivider() {
-    return Divider(height: 1, indent: 56.w, color: AppColors.divider);
+    return Divider(height: 1, indent: 56.w, color: Get.theme.dividerColor);
   }
 
   void _openUrl(String url) async {

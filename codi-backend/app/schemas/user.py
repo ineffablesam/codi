@@ -41,6 +41,8 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
     name: Optional[str] = None
     github_avatar_url: Optional[str] = None
+    what_brings_you: Optional[str] = None
+    coding_experience: Optional[str] = None
     is_active: bool
     created_at: datetime
     last_login_at: Optional[datetime] = None
@@ -59,6 +61,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int  # seconds
     user: UserResponse
+    is_new_user: bool = False
 
 
 class GitHubOAuthCallback(BaseModel):
@@ -85,3 +88,11 @@ class GitHubTokenResponse(BaseModel):
     access_token: str
     token_type: str
     scope: str
+
+
+class OnboardingUpdate(BaseModel):
+    """Schema for completing user onboarding."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    what_brings_you: str = Field(..., min_length=1, max_length=100)
+    coding_experience: str = Field(..., min_length=1, max_length=50)

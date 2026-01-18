@@ -1,43 +1,60 @@
-/// Environment configuration
-library;
+import 'dart:io';
 
-/// Application environment settings
+import 'package:flutter/foundation.dart';
+
 class Environment {
   Environment._();
 
-  /// API base URL for REST endpoints
-  static const String apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000/api/v1',
-  );
+  /// Check if running in development mode
+  static bool get isDevelopment => kDebugMode;
 
-  /// WebSocket base URL for real-time updates
-  static const String wsBaseUrl = String.fromEnvironment(
-    'WS_BASE_URL',
-    defaultValue: 'ws://10.0.2.2:8000',
-  );
+  /// Check if running in production mode
+  static bool get isProduction => kReleaseMode;
 
-  /// GitHub OAuth client ID
-  static const String githubClientId = String.fromEnvironment(
-    'GITHUB_CLIENT_ID',
-    defaultValue: '',
-  );
+  /// Check if running in profile mode
+  static bool get isProfile => kProfileMode;
 
-  /// GitHub OAuth redirect URI
+  static const String _apiBaseUrlFromEnv =
+      String.fromEnvironment('API_BASE_URL', defaultValue: '');
+
+  static String get apiBaseUrl {
+    // Highest priority: build-time override
+    if (_apiBaseUrlFromEnv.isNotEmpty) {
+      return _apiBaseUrlFromEnv;
+    }
+
+    // Local development defaults
+    if (isDebug) {
+      if (Platform.isAndroid) {
+        return 'http://10.0.2.2:8000/api/v1';
+      }
+      if (Platform.isIOS) {
+        return 'http://localhost:8000/api/v1';
+      }
+    }
+
+    // Fallback (should never happen in prod)
+    return 'https://api.yourapp.com/api/v1';
+  }
+
+  static String get wsBaseUrl {
+    final base = apiBaseUrl.replaceFirst('http', 'ws');
+    return base.replaceAll('/api/v1', '');
+  }
+
+  static const String githubClientId =
+      String.fromEnvironment('GITHUB_CLIENT_ID', defaultValue: '');
+
   static String get githubRedirectUri => '$apiBaseUrl/auth/github/callback';
 
-  /// Connection timeout in milliseconds
   static const int connectionTimeout = 30000;
-
-  /// Receive timeout in milliseconds
   static const int receiveTimeout = 30000;
 
-  /// WebSocket reconnect attempts
   static const int wsReconnectAttempts = 5;
-
-  /// WebSocket heartbeat interval in seconds
   static const int wsHeartbeatInterval = 30;
 
-  /// Is debug mode
-  static const bool isDebug = true;
+  static const bool isDebug = bool.fromEnvironment(
+    'DEBUG',
+    defaultValue: true,
+  );
 }

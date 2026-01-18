@@ -58,4 +58,21 @@ class AuthService {
     );
     return response.success;
   }
+
+  /// Complete onboarding
+  Future<bool> completeOnboarding({
+    required String name,
+    required String whatBringsYou,
+    required String codingExperience,
+  }) async {
+    final response = await ApiClient.patch<Map<String, dynamic>>(
+      '${ApiEndpoints.authMe}/onboarding',
+      data: {
+        'name': name,
+        'what_brings_you': whatBringsYou,
+        'coding_experience': codingExperience,
+      },
+    );
+    return response.success;
+  }
 }

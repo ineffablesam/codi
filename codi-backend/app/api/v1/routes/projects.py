@@ -36,6 +36,21 @@ router = APIRouter(prefix="/projects", tags=["Projects"])
 
 def _project_to_response(p: Project) -> ProjectResponse:
     """Convert a Project model to ProjectResponse schema."""
+    # Find active container ID from deployments
+    active_container_id = None
+    if hasattr(p, 'deployments') and p.deployments:
+        # Find the active production deployment
+        for deployment in p.deployments:
+            if deployment.status.value == 'active' and deployment.is_production and deployment.container_id:
+                active_container_id = deployment.container_id
+                break
+        # If no production deployment, fall back to any active deployment
+        if not active_container_id:
+            for deployment in p.deployments:
+                if deployment.status.value == 'active' and deployment.container_id:
+                    active_container_id = deployment.container_id
+                    break
+    
     return ProjectResponse(
         id=p.id,
         owner_id=p.owner_id,
@@ -56,6 +71,7 @@ def _project_to_response(p: Project) -> ProjectResponse:
         last_deployment_at=p.last_deployment_at,
         last_build_status=p.last_build_status,
         last_build_at=p.last_build_at,
+        active_container_id=active_container_id,
         created_at=p.created_at,
         updated_at=p.updated_at,
     )
@@ -254,7 +270,7 @@ async def get_project(
     """
     result = await session.execute(
         select(Project)
-        .options(selectinload(Project.owner))
+        .options(selectinload(Project.owner), selectinload(Project.deployments))
         .where(
             Project.id == project_id,
             Project.owner_id == current_user.id,
@@ -267,6 +283,21 @@ async def get_project(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Project not found",
         )
+
+    # Find active container ID from deployments
+    active_container_id = None
+    if hasattr(project, 'deployments') and project.deployments:
+        # Find the active production deployment first
+        for deployment in project.deployments:
+            if deployment.status.value == 'active' and deployment.is_production and deployment.container_id:
+                active_container_id = deployment.container_id
+                break
+        # If no production deployment, fall back to any active deployment
+        if not active_container_id:
+            for deployment in project.deployments:
+                if deployment.status.value == 'active' and deployment.container_id:
+                    active_container_id = deployment.container_id
+                    break
 
     return ProjectWithOwner(
         id=project.id,
@@ -286,6 +317,7 @@ async def get_project(
         last_deployment_at=project.last_deployment_at,
         last_build_status=project.last_build_status,
         last_build_at=project.last_build_at,
+        active_container_id=active_container_id,
         created_at=project.created_at,
         updated_at=project.updated_at,
         owner_username=project.owner.github_username or project.owner.email or "Unknown",

@@ -28,6 +28,10 @@ class User(Base):
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     github_avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
+    # Onboarding fields (required for new users, filled during onboarding)
+    what_brings_you: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    coding_experience: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     # Encrypted GitHub access token (encrypted using Fernet)
     github_access_token_encrypted: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -84,6 +88,8 @@ class User(Base):
             "email": self.email,
             "name": self.name,
             "github_avatar_url": self.github_avatar_url,
+            "what_brings_you": self.what_brings_you,
+            "coding_experience": self.coding_experience,
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

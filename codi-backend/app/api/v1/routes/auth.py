@@ -93,6 +93,7 @@ async def github_oauth_callback(
 
         # Encrypt the GitHub token
         encrypted_token = encryption_service.encrypt_token(access_token)
+        is_new_user = False
 
         if user:
             # Update existing user
@@ -106,6 +107,7 @@ async def github_oauth_callback(
             logger.info(f"User logged in: {github_username}")
         else:
             # Create new user
+            is_new_user = True
             user = User(
                 github_id=github_id,
                 github_username=github_username,
@@ -146,6 +148,7 @@ async def github_oauth_callback(
                 created_at=user.created_at,
                 last_login_at=user.last_login_at,
             ),
+            is_new_user=is_new_user,
         )
 
     except ValueError as e:
@@ -183,11 +186,56 @@ async def get_current_user_info(
         email=user.email,
         name=user.name,
         github_avatar_url=user.github_avatar_url,
+        what_brings_you=user.what_brings_you,
+        coding_experience=user.coding_experience,
         is_active=user.is_active,
         created_at=user.created_at,
         last_login_at=user.last_login_at,
     )
 
+
+@router.patch("/me/onboarding", response_model=UserResponse)
+async def complete_onboarding(
+    onboarding_data: "OnboardingUpdate",
+    session: AsyncSession = Depends(get_db_session),
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+) -> UserResponse:
+    """Complete user onboarding by saving required profile fields.
+
+    Args:
+        onboarding_data: Required onboarding fields (name, what_brings_you, coding_experience)
+
+    Returns:
+        Updated user information
+    """
+    from app.api.v1.deps import get_current_user
+    from app.schemas.user import OnboardingUpdate
+
+    user = await get_current_user(credentials, session)
+
+    # Update user with onboarding data
+    user.name = onboarding_data.name
+    user.what_brings_you = onboarding_data.what_brings_you
+    user.coding_experience = onboarding_data.coding_experience
+
+    await session.commit()
+    await session.refresh(user)
+
+    logger.info(f"User {user.github_username} completed onboarding")
+
+    return UserResponse(
+        id=user.id,
+        github_id=user.github_id,
+        github_username=user.github_username,
+        email=user.email,
+        name=user.name,
+        github_avatar_url=user.github_avatar_url,
+        what_brings_you=user.what_brings_you,
+        coding_experience=user.coding_experience,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        last_login_at=user.last_login_at,
+    )
 
 
 @router.post("/logout")

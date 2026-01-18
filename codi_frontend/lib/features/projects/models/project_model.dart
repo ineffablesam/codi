@@ -30,6 +30,9 @@ class ProjectModel {
   final String? backendType;
   final String? deploymentPlatform;
 
+  // Active container for logs
+  final String? activeContainerId;
+
   // Optional owner info
   final int? ownerId;
   final String? ownerUsername;
@@ -55,6 +58,7 @@ class ProjectModel {
     this.framework,
     this.backendType,
     this.deploymentPlatform,
+    this.activeContainerId,
     this.ownerId,
     this.ownerUsername,
     this.ownerAvatarUrl,
@@ -85,6 +89,7 @@ class ProjectModel {
       framework: json['framework'] as String?,
       backendType: json['backend_type'] as String?,
       deploymentPlatform: json['deployment_platform'] as String?,
+      activeContainerId: json['active_container_id'] as String?,
       ownerId: json['owner_id'] as int?,
       ownerUsername: json['owner_username'] as String?,
       ownerAvatarUrl: json['owner_avatar_url'] as String?,

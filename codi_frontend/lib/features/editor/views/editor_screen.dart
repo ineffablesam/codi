@@ -8,7 +8,6 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:radix_icons/radix_icons.dart';
-import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/sf_font.dart';
@@ -31,22 +30,21 @@ class EditorScreen extends StatelessWidget {
     final controller = Get.find<EditorController>();
     final previewController = Get.find<PreviewController>();
     return Scaffold(
-      backgroundColor: AppColors.background,
-      // appBar: _buildAppBar(controller),
+      backgroundColor: Get.theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: CustomScrollView(
           physics: const NeverScrollableScrollPhysics(),
           slivers: [
             SliverAppBar(
               pinned: true,
-              backgroundColor: AppColors.background,
+              backgroundColor: Get.theme.scaffoldBackgroundColor,
               expandedHeight: 80.h,
               automaticallyImplyLeading: false,
               flexibleSpace: FlexibleSpaceBar(
                 background: _buildAppBar(controller),
               ),
             ),
-            shadcn.SliverFillRemaining(
+            SliverFillRemaining(
               child: Obx(() {
                 if (controller.isLoading.value) {
                   return const Center(child: CircularProgressIndicator());
@@ -83,7 +81,7 @@ class EditorScreen extends StatelessWidget {
                             height: MediaQuery.of(context).size.height * 0.85,
                             margin: EdgeInsets.only(top: 80.h),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: Get.theme.cardTheme.color,
                               borderRadius: BorderRadius.vertical(
                                 top: Radius.circular(24.r),
                               ),
@@ -154,7 +152,7 @@ class EditorScreen extends StatelessWidget {
                                       child: Container(
                                         padding: EdgeInsets.all(12.w),
                                         decoration: BoxDecoration(
-                                          color: Colors.grey.shade900,
+                                          color: Get.theme.cardTheme.color,
                                           borderRadius:
                                               BorderRadius.circular(18.r),
                                           border: Border.all(
@@ -172,14 +170,13 @@ class EditorScreen extends StatelessWidget {
                             ),
                             FlexSwitch.fromEnum<EditorTab>(
                               style: FlexSwitchStyle(
-                                backgroundColor: Colors.grey.shade900,
+                                backgroundColor: Get.theme.cardTheme.color,
                                 thumbColor: Colors.grey.shade800,
                                 activeLabelColor: Colors.white,
                                 inactiveLabelColor: Colors.grey.shade400,
                                 borderRadius: 16,
                                 thumbRadius: 12,
                                 thumbPressScale: 0.95,
-                                // scale thumb while pressed (1.0 to disable)
                                 padding: 6,
                                 itemPadding: EdgeInsets.symmetric(vertical: 8),
                                 gap: 8,
@@ -192,16 +189,13 @@ class EditorScreen extends StatelessWidget {
                                 border: null,
                                 labelTextStyle: null,
                                 iconSize: null,
-                                // computed from height if null
                                 focusRingWidth: 2,
                                 enableRipple: true,
                                 segmentOverlayColor: null,
                                 splashFactory: null,
                                 enableTrackHoverOverlay: true,
                                 segmentGutter: 6,
-                                // interior gap; outer edges keep the track padding
-                                layout: FlexSwitchLayout
-                                    .equal, // default layout; can also come from FlexSwitchTheme
+                                layout: FlexSwitchLayout.equal,
                               ),
                               iconBuilder: (v) => switch (v) {
                                 EditorTab.preview => RadixIcons.Eye_Open,
@@ -233,252 +227,322 @@ class EditorScreen extends StatelessWidget {
 
   Widget _buildAppBar(EditorController controller,
       {BranchController? branchCtrl}) {
-    return shadcn.OutlinedContainer(
-      clipBehavior: Clip.antiAlias,
-      child: shadcn.AppBar(
-        // Title + subtitle area with reactive updates
-        title: Obx(() => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      decoration: BoxDecoration(
+        color: Get.theme.cardTheme.color,
+        border: Border.all(
+          color: Get.theme.dividerColor,
+          width: 1,
+        ),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        child: Row(
+          children: [
+            // Leading - Back button
+            _buildIconButton(
+              icon: Icons.arrow_back,
+              onPressed: () => Get.back(),
+            ),
+            SizedBox(width: 12.w),
+
+            // Title + subtitle area
+            Expanded(
+              child: Obx(() => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        controller.currentProject.value?.name ?? 'Editor',
+                        style: SFPro.medium(
+                          fontSize: 16.sp,
+                          color: Get.textTheme.titleMedium?.color,
+                        ),
+                      ),
+                      Obx(() {
+                        if (controller.isAgentWorking.value) {
+                          return Row(
+                            children: [
+                              SizedBox(
+                                width: 10.r,
+                                height: 10.r,
+                                child: const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor:
+                                      AlwaysStoppedAnimation(AppColors.primary),
+                                ),
+                              ),
+                              SizedBox(width: 6.w),
+                              Text(
+                                'Working...',
+                                style: SFPro.regular(
+                                  fontSize: 11.sp,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      }),
+                    ],
+                  )),
+            ),
+
+            // Trailing buttons
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  controller.currentProject.value?.name ?? 'Editor',
-                  style: SFPro.medium(
-                    fontSize: 16.sp,
-                    color: Colors.black,
-                  ),
-                ),
+                // Commit badge
                 Obx(() {
-                  if (controller.isAgentWorking.value) {
-                    return Row(
-                      children: [
-                        SizedBox(
-                          width: 10.r,
-                          height: 10.r,
-                          child: const CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation(AppColors.primary),
+                  if (Get.isRegistered<CommitPanelController>()) {
+                    final commitController = Get.find<CommitPanelController>();
+                    if (commitController.modifiedFiles.isNotEmpty) {
+                      return _buildIconButton(
+                        icon: Icons.commit,
+                        onPressed: () {
+                          controller.setTab(EditorTab.preview);
+                          commitController.isExpanded.value = true;
+                        },
+                        badge: commitController.modifiedFiles.length,
+                      );
+                    }
+                  }
+                  return const SizedBox.shrink();
+                }),
+
+                // Build progress indicator
+                Obx(() {
+                  if (controller.buildProgress.value > 0 &&
+                      controller.buildProgress.value < 1.0) {
+                    return Container(
+                      margin: EdgeInsets.symmetric(horizontal: 8.w),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 12.r,
+                            height: 12.r,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              value: controller.buildProgress.value,
+                              valueColor:
+                                  const AlwaysStoppedAnimation(AppColors.info),
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 6.w),
-                        Text(
-                          'Working...',
-                          style: SFPro.regular(
-                            fontSize: 11.sp,
-                            color: AppColors.primary,
+                          SizedBox(width: 6.w),
+                          Text(
+                            '${(controller.buildProgress.value * 100).toInt()}%',
+                            style: SFPro.medium(
+                              fontSize: 12.sp,
+                              color: AppColors.info,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     );
                   }
                   return const SizedBox.shrink();
                 }),
-              ],
-            )),
-        subtitle: const SizedBox.shrink(), // optional, not required
-        // Leading buttons (left)
-        leading: [
-          shadcn.OutlineButton(
-            density: shadcn.ButtonDensity.icon,
-            onPressed: () {
-              Get.back();
-            },
-            child: const Icon(Icons.arrow_back),
-          ),
-        ],
-        // Trailing buttons (right)
-        trailing: [
-          // Commit badge
-          Obx(() {
-            if (Get.isRegistered<CommitPanelController>()) {
-              final commitController = Get.find<CommitPanelController>();
-              if (commitController.modifiedFiles.isNotEmpty) {
-                return shadcn.OutlineButton(
-                  density: shadcn.ButtonDensity.icon,
-                  onPressed: () {
-                    controller.setTab(EditorTab.preview);
-                    commitController.isExpanded.value = true;
-                  },
-                  child: Badge(
-                    label: Text('${commitController.modifiedFiles.length}'),
-                    child: const Icon(Icons.commit),
+
+                SizedBox(width: 8.w),
+
+                // Branch switcher button
+                _buildOutlineButton(
+                  onPressed: () => BranchSwitcherSheet.show(
+                    Get.context!,
+                    onBranchSelected: (branch, {createPreview = false}) async {
+                      if (createPreview) {
+                        final previewCtrl = Get.find<PreviewController>();
+                        await previewCtrl.createDeployment(
+                            branch: branch, isPreview: true);
+                      }
+                    },
                   ),
-                );
-              }
-            }
-            return const SizedBox.shrink();
-          }),
-          // Build progress indicator
-          Obx(() {
-            if (controller.buildProgress.value > 0 &&
-                controller.buildProgress.value < 1.0) {
-              return Container(
-                margin: EdgeInsets.symmetric(horizontal: 8.w),
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16.r),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Iconsax.code_circle, size: 18),
+                      if (branchCtrl != null) ...[
+                        SizedBox(width: 4.w),
+                        Text(
+                          branchCtrl.currentBranch.value,
+                          style: SFPro.medium(fontSize: 11.sp),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: 12.r,
-                      height: 12.r,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value: controller.buildProgress.value,
-                        valueColor:
-                            const AlwaysStoppedAnimation(AppColors.info),
-                      ),
-                    ),
-                    SizedBox(width: 6.w),
-                    Text(
-                      '${(controller.buildProgress.value * 100).toInt()}%',
-                      style: SFPro.medium(
-                        fontSize: 12.sp,
-                        color: AppColors.info,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          }),
-          // Branch switcher button
-          shadcn.OutlineButton(
-            density: shadcn.ButtonDensity.icon,
-            onPressed: () => BranchSwitcherSheet.show(
-              Get.context!,
-              onBranchSelected: (branch, {createPreview = false}) async {
-                if (createPreview) {
-                  final previewCtrl = Get.find<PreviewController>();
-                  await previewCtrl.createDeployment(
-                      branch: branch, isPreview: true);
-                }
-              },
+
+                SizedBox(width: 8.w),
+
+                // More menu
+                _buildPopupMenu(controller),
+              ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIconButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    int? badge,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8.r),
+        child: Container(
+          padding: EdgeInsets.all(8.r),
+          decoration: BoxDecoration(
+            border: Border.all(color: Get.theme.dividerColor),
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+          child: badge != null
+              ? Badge(
+                  label: Text('$badge'),
+                  child: Icon(icon, size: 20.sp),
+                )
+              : Icon(icon, size: 20.sp),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOutlineButton({
+    required VoidCallback onPressed,
+    required Widget child,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8.r),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+          decoration: BoxDecoration(
+            border: Border.all(color: Get.theme.dividerColor),
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPopupMenu(EditorController controller) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Get.theme.dividerColor),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: PopupMenuButton(
+        icon: Icon(Icons.more_vert, size: 20.sp),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        itemBuilder: (context) => [
+          const PopupMenuItem(
+            value: 'refresh',
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Iconsax.code_circle, size: 18),
-                if (branchCtrl != null) ...[
-                  SizedBox(width: 4.w),
-                  Text(
-                    branchCtrl.currentBranch.value,
-                    style: SFPro.medium(fontSize: 11.sp),
-                  ),
-                ],
+                Icon(Icons.refresh),
+                SizedBox(width: 8),
+                Text('Refresh'),
               ],
             ),
           ),
-          SizedBox(width: 4.w),
-          // Popup menu (local Git actions)
-          shadcn.OutlineButton(
-            density: shadcn.ButtonDensity.icon,
-            onPressed: () {},
-            child: PopupMenuButton(
-              icon: const Icon(Icons.more_vert),
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'refresh',
-                  child: Row(
-                    children: [
-                      Icon(Icons.refresh),
-                      SizedBox(width: 8),
-                      Text('Refresh'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'branches',
-                  child: Row(
-                    children: [
-                      Icon(Iconsax.code_circle),
-                      SizedBox(width: 8),
-                      Text('Branches'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'logs',
-                  child: Row(
-                    children: [
-                      Icon(Iconsax.monitor),
-                      SizedBox(width: 8),
-                      Text('Container Logs'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'deploy',
-                  child: Row(
-                    children: [
-                      Icon(Iconsax.cloud_add),
-                      SizedBox(width: 8),
-                      Text('Deploy'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'redeploy',
-                  child: Row(
-                    children: [
-                      Icon(Iconsax.refresh_circle),
-                      SizedBox(width: 8),
-                      Text('Redeploy'),
-                    ],
-                  ),
-                ),
+          const PopupMenuItem(
+            value: 'branches',
+            child: Row(
+              children: [
+                Icon(Iconsax.code_circle),
+                SizedBox(width: 8),
+                Text('Branches'),
               ],
-              onSelected: (value) async {
-                final previewCtrl = Get.find<PreviewController>();
-                switch (value) {
-                  case 'refresh':
-                    controller.refresh();
-                    break;
-                  case 'branches':
-                    BranchSwitcherSheet.show(Get.context!);
-                    break;
-                  case 'logs':
-                    if (previewCtrl.containerId.value != null) {
-                      ContainerLogsSheet.show(
-                        Get.context!,
-                        containerId: previewCtrl.containerId.value!,
-                        containerName: controller.currentProject.value?.name,
-                      );
-                    } else {
-                      Get.snackbar('No Container', 'Deploy first to view logs');
-                    }
-                    break;
-                  case 'deploy':
-                    await previewCtrl.createDeployment();
-                    break;
-                  case 'redeploy':
-                    await previewCtrl.redeploy();
-                    break;
-                }
-              },
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'logs',
+            child: Row(
+              children: [
+                Icon(Iconsax.monitor),
+                SizedBox(width: 8),
+                Text('Container Logs'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'deploy',
+            child: Row(
+              children: [
+                Icon(Iconsax.cloud_add),
+                SizedBox(width: 8),
+                Text('Deploy'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'redeploy',
+            child: Row(
+              children: [
+                Icon(Iconsax.refresh_circle),
+                SizedBox(width: 8),
+                Text('Redeploy'),
+              ],
             ),
           ),
         ],
+        onSelected: (value) async {
+          final previewCtrl = Get.find<PreviewController>();
+          switch (value) {
+            case 'refresh':
+              controller.refresh();
+              break;
+            case 'branches':
+              BranchSwitcherSheet.show(Get.context!);
+              break;
+            case 'logs':
+              if (previewCtrl.containerId.value != null) {
+                ContainerLogsSheet.show(
+                  Get.context!,
+                  containerId: previewCtrl.containerId.value!,
+                  containerName: controller.currentProject.value?.name,
+                );
+              } else {
+                Get.snackbar('No Container', 'Deploy first to view logs');
+              }
+              break;
+            case 'deploy':
+              await previewCtrl.createDeployment();
+              break;
+            case 'redeploy':
+              await previewCtrl.redeploy();
+              break;
+          }
+        },
       ),
     );
   }
 
   Widget _buildAgentTab(BuildContext context) {
-    return Column(
+    return const Column(
       children: [
         // Preview panel (top half)
         Expanded(
-          // flex: 5,
-          child: const PreviewPanel(),
+          child: PreviewPanel(),
         ),
-        // Agent chat panel (bottom half)
-        // const Expanded(
-        //   flex: 6,
-        //   child: AgentChatPanel(),
-        // ),
       ],
     );
   }

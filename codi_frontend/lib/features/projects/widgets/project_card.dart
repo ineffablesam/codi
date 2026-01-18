@@ -3,13 +3,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../models/project_model.dart';
 
-/// Project card widget for list display
 /// Project card widget for list display
 class ProjectCard extends StatelessWidget {
   final ProjectModel project;
@@ -36,9 +36,9 @@ class ProjectCard extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(16.r),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Get.theme.cardTheme.color,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: Get.theme.dividerColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.03),
@@ -91,7 +91,7 @@ class ProjectCard extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 16.sp,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: Get.textTheme.titleMedium?.color,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -112,7 +112,7 @@ class ProjectCard extends StatelessWidget {
                             _getStatusText(),
                             style: GoogleFonts.inter(
                               fontSize: 12.sp,
-                              color: AppColors.textSecondary,
+                              color: Get.textTheme.bodyMedium?.color,
                             ),
                           ),
                         ],
@@ -145,7 +145,7 @@ class ProjectCard extends StatelessWidget {
                           children: [
                             Icon(Icons.archive_outlined, size: 20.r, color: AppColors.textSecondary),
                             SizedBox(width: 8.w),
-                            Text('Archive', style: TextStyle(color: AppColors.textPrimary)),
+                            Text('Archive', style: TextStyle(color: Get.textTheme.bodyMedium?.color)),
                           ],
                         ),
                       ),
@@ -156,7 +156,7 @@ class ProjectCard extends StatelessWidget {
                           children: [
                             Icon(Icons.restore, size: 20.r, color: AppColors.success),
                             SizedBox(width: 8.w),
-                            Text('Restore', style: TextStyle(color: AppColors.textPrimary)),
+                            Text('Restore', style: TextStyle(color: Get.textTheme.bodyMedium?.color)),
                           ],
                         ),
                       ),
@@ -210,7 +210,7 @@ class ProjectCard extends StatelessWidget {
                       project.githubCurrentBranch!,
                       style: GoogleFonts.jetBrainsMono(
                         fontSize: 11.sp,
-                        color: AppColors.textTertiary,
+                        color: Get.textTheme.bodySmall?.color,
                       ),
                     ),
                     SizedBox(width: 16.w),

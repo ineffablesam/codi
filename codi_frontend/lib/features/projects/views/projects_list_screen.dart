@@ -24,7 +24,7 @@ class ProjectsListScreen extends StatelessWidget {
     final authController = Get.find<AuthController>();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Get.theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           AppStrings.myProjects,
@@ -105,15 +105,6 @@ class ProjectsListScreen extends StatelessWidget {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Get.toNamed(AppRoutes.createProject),
-        backgroundColor: AppColors.primary,
-        icon: Icon(Icons.add, size: 20.r),
-        label: Text(
-          AppStrings.newProject,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
-      ),
     );
   }
 
@@ -161,7 +152,7 @@ class ProjectsListScreen extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Get.textTheme.titleLarge?.color,
               ),
             ),
             SizedBox(height: 8.h),
@@ -207,7 +198,7 @@ class ProjectsListScreen extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Get.textTheme.titleLarge?.color,
               ),
             ),
             SizedBox(height: 8.h),

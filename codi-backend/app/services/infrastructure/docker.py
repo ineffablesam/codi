@@ -884,11 +884,48 @@ node_modules
             if since:
                 kwargs["since"] = since
             
-            for chunk in container.logs(**kwargs):
-                if isinstance(chunk, bytes):
-                    yield chunk.decode("utf-8", errors="replace")
-                else:
-                    yield str(chunk)
+            # Run the blocking log stream in a thread
+            import asyncio
+            import queue
+            import threading
+            
+            log_queue: queue.Queue = queue.Queue()
+            stop_event = threading.Event()
+            
+            def stream_in_thread():
+                try:
+                    for chunk in container.logs(**kwargs):
+                        if stop_event.is_set():
+                            break
+                        if isinstance(chunk, bytes):
+                            log_queue.put(chunk.decode("utf-8", errors="replace"))
+                        else:
+                            log_queue.put(str(chunk))
+                except Exception as e:
+                    log_queue.put(None)  # Signal completion
+                finally:
+                    log_queue.put(None)  # Signal completion
+            
+            # Start streaming thread
+            thread = threading.Thread(target=stream_in_thread, daemon=True)
+            thread.start()
+            
+            # Yield logs as they become available
+            try:
+                while True:
+                    try:
+                        # Check queue with timeout to allow async cancellation
+                        log_line = await asyncio.get_event_loop().run_in_executor(
+                            None, lambda: log_queue.get(timeout=0.5)
+                        )
+                        if log_line is None:
+                            break
+                        yield log_line
+                    except queue.Empty:
+                        # No log line yet, continue waiting
+                        await asyncio.sleep(0.1)
+            finally:
+                stop_event.set()
                     
         except NotFound:
             raise ValueError(f"Container not found: {container_id}")

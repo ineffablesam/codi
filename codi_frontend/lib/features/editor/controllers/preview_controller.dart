@@ -38,13 +38,21 @@ class PreviewController extends GetxController {
     super.onInit();
     _editorController = Get.find<EditorController>();
 
-    // Initialize with current deployment URL
+    // Initialize with current deployment URL and container ID
     deploymentUrl.value = _editorController.previewUrl.value;
+    containerId.value = _editorController.currentProject.value?.activeContainerId;
 
     // Listen for URL changes
     ever(_editorController.previewUrl, (String? url) {
       if (url != null && url.isNotEmpty) {
         updatePreviewUrl(url);
+      }
+    });
+
+    // Listen for project changes to update container ID
+    ever(_editorController.currentProject, (project) {
+      if (project?.activeContainerId != null && containerId.value == null) {
+        containerId.value = project!.activeContainerId;
       }
     });
 

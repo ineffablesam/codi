@@ -10,7 +10,8 @@ class AppStrings {
   static const String appTagline = 'AI-powered Flutter development';
 
   // Auth
-  static const String loginWithGitHub = 'Continue with GitHub';
+  static const String loginWithGitHub = 'Sign in with Github';
+  static const String loginWithGoogle = 'Continue with Google';
   static const String loginTitle = 'Welcome to Codi';
   static const String loginSubtitle = 'Build Flutter apps with AI assistance';
   static const String loggingIn = 'Signing you in...';
@@ -28,9 +29,11 @@ class AppStrings {
   static const String privateProject = 'Private repository';
   static const String creating = 'Creating...';
   static const String noProjects = 'No projects yet';
-  static const String noProjectsSubtitle = 'Create your first project to get started';
+  static const String noProjectsSubtitle =
+      'Create your first project to get started';
   static const String deleteProject = 'Delete Project';
-  static const String deleteConfirm = 'Are you sure you want to delete this project?';
+  static const String deleteConfirm =
+      'Are you sure you want to delete this project?';
 
   // Editor
   static const String editor = 'Editor';
@@ -45,7 +48,8 @@ class AppStrings {
   static const String refresh = 'Refresh';
   static const String openInBrowser = 'Open in browser';
   static const String startConversation = 'Start a conversation';
-  static const String startConversationSubtitle = 'Ask me to build features for your app';
+  static const String startConversationSubtitle =
+      'Ask me to build features for your app';
   static const String working = 'Working...';
 
   // Agents
@@ -83,7 +87,8 @@ class AppStrings {
   // Deployments
   static const String deployments = 'Deployments';
   static const String noDeployments = 'No deployments yet';
-  static const String noDeploymentsSubtitle = 'Deploy your project to see history';
+  static const String noDeploymentsSubtitle =
+      'Deploy your project to see history';
   static const String viewDeployment = 'View Deployment';
 
   // Settings
@@ -100,7 +105,8 @@ class AppStrings {
   // Errors
   static const String error = 'Error';
   static const String connectionError = 'Connection error';
-  static const String connectionErrorMessage = 'Unable to connect to server. Please try again.';
+  static const String connectionErrorMessage =
+      'Unable to connect to server. Please try again.';
   static const String somethingWentWrong = 'Something went wrong';
   static const String tryAgain = 'Try again';
   static const String cancel = 'Cancel';

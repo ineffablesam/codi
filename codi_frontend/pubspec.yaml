@@ -76,6 +76,15 @@ dependencies:
   
   # Confetti animation (for completion celebrations)
   confetti: ^0.7.0
+  lottie: ^3.3.2
+  flutter_svg: ^2.2.3
+  screen_corner_radius: ^3.0.0
+  liquid_glass_renderer: ^0.2.0-dev.4
+  animate_do: ^4.2.0
+  chewie: ^1.13.0
+  animated_custom_dropdown: ^3.1.1
+  adaptive_platform_ui: ^0.1.100
+  lucky_navigation_bar: ^1.0.0
 
 dev_dependencies:
   flutter_test:
@@ -90,6 +99,9 @@ flutter:
   assets:
     - assets/
     - assets/fonts/sf/
+    - assets/lottie/
+    - assets/images/
+    - assets/videos/
 
   fonts:
     - family: SFPro

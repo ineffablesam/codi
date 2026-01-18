@@ -1,6 +1,3 @@
-/// User model
-library;
-
 /// User data model
 class UserModel {
   final int id;
@@ -67,12 +64,14 @@ class TokenResponse {
   final String tokenType;
   final int expiresIn;
   final UserModel user;
+  final bool isNewUser;
 
   TokenResponse({
     required this.accessToken,
     required this.tokenType,
     required this.expiresIn,
     required this.user,
+    this.isNewUser = false,
   });
 
   factory TokenResponse.fromJson(Map<String, dynamic> json) {
@@ -81,6 +80,7 @@ class TokenResponse {
       tokenType: json['token_type'] as String,
       expiresIn: json['expires_in'] as int,
       user: UserModel.fromJson(json['user'] as Map<String, dynamic>),
+      isNewUser: json['is_new_user'] as bool? ?? false,
     );
   }
 }

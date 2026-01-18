@@ -482,17 +482,28 @@ async def get_container_stats(
 async def stream_container_logs(
     websocket: WebSocket,
     container_id: str,
+    since_now: bool = True,  # Default to only streaming new logs
 ) -> None:
-    """WebSocket endpoint for streaming container logs."""
+    """WebSocket endpoint for streaming container logs.
+    
+    Query params:
+        since_now: If True (default), only stream new logs from now.
+                   If False, include all historical logs.
+    """
     await websocket.accept()
     
     docker_service = get_docker_service()
     
+    # If since_now is True, only stream logs from current time
+    from datetime import datetime
+    since = datetime.utcnow() if since_now else None
+    
     try:
-        async for log_line in docker_service.stream_logs(container_id):
+        async for log_line in docker_service.stream_logs(container_id, since=since):
             await websocket.send_text(log_line)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected for container {container_id}")
     except Exception as e:
         logger.error(f"Error streaming logs: {e}")
         await websocket.close(code=1011, reason=str(e))
+

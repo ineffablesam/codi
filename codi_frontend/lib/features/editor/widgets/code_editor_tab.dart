@@ -3,7 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_code_editor/flutter_code_editor.dart';
-import 'package:flutter_highlight/themes/xcode.dart';
+import 'package:flutter_highlight/themes/vs2015.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -89,20 +89,20 @@ class CodeEditorTab extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+        color: Get.theme.cardTheme.color,
+        border: Border(bottom: BorderSide(color: Get.theme.dividerColor)),
       ),
       child: Row(
         children: [
           Icon(Icons.folder_outlined,
-              size: 20.r, color: AppColors.textSecondary),
+              size: 20.r, color: Get.textTheme.bodyMedium?.color),
           SizedBox(width: 8.w),
           Text(
             'Files',
             style: GoogleFonts.inter(
               fontSize: 14.sp,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: Get.textTheme.bodyLarge?.color,
             ),
           ),
           const Spacer(),
@@ -117,12 +117,12 @@ class CodeEditorTab extends StatelessWidget {
                   onPressed: controller.refreshFileTree,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  color: AppColors.textSecondary,
+                  color: Get.textTheme.bodyMedium?.color,
                 )),
           SizedBox(width: 8.w),
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert,
-                size: 20.r, color: AppColors.textSecondary),
+                size: 20.r, color: Get.textTheme.bodyMedium?.color),
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'expand', child: Text('Expand All')),
               const PopupMenuItem(
@@ -171,7 +171,7 @@ class _FileTreePanel extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.folder_open,
-                    size: 40.r, color: AppColors.textSecondary),
+                    size: 40.r, color: Get.textTheme.bodyMedium?.color),
                 SizedBox(height: 8.h),
                 Text(
                   'No files found',
@@ -244,7 +244,7 @@ class _FileTreeNode extends StatelessWidget {
                           ? Icons.keyboard_arrow_down
                           : Icons.keyboard_arrow_right,
                       size: 16.r,
-                      color: AppColors.textSecondary,
+                      color: Get.textTheme.bodyMedium?.color,
                     ),
                   if (node.isFile) SizedBox(width: 16.w),
                   Text(
@@ -261,7 +261,7 @@ class _FileTreeNode extends StatelessWidget {
                             isSelected ? FontWeight.w600 : FontWeight.w400,
                         color: node.modified
                             ? AppColors.warning
-                            : AppColors.textPrimary,
+                            : Get.textTheme.bodyMedium?.color,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -323,14 +323,14 @@ class _CodeEditorPanel extends StatelessWidget {
 
       return Container(
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: Get.theme.dividerColor),
         ),
         child: Column(
           children: [
             _buildEditorToolbar(controller),
             Expanded(
               child: CodeTheme(
-                data: CodeThemeData(styles: xcodeTheme),
+                data: CodeThemeData(styles: vs2015Theme),
                 child: SingleChildScrollView(
                   child: CodeField(
                     controller: controller.codeController,
@@ -363,12 +363,12 @@ class _CodeEditorPanel extends StatelessWidget {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+        color: Get.theme.cardTheme.color,
+        border: Border(bottom: BorderSide(color: Get.theme.dividerColor)),
       ),
       child: Row(
         children: [
-          Icon(Icons.description, size: 16.r, color: AppColors.textSecondary),
+          Icon(Icons.description, size: 16.r, color: Get.textTheme.bodyMedium?.color),
           SizedBox(width: 8.w),
           Expanded(
             child: Obx(() => Text(
@@ -445,8 +445,8 @@ class _CommitPanel extends StatelessWidget {
 
       return Container(
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          border: Border(top: BorderSide(color: AppColors.border)),
+          color: Get.theme.cardTheme.color,
+          border: Border(top: BorderSide(color: Get.theme.dividerColor)),
         ),
         child: Column(
           children: [
@@ -464,7 +464,7 @@ class _CommitPanel extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: Get.textTheme.titleSmall?.color,
                       ),
                     ),
                     Obx(() => controller.modifiedFiles.isNotEmpty
@@ -492,7 +492,7 @@ class _CommitPanel extends StatelessWidget {
                           ? Icons.keyboard_arrow_down
                           : Icons.keyboard_arrow_up,
                       size: 20.r,
-                      color: AppColors.textSecondary,
+                      color: Get.textTheme.bodyMedium?.color,
                     ),
                   ],
                 ),
@@ -520,7 +520,7 @@ class _CommitPanel extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  color: Get.textTheme.titleSmall?.color,
                 ),
               ),
               SizedBox(width: 8.w),
@@ -550,7 +550,7 @@ class _CommitPanel extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'e.g., feat: add login validation',
               hintStyle: GoogleFonts.inter(
-                  fontSize: 12.sp, color: AppColors.textSecondary),
+                  fontSize: 12.sp, color: Get.textTheme.bodyMedium?.color),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8.r),
               ),

@@ -35,13 +35,14 @@ class AppColors {
   static const Color inputBackground = Color(0xFFF3F4F6);
 
   // Background colors (Dark theme)
-  static const Color backgroundDark = Color(0xFF111827);
-  static const Color surfaceDark = Color(0xFF1F2937);
+  static const Color backgroundDark = Color(0xFF1E1E1E); // Terminal dark background
+  static const Color surfaceDark = Color(0xFF252526); // Header background
+  static const Color surfaceDarkVariant = Color(0xFF2D2D2D); // Toolbar background
 
   // Text colors
   static const Color textPrimary = Color(0xFF111827);
   static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textTertiary = Color(0xFF9CA3AF);
+  static const Color textTertiary = Color(0xFFB0B0B0);
   static const Color textInverse = Color(0xFFFFFFFF);
 
   // Border colors
@@ -70,5 +71,8 @@ class AppColors {
   static const Color warningBackground = Color(0xFFFEF3C7);
 
   // GitHub brand color
-  static const Color github = Color(0xFF24292E);
+  static const Color github = Color(0xFFF0FDF4);
+
+  // Google brand color
+  static const Color google = Color(0xFFF0FDF4);
 }
