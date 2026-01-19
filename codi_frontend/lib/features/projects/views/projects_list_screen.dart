@@ -1,6 +1,9 @@
 /// Projects list screen
 library;
 
+import 'dart:ui';
+
+import 'package:codi_frontend/core/utils/sf_font.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -23,79 +26,136 @@ class ProjectsListScreen extends StatelessWidget {
     final controller = Get.find<ProjectsController>();
     final authController = Get.find<AuthController>();
 
-    return Scaffold(
-      backgroundColor: Get.theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          AppStrings.myProjects,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-        ),
-        actions: [
-          // User avatar
-          Obx(() {
-            final user = authController.currentUser.value;
-            return GestureDetector(
-              onTap: () => Get.toNamed(AppRoutes.settings),
-              child: Padding(
-                padding: EdgeInsets.only(right: 16.w),
-                child: CircleAvatar(
-                  radius: 18.r,
-                  backgroundImage: NetworkImage(
-                    ImagePlaceholders.userAvatarWithFallback(
-                      user?.githubAvatarUrl,
-                      user?.githubUsername,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Get.theme.scaffoldBackgroundColor,
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            /// Sliver App Bar with background image
+            SliverAppBar(
+              stretch: false,
+              pinned: true,
+              expandedHeight: 95.h,
+              collapsedHeight: 55.h,
+              backgroundColor: Colors.black,
+              flexibleSpace: FlexibleSpaceBar(
+                background: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Blob 1
+                    Image.asset(
+                      "assets/images/3.jpg",
+                      fit: BoxFit.cover,
                     ),
-                  ),
+                    // image overlay
+                    Container(
+                      color: Colors.black.withOpacity(0.5),
+                    ),
+                    Positioned.fill(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                        child: Container(color: Colors.transparent),
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: SafeArea(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                              left: 28.w, bottom: 16.h, top: 16.h),
+                          child: Text(
+                            AppStrings.myProjects,
+                            style: SFPro.font(
+                              fontSize: 24.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            );
-          }),
-        ],
-      ),
-      body: DefaultTabController(
-        length: 2,
-        child: Column(
-          children: [
-            TabBar(
-              onTap: (index) {
-                controller.loadProjects(status: index == 0 ? 'active' : 'archived');
-              },
-              tabs: const [
-                Tab(text: 'Active'),
-                Tab(text: 'Archived'),
+              actions: [
+                Obx(() {
+                  final user = authController.currentUser.value;
+                  return GestureDetector(
+                    onTap: () => Get.toNamed(AppRoutes.settings),
+                    child: Padding(
+                      padding: EdgeInsets.only(right: 16.w),
+                      child: CircleAvatar(
+                        radius: 18.r,
+                        backgroundImage: NetworkImage(
+                          ImagePlaceholders.userAvatarWithFallback(
+                            user?.githubAvatarUrl,
+                            user?.githubUsername,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ],
-              labelColor: AppColors.primary,
-              unselectedLabelColor: AppColors.textSecondary,
-              indicatorColor: AppColors.primary,
+              bottom: TabBar(
+                onTap: (index) {
+                  controller.loadProjects(
+                    status: index == 0 ? 'active' : 'archived',
+                  );
+                },
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                indicatorColor: Colors.white,
+                tabs: const [
+                  Tab(text: 'Active'),
+                  Tab(text: 'Archived'),
+                ],
+              ),
             ),
-            Expanded(
+
+            /// Tab views
+            SliverFillRemaining(
               child: TabBarView(
-                physics: const NeverScrollableScrollPhysics(), // Disable swipe to avoid accidental refetch
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  // Active Projects
+                  /// Active Projects
                   RefreshIndicator(
                     onRefresh: () => controller.loadProjects(status: 'active'),
                     child: Obx(() {
-                      if (controller.isLoading.value && controller.projects.isEmpty) {
-                        return const Center(child: CircularProgressIndicator());
+                      if (controller.isLoading.value &&
+                          controller.projects.isEmpty) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
                       }
+
                       if (controller.projects.isEmpty) {
                         return _buildEmptyState(false);
                       }
+
                       return _buildProjectsList(controller, false);
                     }),
                   ),
-                  
-                  // Archived Projects
+
+                  /// Archived Projects
                   RefreshIndicator(
-                    onRefresh: () => controller.loadProjects(status: 'archived'),
+                    onRefresh: () =>
+                        controller.loadProjects(status: 'archived'),
                     child: Obx(() {
-                      if (controller.isLoading.value && controller.projects.isEmpty) {
-                        return const Center(child: CircularProgressIndicator());
+                      if (controller.isLoading.value &&
+                          controller.projects.isEmpty) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
                       }
+
                       if (controller.projects.isEmpty) {
                         return _buildEmptyState(true);
                       }
+
                       return _buildProjectsList(controller, true);
                     }),
                   ),
@@ -119,11 +179,11 @@ class ProjectsListScreen extends StatelessWidget {
           child: ProjectCard(
             project: project,
             onTap: () {
-               if (isArchived) {
-                 controller.confirmRestoreProject(project);
-               } else {
-                 controller.openEditor(project);
-               }
+              if (isArchived) {
+                controller.confirmRestoreProject(project);
+              } else {
+                controller.openEditor(project);
+              }
             },
             onArchive: () => controller.confirmArchiveProject(project),
             onRestore: () => controller.confirmRestoreProject(project),
@@ -152,12 +212,11 @@ class ProjectsListScreen extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w600,
-                color: Get.textTheme.titleLarge?.color,
               ),
             ),
             SizedBox(height: 8.h),
             Text(
-              isArchived 
+              isArchived
                   ? 'Projects you archive will appear here'
                   : AppStrings.noProjectsSubtitle,
               style: GoogleFonts.inter(
@@ -174,47 +233,6 @@ class ProjectsListScreen extends StatelessWidget {
                 label: Text(AppStrings.createProject),
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState(ProjectsController controller) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(32.r),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64.r,
-              color: AppColors.error,
-            ),
-            SizedBox(height: 16.h),
-            Text(
-              AppStrings.somethingWentWrong,
-              style: GoogleFonts.inter(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w600,
-                color: Get.textTheme.titleLarge?.color,
-              ),
-            ),
-            SizedBox(height: 8.h),
-            Text(
-              controller.errorMessage.value ?? '',
-              style: GoogleFonts.inter(
-                fontSize: 14.sp,
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 24.h),
-            ElevatedButton(
-              onPressed: controller.loadProjects,
-              child: Text(AppStrings.tryAgain),
-            ),
           ],
         ),
       ),

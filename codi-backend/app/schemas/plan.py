@@ -53,6 +53,7 @@ class PlanResponse(BaseModel):
     total_tasks: int
     completed_tasks: int
     progress: float
+    markdown_content: Optional[str] = None
     file_path: str
     walkthrough_path: Optional[str] = None
     created_at: datetime

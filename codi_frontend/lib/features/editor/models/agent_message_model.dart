@@ -17,6 +17,12 @@ enum MessageType {
   buildProgress,
   deploymentComplete,
   
+  // Plan workflow
+  planCreated,
+  planApproved,
+  planRejected,
+  walkthroughReady,
+  
   // Errors
   error,
 }
@@ -54,6 +60,13 @@ class AgentMessage {
   
   // Result
   final String? toolResult;
+  
+  // Plan workflow
+  final int? planId;
+  final String? planMarkdown;
+  final String? planFilePath;
+  final String? userRequest;
+  final String? walkthroughContent;
 
   AgentMessage({
     required this.text,
@@ -73,6 +86,11 @@ class AgentMessage {
     this.deploymentUrl,
     this.error,
     this.toolResult,
+    this.planId,
+    this.planMarkdown,
+    this.planFilePath,
+    this.userRequest,
+    this.walkthroughContent,
   });
 
   /// Create from WebSocket JSON
@@ -106,6 +124,18 @@ class AgentMessage {
       case 'deployment_complete':
         type = MessageType.deploymentComplete;
         break;
+      case 'plan_created':
+        type = MessageType.planCreated;
+        break;
+      case 'plan_approved':
+        type = MessageType.planApproved;
+        break;
+      case 'plan_rejected':
+        type = MessageType.planRejected;
+        break;
+      case 'walkthrough_ready':
+        type = MessageType.walkthroughReady;
+        break;
       case 'agent_error':
         type = MessageType.error;
         break;
@@ -136,6 +166,11 @@ class AgentMessage {
       deploymentUrl: json['deployment_url'] as String?,
       error: json['error'] as String?,
       toolResult: json['result'] as String?,
+      planId: json['plan_id'] as int?,
+      planMarkdown: json['plan_markdown'] as String?,
+      planFilePath: json['plan_file_path'] as String?,
+      userRequest: json['user_request'] as String?,
+      walkthroughContent: json['walkthrough_content'] as String?,
     );
   }
 

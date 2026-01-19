@@ -93,6 +93,28 @@ class RedisBroadcaster:
             logger.debug(f"Published message to Redis: project={project_id}, type={message.get('type')}")
         except Exception as e:
             logger.error(f"Failed to publish to Redis: {e}")
+
+    async def send_agent_signal(self, project_id: int, signal_type: str, data: Dict[str, Any]) -> None:
+        """Send a signal to a running agent.
+        
+        Args:
+            project_id: Project ID
+            signal_type: Type of signal (e.g., 'plan_approval')
+            data: Signal data
+        """
+        await self.connect()
+        
+        channel = f"codi:project:{project_id}:signals"
+        payload = json.dumps({
+            "type": signal_type,
+            "data": data,
+        })
+        
+        try:
+            await self._redis.publish(channel, payload)
+            logger.info(f"Sent agent signal to Redis: channel={channel}, type={signal_type}")
+        except Exception as e:
+            logger.error(f"Failed to publish signal to Redis: {e}")
     
     async def start_subscriber(self, on_message_callback) -> None:
         """Start subscribing to Redis for messages.

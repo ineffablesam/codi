@@ -624,7 +624,7 @@ class StarterTemplateService:
         # Note: For Docker/local deployment we keep "standalone" mode
         if self.framework == "nextjs" and self.deployment_platform == "github_pages" and file_path.name in ("next.config.js", "next.config.ts", "next.config.mjs"):
             # Replace standalone with export for static GitHub Pages deployment
-            content = content.replace('output: "standalone"', "output: 'export'")
+            content = content.replace('output: "standalone"', "output: 'standalone'")
 
         return content
     

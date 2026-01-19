@@ -1,4 +1,5 @@
 import 'package:animations/animations.dart';
+import 'package:codi_frontend/features/auth/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -7,6 +8,7 @@ import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:lucky_navigation_bar/lucky_navigation_bar.dart';
 
 import '../../../config/routes.dart';
+import '../../../core/constants/image_placeholders.dart';
 import '../../projects/views/projects_list_screen.dart';
 import '../../settings/views/settings_screen.dart';
 import '../controllers/layout_controller.dart';
@@ -35,9 +37,7 @@ class LayoutView extends GetView<LayoutController> {
       final pages = <Widget>[
         const ProjectsListScreen(key: ValueKey('projects')),
         const _PlaceholderPage(
-            title: 'Store',
-            icon: Iconsax.shop,
-            key: ValueKey('store')),
+            title: 'Store', icon: Iconsax.shop, key: ValueKey('store')),
         const _PlaceholderPage(
             title: 'Activity',
             icon: Iconsax.notification,
@@ -96,8 +96,8 @@ class LayoutView extends GetView<LayoutController> {
                         ? Iconsax.shop
                         : Iconsax.shop_copy,
                     size: 24.r),
-                selectedIcon:
-                    Icon(Iconsax.shop, size: 24.r, color: Get.theme.primaryColor),
+                selectedIcon: Icon(Iconsax.shop,
+                    size: 24.r, color: Get.theme.primaryColor),
                 label: 'Store',
               ),
               NavigationDestination(
@@ -111,12 +111,22 @@ class LayoutView extends GetView<LayoutController> {
                 label: 'Activity',
               ),
               NavigationDestination(
-                icon: Icon(
-                    // if selected use user5 else user
-                    controller.currentIndex == 3
-                        ? Iconsax.user
-                        : Iconsax.user_copy,
-                    size: 24.r),
+                icon: Obx(() {
+                  final authController = Get.find<AuthController>();
+                  final user = authController.currentUser.value;
+                  return CircleAvatar(
+                    radius: 14.r,
+                    child: CircleAvatar(
+                      radius: 12.r,
+                      backgroundImage: NetworkImage(
+                        ImagePlaceholders.userAvatarWithFallback(
+                          user?.githubAvatarUrl,
+                          user?.githubUsername,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
                 selectedIcon: Icon(Iconsax.user,
                     size: 24.r, color: Get.theme.primaryColor),
                 label: 'Account',

@@ -13,6 +13,7 @@ import '../../projects/services/project_service.dart';
 enum EditorTab {
   preview,
   code,
+  browser,
 }
 
 /// Main editor controller managing project state
@@ -39,23 +40,32 @@ class EditorController extends GetxController
   }
 
   void setTab(EditorTab tab) {
-    final index = tab == EditorTab.preview ? 0 : 1;
+    final index = switch (tab) {
+      EditorTab.preview => 0,
+      EditorTab.code => 1,
+      EditorTab.browser => 2,
+    };
     if (tabController.index != index) {
       tabController.animateTo(index,
           duration: const Duration(milliseconds: 100));
     }
+    currentTab.value = tab;
   }
 
   @override
   void onInit() {
     super.onInit();
-    tabController = TabController(length: 2, vsync: this);
+    tabController = TabController(length: 3, vsync: this);
 
     tabController.addListener(() {
       if (tabController.indexIsChanging) return;
 
-      currentTab.value =
-          tabController.index == 0 ? EditorTab.preview : EditorTab.code;
+      currentTab.value = switch (tabController.index) {
+        0 => EditorTab.preview,
+        1 => EditorTab.code,
+        2 => EditorTab.browser,
+        _ => EditorTab.preview,
+      };
     });
     _webSocketClient = Get.find<WebSocketClient>();
     _loadProject();

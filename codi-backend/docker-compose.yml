@@ -135,6 +135,25 @@ services:
       - codi-network
     restart: unless-stopped
 
+  # Browser Agent Service for AI-driven browser automation
+  browser-agent:
+    build:
+      context: ../browser-agent
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - codi-network
+    restart: unless-stopped
+    # Chromium requires significant memory
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    # Shared memory for Chromium
+    shm_size: '512mb'
+
 volumes:
   postgres_data:
   redis_data:

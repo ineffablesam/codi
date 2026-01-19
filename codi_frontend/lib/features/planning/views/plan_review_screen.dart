@@ -2,9 +2,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_highlight/flutter_highlight.dart';
+import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:markdown/markdown.dart' as md;
 
 import '../../../core/constants/app_colors.dart';
 import '../controllers/planning_controller.dart';
@@ -19,12 +22,19 @@ class PlanReviewScreen extends GetView<PlanningController> {
     final args = Get.arguments as Map<String, dynamic>?;
     final planId = args?['planId'] as int?;
 
-    if (planId != null && controller.currentPlan.value?.id != planId) {
-      controller.loadPlan(planId);
+    // Only load from API if we don't have this plan already, or if it has no markdown
+    if (planId != null) {
+      final currentPlan = controller.currentPlan.value;
+      final needsLoad = currentPlan == null ||
+          currentPlan.id != planId ||
+          currentPlan.markdownContent.isEmpty;
+      if (needsLoad) {
+        controller.loadPlan(planId);
+      }
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Get.theme.scaffoldBackgroundColor,
       appBar: _buildAppBar(),
       body: Obx(() {
         if (controller.isLoadingPlan.value) {
@@ -43,10 +53,10 @@ class PlanReviewScreen extends GetView<PlanningController> {
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.backgroundDark,
       elevation: 0,
       leading: IconButton(
-        icon: const Icon(Icons.close, color: Colors.black87),
+        icon: const Icon(Icons.close, color: Colors.white),
         onPressed: _handleClose,
       ),
       title: Column(
@@ -57,7 +67,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: Colors.white,
             ),
           ),
           Obx(() {
@@ -66,7 +76,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
                 controller.currentPlan.value!.title,
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: Colors.grey[600],
+                  color: Colors.white70,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -78,7 +88,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.share_outlined, color: Colors.black54),
+          icon: const Icon(Icons.share_outlined, color: Colors.white70),
           onPressed: () {
             Get.snackbar('Share', 'Plan sharing coming soon');
           },
@@ -102,9 +112,9 @@ class PlanReviewScreen extends GetView<PlanningController> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.backgroundDark,
         border: Border(
-          bottom: BorderSide(color: Colors.grey[200]!),
+          bottom: BorderSide(color: Colors.grey[800]!),
         ),
       ),
       child: Obx(() {
@@ -116,23 +126,26 @@ class PlanReviewScreen extends GetView<PlanningController> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    border:
+                        Border.all(color: AppColors.primary.withOpacity(0.5)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.schedule, size: 14, color: AppColors.primary),
+                      Icon(Icons.schedule,
+                          size: 14, color: AppColors.primaryLight),
                       const SizedBox(width: 4),
                       Text(
-                        plan.estimatedTime ?? 'Unknown',
+                        plan.estimatedTime ?? 'Not estimated',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
+                          color: AppColors.primaryLight,
                         ),
                       ),
                     ],
@@ -140,11 +153,13 @@ class PlanReviewScreen extends GetView<PlanningController> {
                 ),
                 const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.success.withOpacity(0.1),
+                    color: AppColors.success.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                    border:
+                        Border.all(color: AppColors.success.withOpacity(0.5)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -169,7 +184,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
               'Review this plan carefully before approving.',
               style: GoogleFonts.inter(
                 fontSize: 13,
-                color: Colors.grey[700],
+                color: Colors.grey[400],
               ),
             ),
             const SizedBox(height: 4),
@@ -188,59 +203,69 @@ class PlanReviewScreen extends GetView<PlanningController> {
 
   Widget _buildMarkdownViewer() {
     return Container(
-      color: Colors.white,
+      color: AppColors.backgroundDark,
       child: Obx(() {
-        final markdown = controller.currentPlan.value?.markdownContent ?? '';
+        final plan = controller.currentPlan.value;
+        final markdown = plan?.markdownContent ?? '';
 
         return Markdown(
           data: markdown,
           selectable: true,
+          builders: {
+            'code': CodeElementBuilder(),
+          },
           styleSheet: MarkdownStyleSheet(
             h1: GoogleFonts.inter(
               fontSize: 24,
               fontWeight: FontWeight.w700,
-              color: Colors.black87,
+              color: Colors.white,
             ),
             h2: GoogleFonts.inter(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: Colors.white,
             ),
             h3: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: Colors.white,
             ),
             p: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.black87,
+              color: Colors.white,
               height: 1.6,
             ),
             listBullet: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.black87,
+              color: Colors.white,
             ),
             code: GoogleFonts.jetBrainsMono(
               fontSize: 13,
-              backgroundColor: const Color(0xFFF3F4F6),
+              backgroundColor: AppColors.surfaceDarkVariant,
+              color: Colors.white70,
             ),
             codeblockDecoration: BoxDecoration(
-              color: const Color(0xFFF3F4F6),
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
             blockquote: GoogleFonts.inter(
               fontSize: 14,
-              color: Colors.grey[700],
+              color: Colors.grey[400],
               fontStyle: FontStyle.italic,
             ),
             blockquoteDecoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7).withOpacity(0.3),
+              color: const Color(0xFFFEF3C7).withOpacity(0.1),
               border: const Border(
                 left: BorderSide(color: Color(0xFFF59E0B), width: 4),
               ),
             ),
           ),
           padding: const EdgeInsets.all(16),
+          onTapLink: (text, href, title) {
+            if (href != null) {
+              // TODO: Handle link taps
+            }
+          },
         );
       }),
     );
@@ -250,10 +275,10 @@ class PlanReviewScreen extends GetView<PlanningController> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surfaceDark,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -489,6 +514,39 @@ class PlanReviewScreen extends GetView<PlanningController> {
             child: const Text('Close'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class CodeElementBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    var language = '';
+
+    if (element.attributes['class'] != null) {
+      String lg = element.attributes['class'] as String;
+      // "language-dart" -> "dart"
+      language = lg.substring(9);
+    }
+
+    if (language.isEmpty) {
+      return null;
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: AppColors.surfaceDarkVariant,
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: HighlightView(
+        element.textContent,
+        language: language,
+        theme: atomOneDarkTheme,
+        textStyle: GoogleFonts.jetBrainsMono(fontSize: 13),
+        padding: const EdgeInsets.all(12),
       ),
     );
   }

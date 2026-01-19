@@ -248,6 +248,59 @@ Please specify:
             "has_error": False,
         }
 
+    async def _is_initial_project_setup(self, user_message: str) -> bool:
+        """Check if this is an initial project setup that should skip planning.
+        
+        Initial project setup includes:
+        - First message after project creation (starter template deployment)
+        - Messages that are clearly about initial setup/building from template
+        
+        Args:
+            user_message: The user's request message
+            
+        Returns:
+            True if planning should be skipped, False otherwise
+        """
+        import os
+        
+        # Check if project folder has minimal files (just created from template)
+        if self.project_folder and os.path.exists(self.project_folder):
+            # Count non-hidden files/folders in root
+            try:
+                root_items = [f for f in os.listdir(self.project_folder) if not f.startswith('.')]
+                
+                # Check for "fresh project" indicators:
+                # - Only has template files like package.json, next.config, etc.
+                # - No src modifications yet (very few total files)
+                
+                # Count total files in src/app if it exists
+                src_path = os.path.join(self.project_folder, "src", "app")
+                if os.path.exists(src_path):
+                    src_files = os.listdir(src_path)
+                    # Fresh Next.js has ~3-5 files in src/app
+                    if len(src_files) <= 6:
+                        logger.info(f"Detected fresh project (src/app has {len(src_files)} files)")
+                        return True
+                
+                # Alternative: Check for no agent task history yet
+                async with get_db_context() as session:
+                    from sqlalchemy import select, func
+                    result = await session.execute(
+                        select(func.count(AgentTask.id))
+                        .where(AgentTask.project_id == self.project_id)
+                        .where(AgentTask.status == "completed")
+                    )
+                    completed_tasks = result.scalar() or 0
+                    
+                    if completed_tasks == 0:
+                        logger.info(f"First task for project {self.project_id}, skipping planning")
+                        return True
+                        
+            except Exception as e:
+                logger.warning(f"Error checking project setup state: {e}")
+        
+        return False
+
     async def execute(self, user_message: str) -> Dict[str, Any]:
         """Execute the workflow for a user message.
 
@@ -310,9 +363,18 @@ Please specify:
                 task_id=self.task_id,
             )
             
+            # Check if this is initial project setup (skip planning for starter templates)
+            skip_planning = await self._is_initial_project_setup(user_message)
+            if skip_planning:
+                logger.info(f"Skipping planning phase for initial project setup", task_id=self.task_id)
+            
             # Run the simple coding agent with tech stack for knowledge packs
             tech_stack = getattr(self, "_tech_stack", {})
-            agent = CodingAgent(context=context, tech_stack=tech_stack)
+            agent = CodingAgent(context=context, tech_stack=tech_stack, skip_planning=skip_planning)
+            
+            # Register agent for approval signal handling
+            from app.agent.agent import register_active_agent, unregister_active_agent
+            register_active_agent(self.project_id, agent)
             
             if tech_stack:
                 logger.info(
@@ -321,7 +383,11 @@ Please specify:
                     task_id=self.task_id,
                 )
             
-            response = await agent.run(user_message)
+            try:
+                response = await agent.run(user_message)
+            finally:
+                # Always unregister the agent when done
+                unregister_active_agent(self.project_id)
 
             end_time = datetime.utcnow()
             duration = (end_time - start_time).total_seconds()

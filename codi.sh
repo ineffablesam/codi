@@ -72,7 +72,7 @@ restart_backend() {
         docker compose down
         docker compose up -d --build
         cd - > /dev/null || exit
-        echo -e "${GREEN}Backend restarted with new build.${NC}"
+        echo -e "${GREEN}Backend restarted with new build (including Browser Agent).${NC}"
     else
         echo -e "${RED}Error: Backend directory $BACKEND_DIR not found.${NC}"
     fi
@@ -80,14 +80,38 @@ restart_backend() {
 
 # Function to refresh api and celery (restart only)
 refresh_services() {
-    echo -e "${YELLOW}Refreshing API and Celery services...${NC}"
+    echo -e "${YELLOW}Refreshing Codi services...${NC}"
     if [ -d "$BACKEND_DIR" ]; then
         cd "$BACKEND_DIR" || exit
-        docker compose restart api celery-worker celery-beat
+        docker compose restart api celery-worker celery-beat browser-agent
         cd - > /dev/null || exit
-        echo -e "${GREEN}Services refreshed.${NC}"
+        echo -e "${GREEN}Services refreshed (API, Celery, Browser Agent).${NC}"
     else
         echo -e "${RED}Error: Backend directory $BACKEND_DIR not found.${NC}"
+    fi
+}
+
+# Function to restart browser agent specifically
+restart_browser_agent() {
+    echo -e "${YELLOW}Restarting Browser Agent...${NC}"
+    if [ -d "$BACKEND_DIR" ]; then
+        cd "$BACKEND_DIR" || exit
+        docker compose restart browser-agent
+        cd - > /dev/null || exit
+        echo -e "${GREEN}Browser Agent restarted.${NC}"
+    else
+        echo -e "${RED}Error: Backend directory $BACKEND_DIR not found.${NC}"
+    fi
+}
+
+# Function to show browser agent logs
+show_browser_logs() {
+    echo -e "${BLUE}Showing Browser Agent logs (last 50 lines, follow)...${NC}"
+    echo -e "${YELLOW}Press Ctrl+C to stop${NC}"
+    if [ -d "$BACKEND_DIR" ]; then
+        cd "$BACKEND_DIR" || exit
+        docker compose logs -f --tail 50 browser-agent
+        cd - > /dev/null || exit
     fi
 }
 
@@ -135,11 +159,13 @@ while true; do
     show_banner
     echo -e "1) ${GREEN}Start Backend${NC}"
     echo -e "2) ${YELLOW}Stop Backend${NC}"
-    echo -e "3) ${BLUE}Restart Backend (Rebuild)${NC}"
-    echo -e "4) ${BLUE}Refresh API & Celery (Restart Only)${NC}"
-    echo -e "5) ${NC}Check Status${NC}"
-    echo -e "6) ${YELLOW}Setup Network Only${NC}"
-    echo -e "7) ${RED}Purge All (Reclaim Space)${NC}"
+    echo -e "3) ${BLUE}Restart All (Rebuild)${NC}"
+    echo -e "4) ${BLUE}Refresh Services (Restart Only)${NC}"
+    echo -e "5) ${BLUE}Restart Browser Agent Only${NC}"
+    echo -e "6) ${MAGENTA}View Browser Agent Logs${NC}"
+    echo -e "7) ${NC}Check Status${NC}"
+    echo -e "8) ${YELLOW}Setup Network Only${NC}"
+    echo -e "9) ${RED}Purge All (Reclaim Space)${NC}"
     echo -e "q) Exit"
     echo
     read -p "Select an option: " choice
@@ -149,9 +175,11 @@ while true; do
         2) stop_backend ;;
         3) restart_backend ;;
         4) refresh_services ;;
-        5) show_status ;;
-        6) setup_network ;;
-        7) purge_all ;;
+        5) restart_browser_agent ;;
+        6) show_browser_logs ;;
+        7) show_status ;;
+        8) setup_network ;;
+        9) purge_all ;;
         q|Q) echo "Goodbye!"; exit 0 ;;
         *) echo -e "${RED}Invalid option.${NC}" ;;
     esac

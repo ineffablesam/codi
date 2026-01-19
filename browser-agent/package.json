@@ -1,0 +1,21 @@
+{
+    "name": "codi-browser-agent",
+    "version": "1.0.0",
+    "description": "Browser automation service for Codi using agent-browser",
+    "type": "module",
+    "main": "src/server.js",
+    "scripts": {
+        "start": "node src/server.js",
+        "dev": "node --watch src/server.js"
+    },
+    "dependencies": {
+        "agent-browser": "^0.6.0",
+        "express": "^4.21.0",
+        "ws": "^8.18.0",
+        "cors": "^2.8.5",
+        "uuid": "^10.0.0"
+    },
+    "engines": {
+        "node": ">=20.0.0"
+    }
+}

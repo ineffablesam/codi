@@ -17,6 +17,7 @@ import '../controllers/editor_controller.dart';
 import '../controllers/preview_controller.dart';
 import '../widgets/agent_chat_panel.dart';
 import '../widgets/branch_switcher_sheet.dart';
+import '../widgets/browser_agent_panel.dart';
 import '../widgets/code_editor_tab.dart';
 import '../widgets/container_logs_sheet.dart';
 import '../widgets/preview_panel.dart';
@@ -64,10 +65,12 @@ class EditorScreen extends StatelessWidget {
                       controller: controller.tabController,
                       physics: const NeverScrollableScrollPhysics(),
                       children: [
-                        // Agent Tab (existing layout)
+                        // Preview Tab
                         _buildAgentTab(context),
-                        // Code Editor Tab (new)
+                        // Code Editor Tab
                         const CodeEditorTab(),
+                        // Browser Agent Tab
+                        const BrowserAgentPanel(),
                       ],
                     ),
                     // Sliding Chat Panel from bottom
@@ -200,6 +203,7 @@ class EditorScreen extends StatelessWidget {
                               iconBuilder: (v) => switch (v) {
                                 EditorTab.preview => RadixIcons.Eye_Open,
                                 EditorTab.code => RadixIcons.CodeSandbox_Logo,
+                                EditorTab.browser => RadixIcons.Globe,
                               },
                               values: EditorTab.values,
                               selectedValue: controller.currentTab.value,
@@ -208,7 +212,8 @@ class EditorScreen extends StatelessWidget {
                               dragCommitBehavior: DragCommitBehavior.immediate,
                               labelBuilder: (v) => switch (v) {
                                 EditorTab.preview => 'Preview',
-                                EditorTab.code => 'Code Editor',
+                                EditorTab.code => 'Code',
+                                EditorTab.browser => 'Browser',
                               },
                             ),
                           ],

@@ -116,6 +116,104 @@ class PlanningController extends GetxController {
     }
   }
 
+  /// Set plan from agent WebSocket data (avoids extra API call)
+  void setFromAgentData({
+    required int planId,
+    required String markdown,
+    String? title,
+    String? userRequest,
+    int? projectId,
+  }) {
+    // Parse title from markdown if not provided
+    String planTitle = title ?? 'Implementation Plan';
+    final titleMatch =
+        RegExp(r'^#\s*(.+)$', multiLine: true).firstMatch(markdown);
+    if (titleMatch != null) {
+      planTitle = titleMatch
+              .group(1)
+              ?.replaceAll(RegExp(r'^Implementation Plan:?\s*'), '')
+              .trim() ??
+          planTitle;
+    }
+
+    // Parse estimated time from markdown (e.g., "**Estimated time**: 10 minutes")
+    String? estimatedTime;
+    final timeMatch = RegExp(
+      r'\*\*Estimated\s*time\*\*:\s*(.+?)(?:\n|$)',
+      caseSensitive: false,
+    ).firstMatch(markdown);
+    if (timeMatch != null) {
+      estimatedTime = timeMatch.group(1)?.trim();
+    }
+    
+    // Also try format "- **Estimated time**: X minutes"
+    if (estimatedTime == null) {
+      final altTimeMatch = RegExp(
+        r'Estimated\s*time[:\s]+([^\n\r]+)',
+        caseSensitive: false,
+      ).firstMatch(markdown);
+      if (altTimeMatch != null) {
+        estimatedTime = altTimeMatch.group(1)?.trim();
+      }
+    }
+
+    // Count tasks from markdown - match various formats:
+    // "1. [ ] Task" or "- [ ] Task"
+    int taskCount = 0;
+
+    // First try: numbered tasks with checkboxes like "1. [ ] Task"
+    final numberedCheckboxTasks = RegExp(
+      r'^\s*\d+\.\s*\[\s*[x ]?\s*\]',
+      multiLine: true,
+      caseSensitive: false,
+    ).allMatches(markdown);
+    taskCount = numberedCheckboxTasks.length;
+
+    // Fallback: bullet points with checkboxes like "- [ ] Task"
+    if (taskCount == 0) {
+      final bulletCheckboxTasks = RegExp(
+        r'^\s*[-*]\s*\[\s*[x ]?\s*\]',
+        multiLine: true,
+      ).allMatches(markdown);
+      taskCount = bulletCheckboxTasks.length;
+    }
+
+    // Last fallback: count numbered lines in ## Tasks section
+    if (taskCount == 0) {
+      final tasksSection = RegExp(
+        r'##\s*Tasks\s*\n([\s\S]*?)(?=\n##|\n#|$)',
+        caseSensitive: false,
+      ).firstMatch(markdown);
+      if (tasksSection != null) {
+        taskCount = RegExp(r'^\s*\d+\.', multiLine: true)
+            .allMatches(tasksSection.group(1) ?? '')
+            .length;
+      }
+    }
+
+    // Create plan from markdown data
+    currentPlan.value = ImplementationPlan(
+      id: planId,
+      projectId: projectId ?? 0,
+      title: planTitle,
+      userRequest: userRequest ?? '',
+      status: 'pending_review',
+      estimatedTime: estimatedTime ?? '~5 minutes',
+      totalTasks: taskCount > 0 ? taskCount : 1,
+      completedTasks: 0,
+      progress: 0.0,
+      markdownContent: markdown,
+      filePath: '.codi/plans/plan_$planId.md',
+      createdAt: DateTime.now(),
+      tasks: [],
+    );
+
+    AppLogger.info('Set plan from agent data: $planId, tasks: $taskCount, time: $estimatedTime');
+    print('DEBUG: PlanningController.setFromAgentData called');
+    print('DEBUG: Plan ID: $planId');
+    print('DEBUG: Markdown length: ${markdown.length}');
+  }
+
   /// Load all plans for a project
   Future<void> loadProjectPlans(int projectId) async {
     try {

@@ -34,12 +34,13 @@ class ProjectsController extends GetxController {
     if (status != null) {
       currentStatus.value = status;
     }
-    
+
     isLoading.value = true;
     errorMessage.value = null;
 
     try {
-      final result = await _projectService.getProjects(status: currentStatus.value);
+      final result =
+          await _projectService.getProjects(status: currentStatus.value);
       projects.value = result;
     } catch (e) {
       AppLogger.error('Failed to load projects', error: e);
@@ -97,12 +98,12 @@ class ProjectsController extends GetxController {
       );
 
       final result = await _projectService.createProject(request);
-      
+
       if (result != null) {
         if (currentStatus.value == 'active') {
           projects.insert(0, result);
         }
-        
+
         Get.snackbar(
           'Success!',
           'Project "${result.name}" created with ${result.frameworkLabel}',
@@ -132,10 +133,10 @@ class ProjectsController extends GetxController {
   Future<bool> archiveProject(int id) async {
     try {
       final success = await _projectService.archiveProject(id);
-      
+
       if (success) {
         projects.removeWhere((p) => p.id == id);
-        
+
         Get.snackbar(
           'Archived',
           'Project has been moved to archive',
@@ -152,15 +153,15 @@ class ProjectsController extends GetxController {
       return false;
     }
   }
-  
+
   /// Restore a project
   Future<bool> restoreProject(int id) async {
     try {
       final success = await _projectService.restoreProject(id);
-      
+
       if (success) {
         projects.removeWhere((p) => p.id == id);
-        
+
         Get.snackbar(
           'Restored',
           'Project has been restored',
@@ -182,10 +183,10 @@ class ProjectsController extends GetxController {
   Future<bool> deleteProject(int id) async {
     try {
       final success = await _projectService.deleteProject(id);
-      
+
       if (success) {
         projects.removeWhere((p) => p.id == id);
-        
+
         Get.snackbar(
           'Deleted',
           'Project has been permanently deleted',
@@ -208,7 +209,8 @@ class ProjectsController extends GetxController {
     final result = await Get.dialog<bool>(
       AlertDialog(
         title: const Text('Archive Project'),
-        content: Text('Are you sure you want to archive "${project.name}"?\nIt will be hidden from the main list.'),
+        content: Text(
+            'Are you sure you want to archive "${project.name}"?\nIt will be hidden from the main list.'),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
@@ -229,7 +231,7 @@ class ProjectsController extends GetxController {
       await archiveProject(project.id);
     }
   }
-  
+
   /// Confirm and restore project
   Future<void> confirmRestoreProject(ProjectModel project) async {
     final result = await Get.dialog<bool>(
@@ -270,7 +272,8 @@ class ProjectsController extends GetxController {
             SizedBox(height: 8),
             Text(
               'This action cannot be undone. All files, deployments, and databases associated with this project will be destroyed.',
-              style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: AppColors.error, fontWeight: FontWeight.bold),
             ),
           ],
         ),

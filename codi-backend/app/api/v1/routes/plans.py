@@ -28,6 +28,7 @@ from app.schemas.plan import (
 )
 from app.utils.logging import get_logger
 from app.api.websocket.connection_manager import connection_manager
+from app.api.websocket.redis_broadcaster import redis_broadcaster
 
 logger = get_logger(__name__)
 
@@ -86,6 +87,7 @@ async def create_plan(
             total_tasks=plan.total_tasks,
             completed_tasks=plan.completed_tasks,
             progress=plan.progress,
+            markdown_content=plan.markdown_content,
             file_path=plan.file_path,
             walkthrough_path=plan.walkthrough_path,
             created_at=plan.created_at,
@@ -144,6 +146,7 @@ async def get_plan(
         total_tasks=plan.total_tasks,
         completed_tasks=plan.completed_tasks,
         progress=plan.progress,
+        markdown_content=plan.markdown_content,
         file_path=plan.file_path,
         walkthrough_path=plan.walkthrough_path,
         created_at=plan.created_at,
@@ -255,6 +258,13 @@ async def approve_plan(
         },
     )
 
+    # Send Agent Signal to wake up the agent
+    await redis_broadcaster.send_agent_signal(
+        project_id=plan.project_id,
+        signal_type="plan_approval",
+        data={"plan_id": plan.id, "approved": True}
+    )
+
     return PlanResponse(
         id=plan.id,
         project_id=plan.project_id,
@@ -329,6 +339,13 @@ async def reject_plan(
             "message": request.comment or "Plan declined.",
             "timestamp": datetime.utcnow().isoformat(),
         },
+    )
+
+    # Send Agent Signal
+    await redis_broadcaster.send_agent_signal(
+        project_id=plan.project_id,
+        signal_type="plan_approval",
+        data={"plan_id": plan.id, "approved": False}
     )
 
     return PlanResponse(

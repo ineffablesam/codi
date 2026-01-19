@@ -11,6 +11,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/logger.dart';
 import '../models/agent_message_model.dart';
 import '../services/editor_service.dart';
+import '../../planning/controllers/planning_controller.dart';
 import 'editor_controller.dart';
 import 'preview_controller.dart';
 
@@ -31,6 +32,13 @@ class AgentChatController extends GetxController {
   final isTyping = false.obs;
   final isSending = false.obs;
   final currentTaskId = RxnString();
+  
+  // Browser agent mode
+  final isBrowserAgentMode = false.obs;
+  
+  // Plan approval state
+  final currentPendingPlanId = RxnInt();
+  final isAwaitingApproval = false.obs;
 
   @override
   void onInit() {
@@ -48,6 +56,16 @@ class AgentChatController extends GetxController {
         AppLogger.error('WebSocket stream error', error: error);
       },
     );
+  }
+
+  /// Toggle browser agent mode
+  void toggleBrowserAgentMode() {
+    isBrowserAgentMode.toggle();
+    
+    // Auto-switch to browser tab when enabling browser mode
+    if (isBrowserAgentMode.value) {
+      _editorController.setTab(EditorTab.browser);
+    }
   }
 
   /// Handle incoming WebSocket message
@@ -155,6 +173,57 @@ class AgentChatController extends GetxController {
         );
         break;
 
+      case MessageType.planCreated:
+        // Plan created - show in chat and wait for approval
+        addMessage(message);
+        currentPendingPlanId.value = message.planId;
+        isAwaitingApproval.value = true;
+        isTyping.value = false;
+        // Keep isAgentWorking true because agent is waiting for approval
+        
+        // Set plan data in PlanningController for review screen
+        if (message.planId != null && message.planMarkdown != null) {
+          try {
+            final planningController = Get.find<PlanningController>();
+            planningController.setFromAgentData(
+              planId: message.planId!,
+              markdown: message.planMarkdown!,
+              userRequest: message.userRequest,
+            );
+          } catch (_) {
+            // PlanningController not registered, navigation will load from API
+          }
+        }
+        break;
+
+      case MessageType.planApproved:
+        addMessage(message);
+        currentPendingPlanId.value = null;
+        isAwaitingApproval.value = false;
+        // Agent continues working after approval
+        isTyping.value = true;
+        break;
+
+      case MessageType.planRejected:
+        addMessage(message);
+        currentPendingPlanId.value = null;
+        isAwaitingApproval.value = false;
+        isAgentWorking.value = false;
+        isTyping.value = false;
+        _editorController.setAgentWorking(false);
+        break;
+
+      case MessageType.walkthroughReady:
+        addMessage(message);
+        // Navigate to walkthrough screen with confetti celebration
+        if (message.walkthroughContent != null) {
+          Get.toNamed('/walkthrough', arguments: {
+            'planId': message.planId,
+            'content': message.walkthroughContent,
+          });
+        }
+        break;
+
       case MessageType.user:
         // User messages are added directly by sendMessage()
         break;
@@ -197,8 +266,13 @@ class AgentChatController extends GetxController {
         throw Exception('No project loaded');
       }
 
-      // Send via WebSocket (this triggers the agent workflow)
-      _webSocketClient.sendUserMessage(trimmedText);
+      // Send via WebSocket with browser mode flag
+      _webSocketClient.sendMessage({
+        'type': 'user_message',
+        'message': trimmedText,
+        'project_id': projectId,
+        'browser_mode': isBrowserAgentMode.value,
+      });
 
     } catch (e) {
       AppLogger.error('Failed to send message', error: e);
@@ -242,6 +316,41 @@ class AgentChatController extends GetxController {
   /// Clear chat history
   void clearMessages() {
     messages.clear();
+  }
+
+  /// Approve the pending plan
+  Future<void> approvePlan({String? comment}) async {
+    if (currentPendingPlanId.value == null) return;
+    
+    final planId = currentPendingPlanId.value!;
+    AppLogger.info('Approving plan: $planId');
+    
+    _webSocketClient.sendMessage({
+      'type': 'plan_approval',
+      'plan_id': planId,
+      'approved': true,
+      'comment': comment ?? 'Plan approved',
+    });
+    
+    isAwaitingApproval.value = false;
+  }
+
+  /// Reject the pending plan
+  Future<void> rejectPlan({String? comment}) async {
+    if (currentPendingPlanId.value == null) return;
+    
+    final planId = currentPendingPlanId.value!;
+    AppLogger.info('Rejecting plan: $planId');
+    
+    _webSocketClient.sendMessage({
+      'type': 'plan_approval',
+      'plan_id': planId,
+      'approved': false,
+      'comment': comment ?? 'Plan rejected',
+    });
+    
+    isAwaitingApproval.value = false;
+    currentPendingPlanId.value = null;
   }
 
   @override

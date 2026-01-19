@@ -9,7 +9,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:heroicons/heroicons.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -101,6 +100,15 @@ class AgentChatPanel extends StatelessWidget {
 
       case MessageType.error:
         messageWidget = ErrorMessage(message: message);
+        break;
+
+      case MessageType.planCreated:
+        messageWidget = _buildPlanApprovalMessage(message);
+        break;
+
+      case MessageType.planApproved:
+      case MessageType.planRejected:
+        messageWidget = _buildPlanStatusMessage(message);
         break;
 
       default:
@@ -243,6 +251,7 @@ class AgentChatPanel extends StatelessWidget {
             message.text.isNotEmpty
                 ? message.text
                 : 'Using ${message.tool ?? "tool"}...',
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
               fontSize: 12.sp,
               color: AppColors.textSecondary,
@@ -347,6 +356,274 @@ class AgentChatPanel extends StatelessWidget {
     );
   }
 
+  Widget _buildPlanApprovalMessage(AgentMessage message) {
+    final controller = Get.find<AgentChatController>();
+    final planMarkdown = message.planMarkdown ?? message.text;
+
+    // Extract title from markdown (first # line)
+    String title = 'Implementation Plan';
+    final titleMatch =
+        RegExp(r'^#\s*(.+)$', multiLine: true).firstMatch(planMarkdown);
+    if (titleMatch != null) {
+      title = titleMatch
+              .group(1)
+              ?.replaceAll(RegExp(r'^Implementation Plan:?\s*'), '')
+              .trim() ??
+          title;
+    }
+
+    // Count tasks from markdown - match various formats:
+    // "1. [ ] Task" or "- [ ] Task"
+    int taskCount = 0;
+    
+    // First try: numbered tasks with checkboxes like "1. [ ] Task"
+    final numberedCheckboxTasks = RegExp(
+      r'^\s*\d+\.\s*\[\s*[x ]?\s*\]',
+      multiLine: true,
+      caseSensitive: false,
+    ).allMatches(planMarkdown);
+    taskCount = numberedCheckboxTasks.length;
+    
+    // Fallback: bullet points with checkboxes like "- [ ] Task"
+    if (taskCount == 0) {
+      final bulletCheckboxTasks = RegExp(
+        r'^\s*[-*]\s*\[\s*[x ]?\s*\]',
+        multiLine: true,
+      ).allMatches(planMarkdown);
+      taskCount = bulletCheckboxTasks.length;
+    }
+
+    // Last fallback: count numbered lines in ## Tasks section
+    if (taskCount == 0) {
+      final tasksSection = RegExp(
+        r'##\s*Tasks\s*\n([\s\S]*?)(?=\n##|\n#|$)',
+        caseSensitive: false,
+      ).firstMatch(planMarkdown);
+      if (tasksSection != null) {
+        taskCount = RegExp(r'^\s*\d+\.', multiLine: true)
+            .allMatches(tasksSection.group(1) ?? '')
+            .length;
+      }
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 16.r,
+            backgroundColor: AppColors.warning.withOpacity(0.1),
+            child: Icon(LucideIcons.fileCheck,
+                size: 20.r, color: AppColors.warning),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                // Navigate to full plan review screen
+                if (message.planId != null) {
+                  Get.toNamed('/plan-review',
+                      arguments: {'planId': message.planId});
+                }
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Get.theme.cardTheme.color,
+                  border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Compact header
+                    Container(
+                      padding: EdgeInsets.all(12.r),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withOpacity(0.1),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(11.r),
+                          topRight: Radius.circular(11.r),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: Get.textTheme.titleMedium?.color,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Obx(() {
+                                final isPending = message.planId == controller.currentPendingPlanId.value;
+                                if (!isPending) return const SizedBox.shrink();
+                                
+                                return Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 8.w, vertical: 4.h),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.warning,
+                                    borderRadius: BorderRadius.circular(12.r),
+                                  ),
+                                  child: Text(
+                                    'Pending',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                          SizedBox(height: 8.h),
+                          Row(
+                            children: [
+                              Icon(LucideIcons.listChecks,
+                                  size: 12.r, color: AppColors.textSecondary),
+                              SizedBox(width: 4.w),
+                              Text(
+                                '$taskCount tasks',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.sp,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              SizedBox(width: 12.w),
+                              Icon(LucideIcons.arrowRight,
+                                  size: 12.r, color: AppColors.primary),
+                              SizedBox(width: 4.w),
+                              Text(
+                                'Tap to review',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.sp,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Quick action buttons
+                    Obx(
+                      () => controller.isAwaitingApproval.value
+                          ? Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w, vertical: 10.h),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => controller.rejectPlan(),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.error,
+                                        side: BorderSide(
+                                            color: AppColors.error
+                                                .withOpacity(0.5)),
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 8.h),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8.r),
+                                        ),
+                                      ),
+                                      child: Text('Decline',
+                                          style: GoogleFonts.inter(
+                                              fontSize: 12.sp,
+                                              fontWeight: FontWeight.w600)),
+                                    ),
+                                  ),
+                                  SizedBox(width: 10.w),
+                                  Expanded(
+                                    flex: 2,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () => controller.approvePlan(),
+                                      icon: Icon(LucideIcons.check, size: 14.r),
+                                      label: Text('Approve',
+                                          style: GoogleFonts.inter(
+                                              fontSize: 12.sp,
+                                              fontWeight: FontWeight.w600)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.success,
+                                        foregroundColor: Colors.white,
+                                        padding:
+                                            EdgeInsets.symmetric(vertical: 8.h),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8.r),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0);
+  }
+
+  Widget _buildPlanStatusMessage(AgentMessage message) {
+    final isApproved = message.type == MessageType.planApproved;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12.h, left: 40.w),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: (isApproved ? AppColors.success : AppColors.error)
+              .withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(
+            color: (isApproved ? AppColors.success : AppColors.error)
+                .withOpacity(0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isApproved ? LucideIcons.circleCheck : LucideIcons.circleX,
+              size: 16.r,
+              color: isApproved ? AppColors.success : AppColors.error,
+            ),
+            SizedBox(width: 8.w),
+            Text(
+              isApproved
+                  ? 'Plan approved - starting implementation...'
+                  : 'Plan rejected',
+              style: GoogleFonts.inter(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w500,
+                color: isApproved ? AppColors.success : AppColors.error,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInputArea(AgentChatController controller) {
     return Container(
       padding: EdgeInsets.all(16.r),
@@ -362,101 +639,182 @@ class AgentChatPanel extends StatelessWidget {
         ],
       ),
       child: SafeArea(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Get.theme.inputDecorationTheme.fillColor,
-                  borderRadius: BorderRadius.circular(24.r),
-                  border: Border.all(color: Get.theme.dividerColor),
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(width: 16.w),
-                    Icon(
-                      StatusIcons.message,
-                      size: 20.r,
-                      color: AppColors.textTertiary,
+            // Browser mode indicator banner
+            Obx(() => controller.isBrowserAgentMode.value
+                ? Container(
+                    margin: EdgeInsets.only(bottom: 12.h),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border:
+                          Border.all(color: AppColors.primary.withOpacity(0.3)),
                     ),
-                    SizedBox(width: 10.w),
-                    Expanded(
-                      child: TextField(
-                        controller: controller.textController,
-                        decoration: InputDecoration(
-                          hintText: AppStrings.typeMessage,
-                          hintStyle: GoogleFonts.inter(
-                            fontSize: 14.sp,
-                            color: AppColors.textTertiary,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 12.h),
-                        ),
-                        style: GoogleFonts.inter(fontSize: 14.sp),
-                        maxLines: 4,
-                        minLines: 1,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: controller.sendMessage,
-                      ),
-                    ),
-                    SizedBox(width: 8.w),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Obx(() => AnimatedContainer(
-                  duration: Duration(milliseconds: 200),
-                  width: 48.r,
-                  height: 48.r,
-                  decoration: BoxDecoration(
-                    gradient: controller.isAgentWorking.value
-                        ? LinearGradient(colors: [
-                            AppColors.error,
-                            AppColors.error.withOpacity(0.8)
-                          ])
-                        : LinearGradient(
-                            colors: [
-                              AppColors.primary,
-                              const Color(0xFF6366F1)
-                            ],
-                          ),
-                    shape: BoxShape.circle,
-                    boxShadow: controller.isAgentWorking.value
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: Offset(0, 4),
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.globe,
+                            size: 16.r, color: AppColors.primary),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Text(
+                            'Browser Agent Mode - AI will control the browser',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
                             ),
-                          ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(24.r),
-                      onTap: controller.isAgentWorking.value
-                          ? () => controller.stopTask()
-                          : () => controller
-                              .sendMessage(controller.textController.text),
-                      child: Center(
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: controller.toggleBrowserAgentMode,
+                          child: Icon(LucideIcons.x,
+                              size: 16.r, color: AppColors.primary),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink()),
+
+            // Input row
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Browser mode toggle button
+                Obx(() => GestureDetector(
+                      onTap: controller.toggleBrowserAgentMode,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 44.r,
+                        height: 44.r,
+                        margin: EdgeInsets.only(right: 8.w),
+                        decoration: BoxDecoration(
+                          color: controller.isBrowserAgentMode.value
+                              ? AppColors.primary.withOpacity(0.15)
+                              : Get.theme.inputDecorationTheme.fillColor,
+                          borderRadius: BorderRadius.circular(22.r),
+                          border: Border.all(
+                            color: controller.isBrowserAgentMode.value
+                                ? AppColors.primary
+                                : Get.theme.dividerColor,
+                            width: controller.isBrowserAgentMode.value ? 2 : 1,
+                          ),
+                        ),
                         child: Icon(
-                          controller.isAgentWorking.value
-                              ? LucideIcons.square
-                              : LucideIcons.send,
-                          color: Colors.white,
+                          LucideIcons.globe,
                           size: 20.r,
+                          color: controller.isBrowserAgentMode.value
+                              ? AppColors.primary
+                              : AppColors.textTertiary,
                         ),
                       ),
+                    )),
+
+                // Text input
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Get.theme.inputDecorationTheme.fillColor,
+                      borderRadius: BorderRadius.circular(24.r),
+                      border: Border.all(color: Get.theme.dividerColor),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 16.w),
+                        Icon(
+                          StatusIcons.message,
+                          size: 20.r,
+                          color: AppColors.textTertiary,
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: Obx(() => TextField(
+                                controller: controller.textController,
+                                decoration: InputDecoration(
+                                  hintText: controller.isBrowserAgentMode.value
+                                      ? 'Tell the browser what to do...'
+                                      : AppStrings.typeMessage,
+                                  hintStyle: GoogleFonts.inter(
+                                    fontSize: 14.sp,
+                                    color: AppColors.textTertiary,
+                                  ),
+                                  border: InputBorder.none,
+                                  contentPadding:
+                                      EdgeInsets.symmetric(vertical: 12.h),
+                                ),
+                                style: GoogleFonts.inter(fontSize: 14.sp),
+                                maxLines: 4,
+                                minLines: 1,
+                                textInputAction: TextInputAction.send,
+                                onSubmitted: controller.sendMessage,
+                              )),
+                        ),
+                        SizedBox(width: 8.w),
+                      ],
                     ),
                   ),
-                ).animate(target: controller.isAgentWorking.value ? 1 : 0)
-                    .scale(
-                        begin: Offset(1, 1),
-                        end: Offset(0.9, 0.9),
-                        duration: 200.ms)),
+                ),
+                SizedBox(width: 12.w),
+
+                // Send/Stop button
+                Obx(() => AnimatedContainer(
+                      duration: Duration(milliseconds: 200),
+                      width: 48.r,
+                      height: 48.r,
+                      decoration: BoxDecoration(
+                        gradient: controller.isAgentWorking.value
+                            ? LinearGradient(colors: [
+                                AppColors.error,
+                                AppColors.error.withOpacity(0.8)
+                              ])
+                            : LinearGradient(
+                                colors: [
+                                  AppColors.primary,
+                                  const Color(0xFF6366F1)
+                                ],
+                              ),
+                        shape: BoxShape.circle,
+                        boxShadow: controller.isAgentWorking.value
+                            ? []
+                            : [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: Offset(0, 4),
+                                ),
+                              ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(24.r),
+                          onTap: controller.isAgentWorking.value
+                              ? () => controller.stopTask()
+                              : () => controller
+                                  .sendMessage(controller.textController.text),
+                          child: Center(
+                            child: Icon(
+                              controller.isAgentWorking.value
+                                  ? LucideIcons.square
+                                  : LucideIcons.send,
+                              color: Colors.white,
+                              size: 20.r,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                        .animate(
+                            target: controller.isAgentWorking.value ? 1 : 0)
+                        .scale(
+                            begin: Offset(1, 1),
+                            end: Offset(0.9, 0.9),
+                            duration: 200.ms)),
+              ],
+            ),
           ],
         ),
       ),

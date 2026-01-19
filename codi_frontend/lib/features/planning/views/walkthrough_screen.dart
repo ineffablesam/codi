@@ -23,7 +23,8 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
   @override
   void initState() {
     super.initState();
-    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+    _confettiController =
+        ConfettiController(duration: const Duration(seconds: 3));
 
     // Trigger confetti after 500ms
     Future.delayed(const Duration(milliseconds: 500), () {
@@ -45,7 +46,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
     final walkthroughContent = args?['content'] as String? ?? '';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
+      backgroundColor: Get.theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
           Column(
