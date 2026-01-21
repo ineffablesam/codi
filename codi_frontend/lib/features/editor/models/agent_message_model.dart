@@ -8,6 +8,7 @@ enum MessageType {
   agentStatus,
   agentResponse,
   conversationalResponse,
+  taskSubmitted,
   toolExecution,
   toolResult,
   
@@ -23,6 +24,10 @@ enum MessageType {
   planRejected,
   walkthroughReady,
   
+  // Browser agent
+  browserAction,
+  browserStatus,
+  
   // Errors
   error,
 }
@@ -32,6 +37,9 @@ class AgentMessage {
   final String text;
   final DateTime timestamp;
   final MessageType type;
+  
+  // UI state for collapsible cards
+  bool isCollapsed;
 
   // Core fields
   final String? agent;
@@ -67,11 +75,18 @@ class AgentMessage {
   final String? planFilePath;
   final String? userRequest;
   final String? walkthroughContent;
+  final String? taskId;
+  
+  // Browser agent
+  final String? browserUrl;
+  final String? browserAction;
+  final String? pageTitle;
 
   AgentMessage({
     required this.text,
     required this.timestamp,
     required this.type,
+    this.isCollapsed = false,
     this.agent,
     this.status,
     this.details,
@@ -91,6 +106,10 @@ class AgentMessage {
     this.planFilePath,
     this.userRequest,
     this.walkthroughContent,
+    this.taskId,
+    this.browserUrl,
+    this.browserAction,
+    this.pageTitle,
   });
 
   /// Create from WebSocket JSON
@@ -111,6 +130,9 @@ class AgentMessage {
         break;
       case 'tool_result':
         type = MessageType.toolResult;
+        break;
+      case 'task_submitted':
+        type = MessageType.taskSubmitted;
         break;
       case 'file_operation':
         type = MessageType.fileOperation;
@@ -136,6 +158,12 @@ class AgentMessage {
       case 'walkthrough_ready':
         type = MessageType.walkthroughReady;
         break;
+      case 'browser_action':
+        type = MessageType.browserAction;
+        break;
+      case 'browser_status':
+        type = MessageType.browserStatus;
+        break;
       case 'agent_error':
         type = MessageType.error;
         break;
@@ -145,6 +173,13 @@ class AgentMessage {
 
     final details = json['details'] as Map<String, dynamic>?;
     String messageText = _extractText(json['message']);
+    
+    // Extract file_path from input if not directly provided
+    final input = json['input'] as Map<String, dynamic>?;
+    String? filePath = json['file_path'] as String?;
+    if (filePath == null && input != null) {
+      filePath = input['path'] as String?;
+    }
 
     return AgentMessage(
       text: messageText,
@@ -157,7 +192,7 @@ class AgentMessage {
       details: details,
       tool: json['tool'] as String?,
       operation: json['operation'] as String?,
-      filePath: json['file_path'] as String?,
+      filePath: filePath,
       stats: json['stats'] as String?,
       commitSha: json['commit_sha'] as String?,
       branchName: json['branch_name'] as String?,
@@ -171,6 +206,10 @@ class AgentMessage {
       planFilePath: json['plan_file_path'] as String?,
       userRequest: json['user_request'] as String?,
       walkthroughContent: json['walkthrough_content'] as String?,
+      taskId: json['task_id'] as String?,
+      browserUrl: json['url'] as String?,
+      browserAction: json['action'] as String?,
+      pageTitle: json['page_title'] as String?,
     );
   }
 

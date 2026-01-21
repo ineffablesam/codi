@@ -26,6 +26,7 @@ class EditorController extends GetxController
   final Rx<ProjectModel?> currentProject = Rx<ProjectModel?>(null);
   final isLoading = false.obs;
   final isAgentWorking = false.obs;
+  final isConnected = false.obs;  // WebSocket connection status
   final buildProgress = 0.0.obs;
   final previewUrl = RxnString();
   final errorMessage = RxnString();
@@ -68,6 +69,12 @@ class EditorController extends GetxController
       };
     });
     _webSocketClient = Get.find<WebSocketClient>();
+    
+    // Sync connection status with WebSocketClient
+    ever(_webSocketClient.isConnected, (connected) {
+      isConnected.value = connected;
+    });
+    
     _loadProject();
   }
 

@@ -9,9 +9,10 @@ import 'package:get/get.dart';
 import '../../../core/api/websocket_client.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/logger.dart';
+import '../../planning/controllers/planning_controller.dart';
 import '../models/agent_message_model.dart';
 import '../services/editor_service.dart';
-import '../../planning/controllers/planning_controller.dart';
+import 'browser_agent_controller.dart';
 import 'editor_controller.dart';
 import 'preview_controller.dart';
 
@@ -20,10 +21,10 @@ class AgentChatController extends GetxController {
   final EditorService _editorService = EditorService();
   late final WebSocketClient _webSocketClient;
   late final EditorController _editorController;
-  
+
   final ScrollController scrollController = ScrollController();
   final TextEditingController textController = TextEditingController();
-  
+  final focusNode = FocusNode();
   StreamSubscription? _messageSubscription;
 
   // State
@@ -32,13 +33,21 @@ class AgentChatController extends GetxController {
   final isTyping = false.obs;
   final isSending = false.obs;
   final currentTaskId = RxnString();
-  
+
+  // Track when work started and if tools have been used (to distinguish quick conversations)
+  final Rxn<DateTime> workingStartTime = Rxn<DateTime>();
+  final hasToolActivity = false.obs;
+  final showGeneratingIndicator = false.obs;
+  Timer? _generatingTimer;
+
   // Browser agent mode
   final isBrowserAgentMode = false.obs;
-  
+
   // Plan approval state
   final currentPendingPlanId = RxnInt();
   final isAwaitingApproval = false.obs;
+
+  final isFocused = false.obs;
 
   @override
   void onInit() {
@@ -46,6 +55,32 @@ class AgentChatController extends GetxController {
     _webSocketClient = Get.find<WebSocketClient>();
     _editorController = Get.find<EditorController>();
     _subscribeToMessages();
+    focusNode.addListener(() {
+      isFocused.value = focusNode.hasFocus;
+    });
+    // Periodically check if we should show the generating indicator
+    _generatingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _updateGeneratingStatus();
+    });
+  }
+
+  void _updateGeneratingStatus() {
+    if (!isAgentWorking.value || isAwaitingApproval.value) {
+      showGeneratingIndicator.value = false;
+      return;
+    }
+
+    final startTime = workingStartTime.value;
+    if (startTime == null) {
+      showGeneratingIndicator.value = false;
+      return;
+    }
+
+    final elapsed = DateTime.now().difference(startTime).inSeconds;
+
+    // Show if tools are active OR if it's been more than 20 seconds
+    // to distinguish long-running tasks from quick conversations
+    showGeneratingIndicator.value = hasToolActivity.value || elapsed >= 20;
   }
 
   /// Subscribe to WebSocket messages
@@ -61,7 +96,7 @@ class AgentChatController extends GetxController {
   /// Toggle browser agent mode
   void toggleBrowserAgentMode() {
     isBrowserAgentMode.toggle();
-    
+
     // Auto-switch to browser tab when enabling browser mode
     if (isBrowserAgentMode.value) {
       _editorController.setTab(EditorTab.browser);
@@ -71,33 +106,72 @@ class AgentChatController extends GetxController {
   /// Handle incoming WebSocket message
   void _handleMessage(Map<String, dynamic> data) {
     final messageType = data['type'] as String?;
-    
-    // Skip ping/pong
-    if (messageType == 'ping' || messageType == 'pong') return;
+
+    // Skip ping/pong and browser frames (frames are handled by BrowserAgentController)
+    if (messageType == 'ping' || 
+        messageType == 'pong' || 
+        messageType == 'browser_frame') {
+      return;
+    }
 
     // Parse message
     final message = AgentMessage.fromWebSocket(data);
 
     // Update controller states based on message type
     switch (message.type) {
+      case MessageType.taskSubmitted:
+        // Task was submitted to queue - store the task ID for stopping
+        if (message.taskId != null) {
+          currentTaskId.value = message.taskId;
+        }
+        isAgentWorking.value = true;
+        break;
+
       case MessageType.agentResponse:
       case MessageType.conversationalResponse:
         // Chat response - display and stop working
         addMessage(message);
         isTyping.value = false;
         isAgentWorking.value = false;
+        currentTaskId.value = null; // Clear task ID when done
+        _editorController.setAgentWorking(false);
         break;
 
       case MessageType.agentStatus:
-        addMessage(message);
-        if (message.status == 'started' || message.status == 'thinking') {
+        // Only add thinking/planning status if we don't already have one showing
+        if (message.status == 'started' ||
+            message.status == 'thinking' ||
+            message.status == 'planning') {
+          // Check if we already have a thinking indicator
+          final hasThinking = messages.any((m) =>
+              m.type == MessageType.agentStatus &&
+              (m.status == 'thinking' ||
+                  m.status == 'started' ||
+                  m.status == 'planning'));
+          if (!hasThinking) {
+            addMessage(message);
+          }
           isAgentWorking.value = true;
           isTyping.value = true;
+          // Track when work started
+          workingStartTime.value ??= DateTime.now();
           _editorController.setAgentWorking(true);
-        } else if (message.status == 'completed' || message.status == 'failed') {
+        } else if (message.status == 'completed' ||
+            message.status == 'failed') {
+          // But show "failed" so user knows if something went wrong
+          if (message.status == 'failed') {
+            addMessage(message);
+          }
           isAgentWorking.value = false;
           isTyping.value = false;
+          currentTaskId.value = null; // Clear task ID on completion
+          // Reset tracking
+          workingStartTime.value = null;
+          hasToolActivity.value = false;
           _editorController.setAgentWorking(false);
+        } else {
+          // Other status types (executing, awaiting_approval, etc.)
+          addMessage(message);
         }
         break;
 
@@ -105,6 +179,8 @@ class AgentChatController extends GetxController {
       case MessageType.toolResult:
       case MessageType.fileOperation:
       case MessageType.gitOperation:
+        // Mark that we have tool activity (not just a quick conversation)
+        hasToolActivity.value = true;
         // Operation messages display in chat
         addMessage(message);
         break;
@@ -130,10 +206,10 @@ class AgentChatController extends GetxController {
           final previewController = Get.find<PreviewController>();
           previewController.isBuilding.value = false;
         } catch (_) {}
-        
+
         if (message.deploymentUrl != null) {
           _editorController.updatePreviewUrl(message.deploymentUrl!);
-          
+
           // Refresh preview
           try {
             final previewController = Get.find<PreviewController>();
@@ -155,12 +231,20 @@ class AgentChatController extends GetxController {
             ),
           );
         }
+        // Reset tracking
+        currentTaskId.value = null;
+        isAgentWorking.value = false;
+        isTyping.value = false;
+        workingStartTime.value = null;
+        hasToolActivity.value = false;
+        _editorController.setAgentWorking(false);
         break;
 
       case MessageType.error:
         addMessage(message);
         isAgentWorking.value = false;
         isTyping.value = false;
+        currentTaskId.value = null; // Clear task ID on error
         _editorController.setAgentWorking(false);
         Get.snackbar(
           'Agent Error',
@@ -180,7 +264,7 @@ class AgentChatController extends GetxController {
         isAwaitingApproval.value = true;
         isTyping.value = false;
         // Keep isAgentWorking true because agent is waiting for approval
-        
+
         // Set plan data in PlanningController for review screen
         if (message.planId != null && message.planMarkdown != null) {
           try {
@@ -224,6 +308,52 @@ class AgentChatController extends GetxController {
         }
         break;
 
+      case MessageType.taskSubmitted:
+        // Show thinking indicator instead of "task submitted" text
+        // Add a synthetic thinking status message that will be replaced when response arrives
+        final thinkingMessage = AgentMessage(
+          text: '',
+          timestamp: DateTime.now(),
+          type: MessageType.agentStatus,
+          status: 'thinking',
+        );
+        addMessage(thinkingMessage);
+        isAgentWorking.value = true;
+        isTyping.value = true;
+        _editorController.setAgentWorking(true);
+        break;
+
+      case MessageType.browserAction:
+        // Show browser navigation/action in chat
+        addMessage(message);
+        hasToolActivity.value = true;
+        break;
+
+      case MessageType.browserStatus:
+        // Show browser lifecycle events
+        if (message.status == 'started') {
+          addMessage(message);
+          isAgentWorking.value = true;
+          isTyping.value = true;
+        } else if (message.status == 'completed' || message.status == 'error') {
+          addMessage(message);
+          isAgentWorking.value = false;
+          isTyping.value = false;
+          currentTaskId.value = null;
+          _editorController.setAgentWorking(false);
+        }
+        
+        // Forward URL updates to browser controller
+        if (message.browserUrl != null) {
+          try {
+            final browserController = Get.find<BrowserAgentController>();
+            browserController.currentUrl.value = message.browserUrl!;
+          } catch (_) {
+            // BrowserAgentController not registered, ignore
+          }
+        }
+        break;
+
       case MessageType.user:
         // User messages are added directly by sendMessage()
         break;
@@ -232,8 +362,43 @@ class AgentChatController extends GetxController {
 
   /// Add message to list
   void addMessage(AgentMessage message) {
+    // Auto-collapse previous tool execution messages
+    if (message.type == MessageType.toolExecution ||
+        message.type == MessageType.toolResult) {
+      for (int i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].type == MessageType.toolExecution ||
+            messages[i].type == MessageType.toolResult) {
+          messages[i].isCollapsed = true;
+        }
+      }
+    }
+
+    // Remove previous thinking messages when a new substantive message arrives
+    if (message.type != MessageType.agentStatus ||
+        (message.status != 'thinking' &&
+            message.status != 'started' &&
+            message.status != 'planning')) {
+      messages.removeWhere((m) =>
+          m.type == MessageType.agentStatus &&
+          (m.status == 'thinking' ||
+              m.status == 'started' ||
+              m.status == 'planning'));
+    }
+
+    // Skip empty tool results to reduce clutter
+    if (message.type == MessageType.toolResult) {
+      final result = message.toolResult;
+      if (result == null ||
+          result.trim().isEmpty ||
+          result == 'Success' ||
+          result == 'Done') {
+        // Don't add empty/trivial results, just return
+        return;
+      }
+    }
+
     messages.add(message);
-    
+
     // Auto-scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (scrollController.hasClients) {
@@ -273,7 +438,6 @@ class AgentChatController extends GetxController {
         'project_id': projectId,
         'browser_mode': isBrowserAgentMode.value,
       });
-
     } catch (e) {
       AppLogger.error('Failed to send message', error: e);
       Get.snackbar(
@@ -302,12 +466,11 @@ class AgentChatController extends GetxController {
       // Call high-level API to stop task
       // We'll use editorService since it handles REST calls
       await _editorService.stopTask(projectId.toString(), taskId);
-      
+
       // Update local state proactively
       isAgentWorking.value = false;
       isTyping.value = false;
       _editorController.setAgentWorking(false);
-
     } catch (e) {
       AppLogger.error('Failed to stop task', error: e);
     }
@@ -321,41 +484,43 @@ class AgentChatController extends GetxController {
   /// Approve the pending plan
   Future<void> approvePlan({String? comment}) async {
     if (currentPendingPlanId.value == null) return;
-    
+
     final planId = currentPendingPlanId.value!;
     AppLogger.info('Approving plan: $planId');
-    
+
     _webSocketClient.sendMessage({
       'type': 'plan_approval',
       'plan_id': planId,
       'approved': true,
       'comment': comment ?? 'Plan approved',
     });
-    
+
     isAwaitingApproval.value = false;
   }
 
   /// Reject the pending plan
   Future<void> rejectPlan({String? comment}) async {
     if (currentPendingPlanId.value == null) return;
-    
+
     final planId = currentPendingPlanId.value!;
     AppLogger.info('Rejecting plan: $planId');
-    
+
     _webSocketClient.sendMessage({
       'type': 'plan_approval',
       'plan_id': planId,
       'approved': false,
       'comment': comment ?? 'Plan rejected',
     });
-    
+
     isAwaitingApproval.value = false;
     currentPendingPlanId.value = null;
   }
 
   @override
   void onClose() {
+    _generatingTimer?.cancel();
     _messageSubscription?.cancel();
+    focusNode.dispose();
     scrollController.dispose();
     textController.dispose();
     super.onClose();

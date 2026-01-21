@@ -24,6 +24,7 @@ class GitHubAuthWebView extends StatefulWidget {
 class _GitHubAuthWebViewState extends State<GitHubAuthWebView> {
   late final WebViewController _controller;
   bool _isLoading = true;
+  bool _hasReturnedResult = false;
 
   @override
   void initState() {
@@ -43,25 +44,17 @@ class _GitHubAuthWebViewState extends State<GitHubAuthWebView> {
               _isLoading = false;
             });
             AppLogger.debug('WebView finished loading: $url');
+            
+            // Check if we landed on callback URL (fast redirect case)
+            // This handles when user is already authed with GitHub
+            _tryExtractCallback(url);
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url;
             AppLogger.debug('WebView navigation request: $url');
 
-            final uri = Uri.parse(url);
-            final isCallbackPath = uri.path.endsWith('/auth/github/callback');
-            final hasCode = uri.queryParameters.containsKey('code');
-            final hasState = uri.queryParameters.containsKey('state');
-
-            if (isCallbackPath && hasCode && hasState) {
-              final code = uri.queryParameters['code']!;
-              final state = uri.queryParameters['state']!;
-              
-              AppLogger.info('WebView intercepted callback URL with code and state');
-              Navigator.pop(context, {
-                'code': code,
-                'state': state,
-              });
+            // Try to extract callback - if successful, prevent further navigation
+            if (_tryExtractCallback(url)) {
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
@@ -72,6 +65,47 @@ class _GitHubAuthWebViewState extends State<GitHubAuthWebView> {
         ),
       )
       ..loadRequest(Uri.parse(widget.authUrl));
+  }
+
+  /// Try to extract code/state from callback URL
+  /// Returns true if successful and result was returned
+  bool _tryExtractCallback(String url) {
+    // Prevent returning multiple times
+    if (_hasReturnedResult) return false;
+
+    final uri = Uri.parse(url);
+    final isCallbackPath = uri.path.endsWith('/auth/github/callback');
+    final hasCode = uri.queryParameters.containsKey('code');
+    final hasState = uri.queryParameters.containsKey('state');
+
+    if (isCallbackPath && hasCode && hasState) {
+      final code = uri.queryParameters['code']!;
+      final state = uri.queryParameters['state']!;
+      
+      _hasReturnedResult = true;
+      AppLogger.info('WebView intercepted callback URL with code and state');
+      Navigator.pop(context, {
+        'code': code,
+        'state': state,
+      });
+      return true;
+    }
+    
+    // Check for error in callback
+    final hasError = uri.queryParameters.containsKey('error');
+    if (isCallbackPath && hasError) {
+      final error = uri.queryParameters['error'] ?? 'Unknown error';
+      final errorDescription = uri.queryParameters['error_description'] ?? '';
+      
+      _hasReturnedResult = true;
+      AppLogger.error('GitHub OAuth error: $error - $errorDescription');
+      Navigator.pop(context, {
+        'error': errorDescription.isNotEmpty ? errorDescription : error,
+      });
+      return true;
+    }
+    
+    return false;
   }
 
   @override

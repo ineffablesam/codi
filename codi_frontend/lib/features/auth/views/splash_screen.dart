@@ -23,77 +23,138 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
   late AnimationController _slideController;
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
   late AnimationController _blurController;
+
   late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
   late Animation<double> _blurAnimation;
 
   bool _animationComplete = false;
-  bool _showLogo = false; // Control logo visibility
+  bool _showLogo = false;
+  bool _hasNavigated = false;
 
   @override
   void initState() {
     super.initState();
+    _initializeAnimations();
+  }
 
-    // Slide animation controller
+  void _initializeAnimations() {
+    // Slide animation controller - smoother duration
     _slideController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+
+    // Fade animation controller
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
+    // Scale animation controller
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
 
     // Blur animation controller
     _blurController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1800),
       vsync: this,
     );
 
-    // Slide up animation from slightly below center
+    // Slide up animation with improved curve
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.15), // Start slightly below center
-      end: Offset.zero, // End at center
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
-      curve: Curves.easeInOutCubic,
+      curve: Curves.easeOutCubic,
+    ));
+
+    // Fade in animation
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    ));
+
+    // Scale animation (slight zoom in effect)
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _scaleController,
+      curve: Curves.easeOutBack,
     ));
 
     // Blur animation (starts blurry, ends clear)
     _blurAnimation = Tween<double>(
-      begin: 12.0, // Start with heavy blur
-      end: 0.0, // End with no blur
+      begin: 15.0,
+      end: 0.0,
     ).animate(CurvedAnimation(
       parent: _blurController,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOutQuart,
     ));
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    // Check if user is logged in
-    final isLoggedIn = SharedPrefs.isLoggedIn;
+    if (_hasNavigated) return;
+    _hasNavigated = true;
 
-    if (isLoggedIn) {
-      Get.offAllNamed(AppRoutes.layout);
-    } else {
-      Get.offAllNamed(AppRoutes.login);
+    try {
+      final isLoggedIn = SharedPrefs.isLoggedIn;
+
+      if (!mounted) return;
+
+      if (isLoggedIn) {
+        await Get.offAllNamed(AppRoutes.layout);
+      } else {
+        await Get.offAllNamed(AppRoutes.login);
+      }
+    } catch (e) {
+      debugPrint('Navigation error: $e');
     }
   }
 
   void _onLottieComplete() {
-    if (!_animationComplete) {
+    if (!_animationComplete && mounted) {
       _animationComplete = true;
 
-      // Show the logo and start animations
-      setState(() {
-        _showLogo = true;
-      });
+      // Show the logo with a slight delay for smoothness
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
 
-      // Start both slide and blur animations simultaneously
-      _slideController.forward();
-      _blurController.forward();
+        setState(() {
+          _showLogo = true;
+        });
 
-      // Navigate after 4 seconds from animation completion
-      Future.delayed(const Duration(seconds: 4), () {
-        if (mounted) {
-          _checkAuthAndNavigate();
-        }
+        // Stagger the animations for a more polished effect
+        _fadeController.forward();
+
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (!mounted) return;
+          _blurController.forward();
+          _scaleController.forward();
+        });
+
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (!mounted) return;
+          _slideController.forward();
+        });
+
+        // Navigate after animations complete
+        Future.delayed(const Duration(milliseconds: 3500), () {
+          if (mounted && !_hasNavigated) {
+            _checkAuthAndNavigate();
+          }
+        });
       });
     }
   }
@@ -101,6 +162,8 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     _slideController.dispose();
+    _fadeController.dispose();
+    _scaleController.dispose();
     _blurController.dispose();
     super.dispose();
   }
@@ -108,10 +171,12 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Get.theme.scaffoldBackgroundColor,
       body: Stack(
         alignment: Alignment.center,
         children: [
+          // Optional gradient background
+          // Uncomment if needed
           // Container(
           //   decoration: BoxDecoration(
           //     gradient: LinearGradient(
@@ -125,50 +190,63 @@ class _SplashScreenState extends State<SplashScreen>
           //   ),
           // ),
 
-          // Animated logo with slide and blur (hidden initially)
+          // Lottie animation layer
+          Positioned.fill(
+            child: Lottie.asset(
+              "assets/lottie/codi.json",
+              width: 1.sw,
+              height: 1.sh,
+              fit: BoxFit.cover,
+              frameRate: FrameRate.max,
+              filterQuality: FilterQuality.high,
+              repeat: false,
+              alignment: Alignment.center,
+              onLoaded: (composition) {
+                if (!mounted) return;
+                // Trigger animations when Lottie is near completion
+                final delay =
+                    composition.duration - const Duration(milliseconds: 700);
+                Future.delayed(delay, _onLottieComplete);
+              },
+            ),
+          ),
+
+          // Animated logo layer (appears after Lottie)
           if (_showLogo)
-            SlideTransition(
-              position: _slideAnimation,
+            Align(
+              alignment: Alignment.center,
               child: AnimatedBuilder(
-                animation: _blurAnimation,
+                animation: Listenable.merge([
+                  _slideAnimation,
+                  _fadeAnimation,
+                  _scaleAnimation,
+                  _blurAnimation,
+                ]),
                 builder: (context, child) {
-                  return ImageFiltered(
-                    imageFilter: ImageFilter.blur(
-                      sigmaX: _blurAnimation.value,
-                      sigmaY: _blurAnimation.value,
-                      tileMode: TileMode.decal,
-                    ),
-                    child: Opacity(
-                      opacity: (1.0 - (_blurAnimation.value / 12.0) * 0.7)
-                          .clamp(0.3, 1.0),
-                      child: child,
+                  return SlideTransition(
+                    position: _slideAnimation,
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: ScaleTransition(
+                        scale: _scaleAnimation,
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: _blurAnimation.value,
+                            sigmaY: _blurAnimation.value,
+                            tileMode: TileMode.decal,
+                          ),
+                          child: SvgPicture.asset(
+                            "assets/images/splash-logo.svg",
+                            width: 130.w,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
                     ),
                   );
                 },
-                child: SvgPicture.asset(
-                  "assets/images/splash-logo.svg",
-                  width: 130.w,
-                  fit: BoxFit.cover,
-                ),
               ),
             ),
-
-          // Lottie animation
-          Lottie.asset(
-            "assets/lottie/codi.json",
-            width: 1.sw,
-            height: 1.sh,
-            fit: BoxFit.cover,
-            frameRate: FrameRate.max,
-            filterQuality: FilterQuality.high,
-            repeat: false,
-            onLoaded: (composition) {
-              // Trigger animations when Lottie completes
-              Future.delayed(
-                  composition.duration - const Duration(milliseconds: 700),
-                  _onLottieComplete);
-            },
-          ),
         ],
       ),
     );

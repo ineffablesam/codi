@@ -1,15 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/api_service.dart';
+import '../../../core/api/websocket_client.dart';
 import '../../../core/utils/logger.dart';
 import 'editor_controller.dart';
+
+/// Build phase enumeration
+enum BuildPhase {
+  none,
+  initialDeploy,
+  aiBuilding,
+  liveUpdates,
+}
 
 /// Controller for preview WebView panel using InAppWebView
 class PreviewController extends GetxController {
   late final EditorController _editorController;
+  late final WebSocketClient _webSocketClient;
   final ApiService _apiService = Get.find<ApiService>();
   InAppWebViewController? webViewController;
   PullToRefreshController? pullToRefreshController;
@@ -26,6 +38,11 @@ class PreviewController extends GetxController {
   final isBuilding = false.obs;
   final buildStage = ''.obs;
   final buildProgress = 0.0.obs;
+  final buildPhase = BuildPhase.none.obs;
+  final buildMessages = <String>[].obs; // Recent build messages
+
+  // WebSocket message subscription
+  StreamSubscription? _messageSubscription;
 
   // Deployment state
   final containerId = RxnString();
@@ -37,6 +54,7 @@ class PreviewController extends GetxController {
   void onInit() {
     super.onInit();
     _editorController = Get.find<EditorController>();
+    _webSocketClient = Get.find<WebSocketClient>();
 
     // Initialize with current deployment URL and container ID
     deploymentUrl.value = _editorController.previewUrl.value;
@@ -57,6 +75,9 @@ class PreviewController extends GetxController {
     });
 
     _initPullToRefresh();
+    
+    // Subscribe to WebSocket messages for build updates
+    _subscribeToWebSocket();
   }
 
   void _initPullToRefresh() {
@@ -158,6 +179,7 @@ class PreviewController extends GetxController {
 
   @override
   void onClose() {
+    _messageSubscription?.cancel();
     webViewController = null;
     super.onClose();
   }
@@ -271,5 +293,97 @@ class PreviewController extends GetxController {
       isBuilding.value = false;
     }
     return false;
+  }
+
+  /// Subscribe to WebSocket message stream
+  void _subscribeToWebSocket() {
+    _messageSubscription = _webSocketClient.messageStream.listen(
+      _handleWebSocketMessage,
+      onError: (error) {
+        AppLogger.error('WebSocket stream error', error: error);
+      },
+    );
+  }
+
+  /// Handle incoming WebSocket message
+  void _handleWebSocketMessage(Map<String, dynamic> data) {
+    final type = data['type'] as String?;
+
+    switch (type) {
+      case 'build_progress':
+        _handleBuildProgress(data);
+        break;
+      case 'deployment_complete':
+        _handleDeploymentComplete(data);
+        break;
+      case 'agent_status':
+        _handleAgentStatus(data);
+        break;
+      default:
+        // Ignore other message types
+        break;
+    }
+  }
+
+  /// Handle build progress event
+  void _handleBuildProgress(Map<String, dynamic> data) {
+    final stage = data['stage'] as String?;
+    final message = data['message'] as String?;
+    final progress = (data['progress'] as num?)?.toDouble() ?? 0.0;
+
+    isBuilding.value = true;
+    buildStage.value = message ?? '';
+    buildProgress.value = progress;
+
+    // Determine build phase based on stage
+    if (stage == 'template_deployed') {
+      buildPhase.value = BuildPhase.initialDeploy;
+    } else if (stage == 'ai_building') {
+      buildPhase.value = BuildPhase.aiBuilding;
+    }
+
+    // Add to recent messages
+    if (message != null && message.isNotEmpty) {
+      buildMessages.insert(0, message);
+      if (buildMessages.length > 5) {
+        buildMessages.removeLast();
+      }
+    }
+
+    AppLogger.debug('Build progress: $stage - $progress');
+  }
+
+  /// Handle deployment complete event
+  void _handleDeploymentComplete(Map<String, dynamic> data) {
+    final status = data['status'] as String?;
+    final url = data['deployment_url'] as String?;
+    final message = data['message'] as String?;
+
+    isBuilding.value = false;
+    buildPhase.value = BuildPhase.none;
+    
+    if (status == 'success' && url != null) {
+      deploymentUrl.value = url;
+      loadUrl(url);
+    }
+
+    if (message != null) {
+      buildMessages.insert(0, message);
+    }
+
+    AppLogger.info('Deployment complete: $status');
+  }
+
+  /// Handle agent status event
+  void _handleAgentStatus(Map<String, dynamic> data) {
+    final status = data['status'] as String?;
+    final message = data['message'] as String?;
+
+    if (status == 'working' && message != null) {
+      buildPhase.value = BuildPhase.liveUpdates;
+      buildStage.value = message;
+    } else if (status == 'completed') {
+      buildPhase.value = BuildPhase.none;
+    }
   }
 }

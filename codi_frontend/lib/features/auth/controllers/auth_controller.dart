@@ -23,15 +23,15 @@ class AuthController extends GetxController {
   final isLoggedIn = false.obs;
   final isNewUser = false.obs;
   final errorMessage = RxnString();
+  
+  // True after OAuth callback returns but before we navigate
+  // This prevents showing wrong welcome message during transition
+  final isProcessingAuth = false.obs;
 
   // Flow state management
   final showOnboardingForm = false.obs;
   final isAnimatingNewUser = false.obs;
   final isAnimatingExistingUser = false.obs;
-
-  // Animation timing constants
-  static const Duration _newUserAnimationDuration = Duration(seconds: 7);
-  static const Duration _existingUserAnimationDuration = Duration(seconds: 9);
 
   // Reset key to force widget rebuilds (incremented on each reset)
   final resetKey = 0.obs;
@@ -97,8 +97,23 @@ class AuthController extends GetxController {
           final code = result['code']!;
           final state = result['state']!;
           await handleOAuthCallback(code, state);
+        } else if (result != null && result.containsKey('error')) {
+          // Actual error from WebView
+          AppLogger.error('GitHub auth error: ${result['error']}');
+          errorMessage.value = result['error'];
+          isLoading.value = false;
         } else {
           // User closed the WebView without completing login
+          // But check if maybe they're already logged in (fast redirect case)
+          final token = SharedPrefs.getToken();
+          if (token != null && token.isNotEmpty) {
+            // User might already be authenticated - reload state
+            await _checkAuthState();
+            if (isLoggedIn.value) {
+              Get.offAllNamed(AppRoutes.layout);
+              return;
+            }
+          }
           AppLogger.info('User cancelled GitHub login');
           isLoading.value = false;
         }
@@ -116,6 +131,7 @@ class AuthController extends GetxController {
   /// Handle OAuth callback (called after user returns from browser)
   Future<void> handleOAuthCallback(String code, String state) async {
     isLoading.value = true;
+    isProcessingAuth.value = true;
     errorMessage.value = null;
 
     try {
@@ -134,6 +150,7 @@ class AuthController extends GetxController {
         currentUser.value = tokenResponse.user;
         isNewUser.value = tokenResponse.isNewUser;
         isLoggedIn.value = true;
+        isProcessingAuth.value = false;
 
         // Initiate appropriate flow based on user type
         if (isNewUser.value) {
@@ -143,10 +160,12 @@ class AuthController extends GetxController {
         }
       } else {
         errorMessage.value = 'Authentication failed';
+        isProcessingAuth.value = false;
       }
     } catch (e) {
       AppLogger.error('OAuth callback failed', error: e);
       errorMessage.value = 'Authentication failed. Please try again.';
+      isProcessingAuth.value = false;
     } finally {
       isLoading.value = false;
     }
@@ -159,9 +178,11 @@ class AuthController extends GetxController {
     isAnimatingNewUser.value = true;
     showOnboardingForm.value = false;
 
-    // Wait for welcome and configuration animations (first 2 screens)
-    // Welcome (800ms + 2000ms + 600ms) + Configuring (800ms + 2000ms + 600ms) = 6.8s
-    await Future.delayed(const Duration(milliseconds: 6800));
+    // Wait for welcome and configuration animations
+    // Welcome: 800ms fadeIn + 2000ms delay + 600ms fadeOut = 3.4s
+    // Configuring: 800ms fadeIn + brief display = ~1s
+    // Total: ~4.5s before showing form
+    await Future.delayed(const Duration(milliseconds: 4500));
 
     // Show onboarding form
     isAnimatingNewUser.value = false;
@@ -171,16 +192,11 @@ class AuthController extends GetxController {
   }
 
   /// Initiate existing user flow
-  /// Shows welcome back animations, then navigates to projects
+  /// Navigates directly to projects (no animations for existing users)
   Future<void> initiateExistingUserFlow() async {
-    AppLogger.info('Initiating existing user flow');
-    isAnimatingExistingUser.value = true;
-
-    // Wait for all welcome back animations to complete (9 seconds)
-    await Future.delayed(_existingUserAnimationDuration);
-
-    // Navigate to projects
-    isAnimatingExistingUser.value = false;
+    AppLogger.info('Initiating existing user flow - navigating directly');
+    
+    // Navigate directly to layout - no animations for existing users
     Get.offAllNamed(AppRoutes.layout);
 
     // Show welcome back message

@@ -1,7 +1,10 @@
 /// Preview panel widget with WebView
 library;
 
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
@@ -21,7 +24,12 @@ class PreviewPanel extends StatelessWidget {
     final controller = Get.find<PreviewController>();
 
     return Obx(() {
-      // No preview URL yet
+      // Show build phase UI if building
+      if (controller.isBuilding.value) {
+        return _buildPhaseUI(controller);
+      }
+
+      // No preview URL yet - show initial state
       if (controller.deploymentUrl.value == null ||
           controller.deploymentUrl.value!.isEmpty) {
         return _buildNoPreviewState();
@@ -36,7 +44,7 @@ class PreviewPanel extends StatelessWidget {
         children: [
           Column(
             children: [
-              // _buildPreviewControls(controller),
+              _buildPreviewControls(controller),
               Expanded(
                 child: Stack(
                   fit: StackFit.expand,
@@ -102,19 +110,19 @@ class PreviewPanel extends StatelessWidget {
                         !controller.isBuilding.value &&
                         controller.loadProgress.value < 20)
                       Container(
-                        color: Colors.white.withOpacity(0.5),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                                AppColors.primary),
+                        color: Colors.black.withOpacity(0.35), // dark overlay
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                          child: Center(
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-
-                    // Building overlay (GitHub Actions running)
-                    if (controller.isBuilding.value)
-                      _buildBuildingOverlay(controller),
                   ],
                 ),
               ),
@@ -125,14 +133,276 @@ class PreviewPanel extends StatelessWidget {
     });
   }
 
+  /// Build phase-specific UI (Initial Deploy, AI Building, Live Updates)
+  Widget _buildPhaseUI(PreviewController controller) {
+    return Obx(() {
+      final phase = controller.buildPhase.value;
+      
+      switch (phase) {
+        case BuildPhase.initialDeploy:
+          return _buildInitialDeployUI(controller);
+        case BuildPhase.aiBuilding:
+          return _buildAIBuildingUI(controller);
+        case BuildPhase.liveUpdates:
+          return _buildLiveUpdatesUI(controller);
+        default:
+          return _buildInitialDeployUI(controller);
+      }
+    });
+  }
+
+  /// Phase 1: Initial Deploy UI
+  Widget _buildInitialDeployUI(PreviewController controller) {
+    return Container(
+      color: Get.theme.scaffoldBackgroundColor,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Animated loading indicator
+            SizedBox(
+              width: 60.w,
+              height: 60.w,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            ),
+            SizedBox(height: 32.h),
+            // Title
+            Text(
+              'Initial Deployment',
+              style: GoogleFonts.inter(
+                fontSize: 20.sp,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            SizedBox(height: 12.h),
+            // Stage message
+            Obx(() => Text(
+                  controller.buildStage.value.isNotEmpty
+                      ? controller.buildStage.value
+                      : 'Setting up your development environment...',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                )),
+            SizedBox(height: 32.h),
+            // Progress bar
+            Obx(() => SizedBox(
+                  width: 200.w,
+                  child: LinearProgressIndicator(
+                    value: controller.buildProgress.value > 0
+                        ? controller.buildProgress.value
+                        : null,
+                    backgroundColor: AppColors.surfaceDark,
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Phase 2: AI Building UI
+  Widget _buildAIBuildingUI(PreviewController controller) {
+    return Container(
+      color: Get.theme.scaffoldBackgroundColor,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 32.w),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // AI icon/animation
+              Icon(
+                Icons.auto_awesome,
+                size: 64.r,
+                color: AppColors.primary,
+              ),
+              SizedBox(height: 24.h),
+              // Title
+              Text(
+                'AI Building Your App',
+                style: GoogleFonts.inter(
+                  fontSize: 22.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 12.h),
+              // Current stage
+              Obx(() => Text(
+                    controller.buildStage.value.isNotEmpty
+                        ? controller.buildStage.value
+                        : 'Analyzing your requirements...',
+                    style: GoogleFonts.inter(
+                      fontSize: 14.sp,
+                      color: AppColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  )),
+              SizedBox(height: 32.h),
+              // Progress bar with percentage
+              Obx(() {
+                final progress = controller.buildProgress.value;
+                return Column(
+                  children: [
+                    SizedBox(
+                      width: 250.w,
+                      child: LinearProgressIndicator(
+                        value: progress > 0 ? progress : null,
+                        backgroundColor: AppColors.surfaceDark,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.primary),
+                        minHeight: 6.h,
+                      ),
+                    ),
+                    if (progress > 0) ...[
+                      SizedBox(height: 8.h),
+                      Text(
+                        '${(progress * 100).toInt()}%',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: AppColors.textTertiary,
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              }),
+              SizedBox(height: 32.h),
+              // Recent messages
+              Obx(() {
+                if (controller.buildMessages.isEmpty) return const SizedBox();
+                return Container(
+                  padding: EdgeInsets.all(16.r),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceDark,
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: controller.buildMessages
+                        .take(3)
+                        .map((msg) => Padding(
+                              padding: EdgeInsets.only(bottom: 8.h),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.check_circle,
+                                      size: 16.r, color: AppColors.success),
+                                  SizedBox(width: 8.w),
+                                  Expanded(
+                                    child: Text(
+                                      msg,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.sp,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Phase 3: Live Updates UI (blurred preview overlay)
+  Widget _buildLiveUpdatesUI(PreviewController controller) {
+    return Stack(
+      children: [
+        // Show the webview in background
+        Column(
+          children: [
+            _buildPreviewControls(controller),
+            Expanded(
+              child: InAppWebView(
+                initialSettings: InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  transparentBackground: true,
+                ),
+                pullToRefreshController: controller.pullToRefreshController,
+                onWebViewCreated: (webController) {
+                  controller.onWebViewCreated(webController);
+                },
+              ),
+            ),
+          ],
+        ),
+        // Blurred overlay
+        BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            color: Colors.black.withOpacity(0.6),
+            child: Center(
+              child: Container(
+                padding: EdgeInsets.all(24.r),
+                margin: EdgeInsets.symmetric(horizontal: 32.w),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceDark.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 40.w,
+                      height: 40.w,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.primary),
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'Updating Preview',
+                      style: GoogleFonts.inter(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    Obx(() => Text(
+                          controller.buildStage.value.isNotEmpty
+                              ? controller.buildStage.value
+                              : 'Making changes...',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.sp,
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        )),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPreviewControls(PreviewController controller) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 0.h),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(
-          bottom: BorderSide(color: AppColors.border),
-        ),
+        color: Get.theme.cardTheme.color,
       ),
       child: Row(
         children: [
@@ -162,19 +432,39 @@ class PreviewPanel extends StatelessWidget {
           SizedBox(width: 8.w),
           // URL display
           Expanded(
-            child: Obx(() => Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: AppColors.inputBackground,
-                    borderRadius: BorderRadius.circular(4.r),
-                  ),
-                  child: Text(
-                    controller.deploymentUrl.value ?? '',
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 11.sp,
-                      color: AppColors.textSecondary,
+            child: Obx(() => GestureDetector(
+                  // on click copy and show snackbar
+                  onTap: () {
+                    final url = controller.deploymentUrl.value;
+
+                    if (url != null && url.isNotEmpty) {
+                      Clipboard.setData(ClipboardData(text: url));
+
+                      Get.snackbar(
+                        "Copied to Clipboard",
+                        url,
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: AppColors.primary,
+                        colorText: Colors.white,
+                        margin: EdgeInsets.all(16.r),
+                      );
+                    }
+                  },
+                  child: Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: Get.theme.focusColor,
+                      borderRadius: BorderRadius.circular(4.r),
                     ),
-                    overflow: TextOverflow.ellipsis,
+                    child: Text(
+                      controller.deploymentUrl.value ?? '',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 11.sp,
+                        color: AppColors.textTertiary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 )),
           ),
@@ -280,66 +570,6 @@ class PreviewPanel extends StatelessWidget {
               onPressed: controller.refreshPreview,
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build overlay shown when GitHub Actions is running
-  Widget _buildBuildingOverlay(PreviewController controller) {
-    return Container(
-      color: Colors.black.withOpacity(0.85),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Animated loading indicator
-            SizedBox(
-              width: 10.w,
-              height: 10.w,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor:
-                    const AlwaysStoppedAnimation<Color>(AppColors.primary),
-              ),
-            ),
-            SizedBox(height: 24.h),
-            SizedBox(height: 12.h),
-            // Stage message
-            Obx(() => Text(
-                  controller.buildStage.value.isNotEmpty
-                      ? controller.buildStage.value
-                      : 'Preparing build environment...',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.sp,
-                    color: Colors.white70,
-                  ),
-                  textAlign: TextAlign.center,
-                )),
-            SizedBox(height: 24.h),
-            // Progress bar
-            Obx(() => SizedBox(
-                  width: 200.w,
-                  child: LinearProgressIndicator(
-                    value: controller.buildProgress.value > 0
-                        ? controller.buildProgress.value
-                        : null, // Indeterminate if no progress
-                    backgroundColor: Colors.white24,
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(AppColors.primary),
-                  ),
-                )),
-            SizedBox(height: 32.h),
-            // Info text
-            Text(
-              'Codi is building and deploying your Flutter app.\nThis usually takes 2-3 minutes.',
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                color: Colors.white54,
-              ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),

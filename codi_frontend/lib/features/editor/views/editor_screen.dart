@@ -11,6 +11,7 @@ import 'package:radix_icons/radix_icons.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/sf_font.dart';
+import '../../../shared/controller/ui_controller.dart';
 import '../controllers/branch_controller.dart';
 import '../controllers/commit_panel_controller.dart';
 import '../controllers/editor_controller.dart';
@@ -30,9 +31,12 @@ class EditorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<EditorController>();
     final previewController = Get.find<PreviewController>();
+    final size = MediaQuery.of(Get.context!).size;
+    final ui = Get.find<UIController>();
     return Scaffold(
       backgroundColor: Get.theme.scaffoldBackgroundColor,
       body: SafeArea(
+        bottom: false,
         child: CustomScrollView(
           physics: const NeverScrollableScrollPhysics(),
           slivers: [
@@ -130,91 +134,91 @@ class EditorScreen extends StatelessWidget {
                     Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 24.w,
+                        padding: EdgeInsets.only(
+                          left: 24.w,
+                          right: 24.w,
+                          bottom: 13.h, // account for safe area
                         ),
                         child: Row(
+                          spacing: 5,
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             // Arrow button to toggle chat
                             GestureDetector(
                               onTap: controller.toggleChat,
-                              child: AnimatedSlide(
-                                // webview scroll based animation
-                                duration: const Duration(milliseconds: 100),
-                                offset: previewController.isScrollingDown.value
-                                    ? const Offset(0, 1) // hide
-                                    : const Offset(0, 0), // show
-                                child: Obx(() => AnimatedRotation(
-                                      duration:
-                                          const Duration(milliseconds: 300),
-                                      turns: controller.isChatVisible.value
-                                          ? 0.5
-                                          : 0,
-                                      child: Container(
-                                        padding: EdgeInsets.all(12.w),
-                                        decoration: BoxDecoration(
-                                          color: Get.theme.cardTheme.color,
-                                          borderRadius:
-                                              BorderRadius.circular(18.r),
-                                          border: Border.all(
-                                              color: Colors.grey.shade800,
-                                              width: 2.w),
-                                        ),
-                                        child: Icon(
-                                          Icons.arrow_upward,
-                                          color: Colors.white,
-                                          size: 22.sp,
-                                        ),
+                              child: Obx(() => AnimatedRotation(
+                                    duration: const Duration(milliseconds: 300),
+                                    turns: controller.isChatVisible.value
+                                        ? 0.5
+                                        : 0,
+                                    child: Container(
+                                      padding: EdgeInsets.all(8.w),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Get.theme.scaffoldBackgroundColor,
+                                        borderRadius:
+                                            BorderRadius.circular(1250.r),
+                                        border: Border.all(
+                                            color: Colors.grey.shade800,
+                                            width: 2.w),
                                       ),
-                                    )),
-                              ),
+                                      child: Icon(
+                                        Icons.arrow_upward,
+                                        color: Colors.white,
+                                        size: 22.sp,
+                                      ),
+                                    ),
+                                  )),
                             ),
-                            FlexSwitch.fromEnum<EditorTab>(
-                              style: FlexSwitchStyle(
-                                backgroundColor: Get.theme.cardTheme.color,
-                                thumbColor: Colors.grey.shade800,
-                                activeLabelColor: Colors.white,
-                                inactiveLabelColor: Colors.grey.shade400,
-                                borderRadius: 16,
-                                thumbRadius: 12,
-                                thumbPressScale: 0.95,
-                                padding: 6,
-                                itemPadding: EdgeInsets.symmetric(vertical: 8),
-                                gap: 8,
-                                shadow: [
-                                  BoxShadow(
-                                      blurRadius: 12, color: Colors.black26)
-                                ],
-                                duration: Duration(milliseconds: 150),
-                                curve: Curves.easeInOut,
-                                border: null,
-                                labelTextStyle: null,
-                                iconSize: null,
-                                focusRingWidth: 2,
-                                enableRipple: true,
-                                segmentOverlayColor: null,
-                                splashFactory: null,
-                                enableTrackHoverOverlay: true,
-                                segmentGutter: 6,
-                                layout: FlexSwitchLayout.equal,
+                            Expanded(
+                              child: FlexSwitch.fromEnum<EditorTab>(
+                                style: FlexSwitchStyle(
+                                  backgroundColor: Get.theme.focusColor,
+                                  thumbColor: Get.theme.cardTheme.color,
+                                  activeLabelColor: Colors.white,
+                                  inactiveLabelColor: Colors.grey.shade400,
+                                  borderRadius: ui.topLeft.value,
+                                  thumbRadius: ui.topLeft.value,
+                                  thumbPressScale: 0.95,
+                                  padding: 4.w,
+                                  itemPadding:
+                                      EdgeInsets.symmetric(vertical: 4.w),
+                                  gap: 8,
+                                  shadow: [
+                                    BoxShadow(
+                                        blurRadius: 12, color: Colors.black26)
+                                  ],
+                                  duration: Duration(milliseconds: 150),
+                                  curve: Curves.easeInOut,
+                                  border: null,
+                                  labelTextStyle: null,
+                                  iconSize: null,
+                                  focusRingWidth: 2,
+                                  enableRipple: true,
+                                  segmentOverlayColor: null,
+                                  splashFactory: null,
+                                  enableTrackHoverOverlay: true,
+                                  segmentGutter: 6,
+                                  layout: FlexSwitchLayout.equal,
+                                ),
+                                iconBuilder: (v) => switch (v) {
+                                  EditorTab.preview => RadixIcons.Eye_Open,
+                                  EditorTab.code => RadixIcons.CodeSandbox_Logo,
+                                  EditorTab.browser => RadixIcons.Globe,
+                                },
+                                values: EditorTab.values,
+                                selectedValue: controller.currentTab.value,
+                                onChanged: controller.setTab,
+                                thumbDragOnly: true,
+                                dragCommitBehavior:
+                                    DragCommitBehavior.onRelease,
+                                labelBuilder: (v) => switch (v) {
+                                  EditorTab.preview => 'Preview',
+                                  EditorTab.code => 'Code',
+                                  EditorTab.browser => 'Browser',
+                                },
                               ),
-                              iconBuilder: (v) => switch (v) {
-                                EditorTab.preview => RadixIcons.Eye_Open,
-                                EditorTab.code => RadixIcons.CodeSandbox_Logo,
-                                EditorTab.browser => RadixIcons.Globe,
-                              },
-                              values: EditorTab.values,
-                              selectedValue: controller.currentTab.value,
-                              onChanged: controller.setTab,
-                              thumbDragOnly: true,
-                              dragCommitBehavior: DragCommitBehavior.immediate,
-                              labelBuilder: (v) => switch (v) {
-                                EditorTab.preview => 'Preview',
-                                EditorTab.code => 'Code',
-                                EditorTab.browser => 'Browser',
-                              },
                             ),
                           ],
                         ),
@@ -223,7 +227,7 @@ class EditorScreen extends StatelessWidget {
                   ],
                 );
               }),
-            )
+            ),
           ],
         ),
       ),
@@ -235,10 +239,10 @@ class EditorScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Get.theme.cardTheme.color,
-        border: Border.all(
-          color: Get.theme.dividerColor,
-          width: 1,
-        ),
+        // border: Border.all(
+        //   color: Get.theme.dividerColor,
+        //   width: 1,
+        // ),
         borderRadius: BorderRadius.circular(8.r),
       ),
       child: Padding(
@@ -267,6 +271,7 @@ class EditorScreen extends StatelessWidget {
                       ),
                       Obx(() {
                         if (controller.isAgentWorking.value) {
+                          // Show working indicator
                           return Row(
                             children: [
                               SizedBox(
@@ -289,7 +294,33 @@ class EditorScreen extends StatelessWidget {
                             ],
                           );
                         }
-                        return const SizedBox.shrink();
+                        // Show connection status when not working
+                        return Row(
+                          children: [
+                            Container(
+                              width: 8.r,
+                              height: 8.r,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: controller.isConnected.value
+                                    ? AppColors.success
+                                    : Colors.grey,
+                              ),
+                            ),
+                            SizedBox(width: 6.w),
+                            Text(
+                              controller.isConnected.value
+                                  ? 'Connected'
+                                  : 'Offline',
+                              style: SFPro.regular(
+                                fontSize: 11.sp,
+                                color: controller.isConnected.value
+                                    ? AppColors.success
+                                    : Colors.grey,
+                              ),
+                            ),
+                          ],
+                        );
                       }),
                     ],
                   )),
@@ -411,7 +442,8 @@ class EditorScreen extends StatelessWidget {
         child: Container(
           padding: EdgeInsets.all(8.r),
           decoration: BoxDecoration(
-            border: Border.all(color: Get.theme.dividerColor),
+            // border: Border.all(color: Get.theme.dividerColor),
+            color: Get.theme.focusColor,
             borderRadius: BorderRadius.circular(8.r),
           ),
           child: badge != null

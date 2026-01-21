@@ -38,7 +38,7 @@ class SelectableOptionButton extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
             height: subtitle != null ? 70.h : 50.h,
-            width: 1.sw - 64.w,
+            width: 1.sw,
             decoration: BoxDecoration(
               color: Colors.grey.shade800.withOpacity(0.15),
               border: Border.all(

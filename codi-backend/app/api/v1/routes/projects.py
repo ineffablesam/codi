@@ -210,12 +210,25 @@ async def create_project(
         local_path=str(project_path),
         user_id=current_user.id,
     )
+    
+    # Emit build progress event - template deployed
+    try:
+        from app.api.websocket.connection_manager import connection_manager
+        await connection_manager.send_build_progress(
+            project_id=project.id,
+            stage="template_deployed",
+            message=f"Starter {framework} template created successfully",
+            progress=0.3,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to emit template deployed event: {e}")
 
     # Auto-trigger agent workflow if app_idea is provided
     if getattr(project_data, 'app_idea', None):
         try:
             from app.tasks.celery_app import run_agent_workflow_task
             from app.models.agent_task import AgentTask
+            from app.api.websocket.connection_manager import connection_manager
             
             task_id = f"task_{uuid.uuid4().hex[:12]}"
             
@@ -229,6 +242,14 @@ async def create_project(
             )
             session.add(agent_task)
             await session.commit()
+            
+            # Emit build progress event - AI building started
+            await connection_manager.send_build_progress(
+                project_id=project.id,
+                stage="ai_building",
+                message=f"AI is building your app based on your idea...",
+                progress=0.4,
+            )
             
             # Queue the Celery task
             run_agent_workflow_task.delay(
@@ -247,6 +268,20 @@ async def create_project(
         except Exception as e:
             logger.error(f"Failed to trigger agent workflow: {e}")
             # Don't fail the project creation if agent trigger fails
+    else:
+        # No app idea - emit deployment ready event
+        try:
+            from app.api.websocket.connection_manager import connection_manager
+            await connection_manager.send_deployment_complete(
+                project_id=project.id,
+                status="success",
+                message="Starter project ready",
+                deployment_url=None,
+                build_time="< 1s",
+                size=None,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to emit deployment ready event: {e}")
 
     return _project_to_response(project)
 

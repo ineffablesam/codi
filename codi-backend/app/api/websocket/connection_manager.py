@@ -70,15 +70,15 @@ class ConnectionManager:
         )
 
         # Send welcome message
-        await self.send_personal_message(
-            websocket,
-            {
-                "type": "connection_established",
-                "message": "Connected to project updates",
-                "project_id": project_id,
-                "timestamp": datetime.utcnow().isoformat(),
-            },
-        )
+        # await self.send_personal_message(
+        #     websocket,
+        #     {
+        #         "type": "connection_established",
+        #         "message": "Connected to project updates",
+        #         "project_id": project_id,
+        #         "timestamp": datetime.utcnow().isoformat(),
+        #     },
+        # )
 
     async def disconnect(self, websocket: WebSocket) -> None:
         """Remove a WebSocket connection.

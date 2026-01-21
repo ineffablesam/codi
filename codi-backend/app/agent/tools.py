@@ -531,6 +531,10 @@ def git_commit(message: str, context: AgentContext) -> str:
         return f"Error committing changes: {e}"
 
 
+# Track which projects have completed initial deploy to prevent duplicates
+_initial_deploy_completed: Dict[int, bool] = {}
+
+
 async def initial_deploy(context: AgentContext) -> str:
     """Run initial Docker deployment for a new project.
     
@@ -544,12 +548,21 @@ async def initial_deploy(context: AgentContext) -> str:
     from app.utils.logging import get_logger
     logger = get_logger(__name__)
     
+    # Guard against duplicate initial deploys
+    if _initial_deploy_completed.get(context.project_id):
+        logger.info(f"Initial deploy already completed for project {context.project_id}, skipping")
+        return "Initial deployment already completed for this project. Use docker_preview for subsequent builds."
+    
     # NOTE: We do NOT run npm install on the host!
     # Docker's `npm ci` handles dependencies inside the container.
     # This prevents double dependency installation and enables caching.
     
     # Build and deploy Docker container (no nocache - let caching work)
     deploy_result = await docker_preview(context, rebuild=False)
+    
+    # Mark as completed to prevent future duplicate deploys
+    _initial_deploy_completed[context.project_id] = True
+    logger.info(f"Initial deploy completed for project {context.project_id}")
     
     return deploy_result
 
@@ -638,6 +651,74 @@ Please check the logs or wait a moment before trying again."""
         
         preview_url = f"http://{context.project_slug}.{domain}"
         
+        # Save deployment and container to database for logs/tracking
+        from app.core.database import get_db_context
+        from app.models.project import Project
+        from app.models.deployment import Deployment, DeploymentStatus
+        from app.models.container import Container, ContainerStatus
+        from sqlalchemy import update, select
+        import uuid
+        
+        async with get_db_context() as session:
+            # Archive any existing deployment with same subdomain
+            existing_deployment_result = await session.execute(
+                select(Deployment).where(Deployment.subdomain == context.project_slug)
+            )
+            existing_deployment = existing_deployment_result.scalar_one_or_none()
+            
+            if existing_deployment:
+                timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+                existing_deployment.subdomain = f"archived-{timestamp}-{existing_deployment.subdomain}"
+                existing_deployment.status = DeploymentStatus.INACTIVE
+                session.add(existing_deployment)
+                await session.flush()
+            
+            # Create deployment record
+            deployment_id = str(uuid.uuid4())
+            deployment = Deployment(
+                id=deployment_id,
+                project_id=context.project_id,
+                container_id=container_info.id,
+                subdomain=context.project_slug,
+                url=preview_url,
+                status=DeploymentStatus.ACTIVE,
+                framework=framework,
+                git_branch=context.current_branch,
+                is_preview=False,
+                is_production=True,
+                deployed_at=datetime.utcnow(),
+            )
+            session.add(deployment)
+            
+            # Create container record
+            container = Container(
+                id=container_info.id,
+                project_id=context.project_id,
+                name=container_name,
+                image=image_tag.split(":")[0],
+                image_tag=image_tag.split(":")[-1] if ":" in image_tag else "latest",
+                status=ContainerStatus.RUNNING,
+                git_branch=context.current_branch,
+                port=target_port,
+                is_preview=False,
+                started_at=datetime.utcnow(),
+            )
+            session.add(container)
+            
+            # Update project with deployment info
+            await session.execute(
+                update(Project)
+                .where(Project.id == context.project_id)
+                .values(
+                    deployment_url=preview_url,
+                    last_deployment_at=datetime.utcnow(),
+                    last_build_status="success",
+                    updated_at=datetime.utcnow(),
+                )
+            )
+            
+            await session.commit()
+        
         # Broadcast deployment success for frontend refresh
         from app.api.websocket.connection_manager import connection_manager
         await connection_manager.broadcast_to_project(
@@ -650,22 +731,46 @@ Please check the logs or wait a moment before trying again."""
             }
         )
         
-        # Update project in database with deployment URL
-        from app.core.database import get_db_context
-        from app.models.project import Project
-        from sqlalchemy import update
-        
-        async with get_db_context() as session:
-            await session.execute(
-                update(Project)
-                .where(Project.id == context.project_id)
-                .values(
-                    deployment_url=preview_url,
-                    last_build_status="success",
-                    updated_at=datetime.utcnow()
-                )
+        # Broadcast LLM-generated deployment summary
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            from langchain_core.messages import HumanMessage
+            from app.core.config import settings
+            
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-2.0-flash",
+                google_api_key=settings.gemini_api_key,
+                temperature=0.7,
             )
-            await session.commit()
+            
+            summary_prompt = """Generate a brief deployment success message. Mention:
+- The preview is ready and live
+- Be celebratory but professional
+- Under 2 sentences
+- No emojis
+- No technical details"""
+            
+            response = await llm.ainvoke([HumanMessage(content=summary_prompt)])
+            summary = response.content.strip().strip('"').strip("'") if isinstance(response.content, str) else "Deployment complete! Your preview is ready."
+            
+            await connection_manager.broadcast_to_project(
+                context.project_id,
+                {
+                    "type": "agent_response",
+                    "message": summary,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
+        except Exception as e:
+            # Fallback - still broadcast a message even if LLM fails
+            await connection_manager.broadcast_to_project(
+                context.project_id,
+                {
+                    "type": "agent_response", 
+                    "message": "Deployment complete! Your preview is now live.",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
             
         return f"""Preview deployed successfully!
 

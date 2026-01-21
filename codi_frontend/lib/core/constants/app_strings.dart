@@ -42,8 +42,8 @@ class AppStrings {
   static const String agentActivity = 'Agent Activity';
   static const String typeMessage = 'Type your message...';
   static const String send = 'Send';
-  static const String noPreview = 'No preview yet';
-  static const String noPreviewSubtitle = 'Build your project to see preview';
+  static const String noPreview = 'Setting up your project';
+  static const String noPreviewSubtitle = 'Preparing your development environment...';
   static const String loadingPreview = 'Loading preview...';
   static const String refresh = 'Refresh';
   static const String openInBrowser = 'Open in browser';

@@ -1,9 +1,9 @@
 /// Project creation wizard controller
 library;
 
-import 'dart:ui';
-
+import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../services/backend_connection_service.dart';
@@ -13,8 +13,12 @@ enum WizardStep { framework, backend, deployment, details }
 
 /// Project creation wizard controller
 class ProjectWizardController extends GetxController {
+  // Form Key
+  final formKey = GlobalKey<FormState>();
+
   // Current step
   final currentStep = WizardStep.framework.obs;
+  final lastStep = WizardStep.framework.obs;
 
   // Selections
   final selectedFramework = 'flutter'.obs;
@@ -25,7 +29,7 @@ class ProjectWizardController extends GetxController {
   final projectName = ''.obs;
   final projectDescription = ''.obs;
   final isPrivate = false.obs;
-  final appIdea = ''.obs; 
+  final appIdea = ''.obs;
 
   // Serverpod manual config
   final serverpodServerUrl = ''.obs;
@@ -34,38 +38,64 @@ class ProjectWizardController extends GetxController {
   // Animation state
   final isAnimating = false.obs;
 
+  // Text editing controllers
+  late final TextEditingController nameController;
+  late final TextEditingController descriptionController;
+  late final TextEditingController appIdeaController;
+
+  @override
+  void onInit() {
+    super.onInit();
+    nameController = TextEditingController();
+    descriptionController = TextEditingController();
+    appIdeaController = TextEditingController();
+
+    // Listen to changes and update observable values
+    nameController.addListener(() => projectName.value = nameController.text);
+    descriptionController.addListener(() => projectDescription.value = descriptionController.text);
+    appIdeaController.addListener(() => appIdea.value = appIdeaController.text);
+  }
+
+  @override
+  void onClose() {
+    nameController.dispose();
+    descriptionController.dispose();
+    appIdeaController.dispose();
+    super.onClose();
+  }
+
   /// Framework options
   static const List<FrameworkOption> frameworks = [
     FrameworkOption(
       id: 'flutter',
       name: 'Flutter',
       description: 'Cross-platform mobile & web apps',
-      icon: '📱',
-      gradient: ['#02569B', '#0175C2'],
+      icon: LucideIcons.tabletSmartphone,
+      gradient: [Color(0xFF02569B), Color(0xFF0175C2)],
       platforms: ['iOS', 'Android', 'Web'],
     ),
     FrameworkOption(
       id: 'react',
       name: 'React',
       description: 'Modern web applications',
-      icon: '⚛️',
-      gradient: ['#20232A', '#61DAFB'],
+      icon: LucideIcons.code,
+      gradient: [Color(0xFF61DAFB), Color(0xFF20232A)],
       platforms: ['Web'],
     ),
     FrameworkOption(
       id: 'nextjs',
       name: 'Next.js',
       description: 'Full-stack React framework',
-      icon: '▲',
-      gradient: ['#000000', '#333333'],
+      icon: LucideIcons.hexagon,
+      gradient: [Color(0xFF61DAFB), Color(0xFF282C34)],
       platforms: ['Web', 'API'],
     ),
     FrameworkOption(
       id: 'react_native',
       name: 'React Native',
       description: 'Native mobile apps with React',
-      icon: '📲',
-      gradient: ['#282C34', '#61DAFB'],
+      icon: LucideIcons.smartphone,
+      gradient: [Color(0xFF61DAFB), Color(0xFF282C34)],
       platforms: ['iOS', 'Android'],
     ),
   ];
@@ -76,24 +106,24 @@ class ProjectWizardController extends GetxController {
       id: 'supabase',
       name: 'Supabase',
       description: 'Open source Firebase alternative',
-      icon: '⚡',
-      gradient: ['#3ECF8E', '#1C7C54'],
+      icon: LucideIcons.database,
+      gradient: [Color(0xFF3ECF8E), Color(0xFF1C7C54)],
       features: ['Auth', 'Database', 'Storage', 'Realtime'],
     ),
     BackendOption(
       id: 'firebase',
       name: 'Firebase',
       description: 'Google\'s app platform',
-      icon: '🔥',
-      gradient: ['#FFCA28', '#F57C00'],
+      icon: LucideIcons.flame,
+      gradient: [Color(0xFFFFCA28), Color(0xFFF57C00)],
       features: ['Auth', 'Firestore', 'Storage', 'Analytics'],
     ),
     BackendOption(
       id: 'serverpod',
       name: 'Serverpod',
       description: 'Dart backend for Flutter',
-      icon: '🎯',
-      gradient: ['#0175C2', '#02569B'],
+      icon: LucideIcons.server,
+      gradient: [Color(0xFF0175C2), Color(0xFF02569B)],
       features: ['Type-safe API', 'ORM', 'Caching', 'Auth'],
     ),
   ];
@@ -104,24 +134,24 @@ class ProjectWizardController extends GetxController {
       id: 'github_pages',
       name: 'GitHub Pages',
       description: 'Free static site hosting',
-      icon: '🐙',
-      gradient: ['#24292E', '#586069'],
+      icon: LucideIcons.github,
+      gradient: [Color(0xFFFFFFFF), Color(0xFF9CA3AF)],
       features: ['Free', 'HTTPS', 'Custom domain'],
     ),
     DeploymentOption(
       id: 'vercel',
       name: 'Vercel',
       description: 'Edge-first deployment',
-      icon: '▲',
-      gradient: ['#000000', '#333333'],
+      icon: LucideIcons.triangle,
+      gradient: [Color(0xFFFFFFFF), Color(0xFF6B7280)],
       features: ['Edge functions', 'Preview deploys', 'Analytics'],
     ),
     DeploymentOption(
       id: 'netlify',
       name: 'Netlify',
       description: 'Modern web hosting',
-      icon: '⚡',
-      gradient: ['#00C7B7', '#008C82'],
+      icon: LucideIcons.cloud,
+      gradient: [Color(0xFF00C7B7), Color(0xFF008C82)],
       features: ['Forms', 'Functions', 'Identity'],
     ),
   ];
@@ -244,6 +274,8 @@ class ProjectWizardController extends GetxController {
     isAnimating.value = true;
     await Future.delayed(const Duration(milliseconds: 150));
 
+    lastStep.value = currentStep.value;
+
     switch (currentStep.value) {
       case WizardStep.framework:
         currentStep.value = WizardStep.backend;
@@ -268,6 +300,8 @@ class ProjectWizardController extends GetxController {
 
     isAnimating.value = true;
     await Future.delayed(const Duration(milliseconds: 150));
+
+    lastStep.value = currentStep.value;
 
     switch (currentStep.value) {
       case WizardStep.framework:
@@ -310,8 +344,8 @@ class FrameworkOption {
   final String id;
   final String name;
   final String description;
-  final String icon;
-  final List<String> gradient;
+  final IconData icon;
+  final List<Color> gradient;
   final List<String> platforms;
 
   const FrameworkOption({
@@ -329,8 +363,8 @@ class BackendOption {
   final String id;
   final String name;
   final String description;
-  final String icon;
-  final List<String> gradient;
+  final IconData icon;
+  final List<Color> gradient;
   final List<String> features;
 
   const BackendOption({
@@ -348,8 +382,8 @@ class DeploymentOption {
   final String id;
   final String name;
   final String description;
-  final String icon;
-  final List<String> gradient;
+  final IconData icon;
+  final List<Color> gradient;
   final List<String> features;
 
   const DeploymentOption({

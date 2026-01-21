@@ -237,6 +237,10 @@ class OnboardingFormWidget extends StatelessWidget {
           ),
           child: Theme(
             data: Theme.of(Get.context!).copyWith(
+              splashFactory:
+                  NoSplash.splashFactory, // This removes splash completely
+              highlightColor: Colors.transparent,
+              splashColor: Colors.transparent,
               inputDecorationTheme: const InputDecorationTheme(
                 errorBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -248,8 +252,30 @@ class OnboardingFormWidget extends StatelessWidget {
             ),
             child: CustomDropdown<String>(
               hideSelectedFieldWhenExpanded: true,
+              // The headerBuilder that will be used to build CustomDropdown header field.
+              listItemBuilder:
+                  (selectedItemBuilder, title, isSelected, defaultHeader) {
+                return Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4.w),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      title,
+                      style: SFPro.font(
+                        color: Colors.white,
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                );
+              },
               decoration: CustomDropdownDecoration(
                 listItemStyle: SFPro.font(),
+                listItemDecoration: ListItemDecoration(
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.grey.shade800,
+                ),
                 hintStyle: SFPro.font(color: Colors.grey.shade300),
                 headerStyle: SFPro.font(color: Colors.grey.shade300),
                 closedFillColor: Colors.transparent,
@@ -258,6 +284,7 @@ class OnboardingFormWidget extends StatelessWidget {
                   color: Colors.grey.shade300,
                   size: 28.r,
                 ),
+                expandedFillColor: Get.theme.scaffoldBackgroundColor,
               ),
               hintText: 'Select an option',
               items: options,

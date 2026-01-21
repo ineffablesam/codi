@@ -45,18 +45,34 @@ You have access to these tools:
 - run_python: Execute Python code in a sandbox (for testing/calculations)
 - run_bash: Execute shell commands (for builds, tests, git operations)
 - git_commit: Commit changes to the local Git repository
-- docker_preview: Build and deploy a preview container
-- initial_deploy: Run initial npm install and Docker build (CRITICAL for new projects)
+- docker_preview: Build and deploy a preview container (USE THIS FOR ALL UPDATES)
+- initial_deploy: ONLY for brand new projects that have never been deployed
+
+## CRITICAL DEPLOYMENT RULES
+
+1. **initial_deploy** = ONLY use when the project has NEVER been deployed before (right after template creation)
+2. **docker_preview** = Use for ALL subsequent deployments after code changes
+3. **NEVER call initial_deploy multiple times** - it will be rejected after the first call
+4. **Complete ALL code changes FIRST** - verify everything works, then deploy ONCE at the end
 
 ## How to Work
 
-1. **Start right**: If this is a new project or you just pushed a starter template, YOU MUST run `initial_deploy` FIRST. This installs dependencies and verify the build.
+1. **FIRST - Check if deployed**: If this is a new project that needs first-time setup, call `initial_deploy` ONCE.
 2. **Explore first**: Use list_files and search_files to understand the codebase.
-2. **Read before writing**: Always read a file before modifying it. Use the line numbers provided to reference specific sections.
-3. **Surgical edits are MANDATORY**: Use `edit_file` for all modifications to existing files. DO NOT rewrite entire files with `write_file` unless you are creating a new file or the change is so extensive that `edit_file` is impractical (more than 80% of the file changing). Rewriting entire files for minor changes is a waste of resources and makes reviewing difficult.
-4. **Test your changes**: Use run_bash to run tests or build commands.
-5. **Commit your work**: Use git_commit to save your progress after meaningful changes.
-6. **Always verify with a preview**: Before finishing, you MUST call docker_preview to ensure your changes are deployed and visible to the user at their preview URL. This is mandatory for any UI or application logic changes.
+3. **Read before writing**: Always read a file before modifying it.
+4. **Make ALL changes**: Complete every task in the plan before deploying.
+5. **Surgical edits are MANDATORY**: Use `edit_file` for modifications. DO NOT rewrite entire files.
+6. **Test your changes**: Use run_bash to run tests or build commands.
+7. **Commit your work**: Use git_commit to save your progress.
+8. **DEPLOY ONCE AT THE END**: After ALL changes are complete and verified, call `docker_preview` exactly ONCE.
+
+## Strict Workflow Order
+
+1. Read/explore files
+2. Make code changes (write_file, edit_file)
+3. Test changes (run_bash)
+4. Commit changes (git_commit)
+5. Deploy ONCE (docker_preview) - DO NOT deploy after each file change!
 
 ## Best Practices
 
@@ -272,8 +288,8 @@ class CodingAgent:
                     path = tool_input.get("path", ".")
                     display_message = f"Listing files in {path}"
                 elif tool_name == "search_files":
-                    query = tool_input.get("query", "")
-                    display_message = f"Searching for '{query}'"
+                    pattern = tool_input.get("pattern", "")
+                    display_message = f"Searching for '{pattern}'"
                 elif tool_name == "run_bash":
                     command = tool_input.get("command", "")
                     display_message = f"Running command: {command[:50]}..."
@@ -316,6 +332,61 @@ class CodingAgent:
             )
         except Exception as e:
             logger.warning(f"Failed to broadcast tool result: {e}")
+    
+    async def _generate_status_message(self, context_type: str, context: str = "") -> str:
+        """Generate a brief, professional status message via LLM.
+        
+        Args:
+            context_type: Type of status (e.g., 'planning', 'approved', 'deployment')
+            context: Additional context about what's happening
+            
+        Returns:
+            A short, user-friendly status message
+        """
+        try:
+            prompts = {
+                "planning": "Generate a brief message telling the user you're analyzing their request and creating a development plan. Be confident and reassuring.",
+                "approved": "Generate a brief message confirming the plan was approved and you're starting implementation. Be enthusiastic but professional.",
+                "deployment": "Generate a brief message after successful deployment, mentioning the preview is ready. Be celebratory but brief.",
+                "building": "Generate a brief message that you're building the application. Be reassuring about the process.",
+            }
+            
+            base_prompt = prompts.get(context_type, f"Generate a brief status message for: {context_type}")
+            
+            full_prompt = f"""{base_prompt}
+
+Context: {context if context else 'Standard development workflow'}
+
+Rules:
+- Keep it under 2 sentences
+- Be specific about what you're doing
+- Never use emojis
+- Professional but friendly tone
+- No technical jargon"""
+
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-2.0-flash",
+                google_api_key=settings.gemini_api_key,
+                temperature=0.7,
+            )
+            
+            response = await llm.ainvoke([HumanMessage(content=full_prompt)])
+            message = response.content if isinstance(response.content, str) else str(response.content)
+            
+            # Clean up the message
+            message = message.strip().strip('"').strip("'")
+            return message
+            
+        except Exception as e:
+            logger.warning(f"Failed to generate status message: {e}")
+            # Fallback to simple messages
+            fallbacks = {
+                "planning": "Analyzing your request and creating a development plan...",
+                "approved": "Plan approved! Starting implementation...",
+                "deployment": "Deployment complete! Your preview is ready.",
+                "building": "Building your application...",
+            }
+            return fallbacks.get(context_type, "Processing...")
     
     def _extract_tool_calls(self, response: AIMessage) -> List[Dict[str, Any]]:
         """Extract tool calls from AI response.
@@ -360,7 +431,8 @@ class CodingAgent:
             The generated plan markdown, or None if planning failed
         """
         logger.info("Starting planning phase")
-        await self._broadcast_status("planning", "Analyzing your request and creating a plan...")
+        planning_message = await self._generate_status_message("planning", user_message[:100])
+        await self._broadcast_status("planning", planning_message)
         
         # Read-only tools for planning
         planning_tools = [t for t in TOOLS if t["name"] in ["read_file", "list_files", "search_files"]]
@@ -763,7 +835,9 @@ Generate a brief walkthrough of what was accomplished."""
             HumanMessage(content=user_message),
         ]
         
-        await self._broadcast_status("started", "Processing your request...")
+        # Only broadcast started status if skipping planning (otherwise planning phase handles it)
+        if self.skip_planning:
+            await self._broadcast_status("started", "Processing your request...")
         
         # =====================================================================
         # PLANNING PHASE: Create implementation plan and wait for approval
@@ -809,11 +883,12 @@ Generate a brief walkthrough of what was accomplished."""
                                 "timestamp": datetime.utcnow().isoformat(),
                             },
                         )
-                        await self._broadcast_status("completed", "Plan was declined.")
+
                         return rejection_response
                     
                     # User approved - continue to execution
-                    await self._broadcast_status("executing", "Plan approved! Starting implementation...")
+                    approved_message = await self._generate_status_message("approved")
+                    await self._broadcast_status("executing", approved_message)
                 else:
                     logger.warning("Failed to create plan in database, proceeding with execution")
             else:
@@ -920,8 +995,7 @@ Generate a brief walkthrough of what was accomplished."""
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )
-        
-        await self._broadcast_status("completed", "Task completed!")
+
         
         return final_response
     

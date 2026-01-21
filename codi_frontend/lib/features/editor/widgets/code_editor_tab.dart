@@ -7,6 +7,8 @@ import 'package:flutter_highlight/themes/vs2015.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:resizable_splitter/resizable_splitter.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../controllers/code_editor_controller.dart';
@@ -20,70 +22,25 @@ class CodeEditorTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-
-    if (isLandscape) {
-      return _buildLandscapeLayout();
-    }
-    return _buildPortraitLayout();
-  }
-
-  Widget _buildPortraitLayout() {
-    return Column(
-      children: [
-        // File tree header
-        _buildFileTreeHeader(),
-        // Content area
-        Expanded(
-          child: Column(
-            children: [
-              // Collapsible file tree
-              const _FileTreePanel(),
-              const Divider(height: 1),
-              // Code editor
-              const Expanded(child: _CodeEditorPanel()),
-            ],
-          ),
-        ),
-        // Commit panel (always at bottom)
-        const _CommitPanel(),
-      ],
+    return ResizableSplitter(
+      axis: Axis.vertical,
+      // minStartPanelSize: 120,
+      // minEndPanelSize: 160,
+      minRatio: 0.2,
+      maxRatio: 0.8,
+      dividerThickness: 8,
+      startPanel: const _FileTreePanel(isCollapsible: false),
+      endPanel: const _CodeEditorPanel(),
+      // onRatioChanged: (ratio) => debugPrint('ratio: $ratio'),
     );
   }
+}
 
-  Widget _buildLandscapeLayout() {
-    return Row(
-      children: [
-        // File tree sidebar (persistent in landscape)
-        SizedBox(
-          width: 250.w,
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border(right: BorderSide(color: AppColors.border)),
-            ),
-            child: Column(
-              children: [
-                _buildFileTreeHeader(),
-                const Expanded(child: _FileTreePanel(isCollapsible: false)),
-              ],
-            ),
-          ),
-        ),
-        // Code editor and commit panel
-        Expanded(
-          child: Column(
-            children: [
-              const Expanded(child: _CodeEditorPanel()),
-              const _CommitPanel(),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+class BuildFileTree extends StatelessWidget {
+  const BuildFileTree({super.key});
 
-  Widget _buildFileTreeHeader() {
+  @override
+  Widget build(BuildContext context) {
     final controller = Get.find<FileTreeController>();
 
     return Container(
@@ -94,7 +51,7 @@ class CodeEditorTab extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.folder_outlined,
+          Icon(LucideIcons.folder,
               size: 20.r, color: Get.textTheme.bodyMedium?.color),
           SizedBox(width: 8.w),
           Text(
@@ -113,7 +70,7 @@ class CodeEditorTab extends StatelessWidget {
                   child: const CircularProgressIndicator(strokeWidth: 2),
                 )
               : IconButton(
-                  icon: Icon(Icons.refresh, size: 20.r),
+                  icon: Icon(LucideIcons.refreshCw, size: 20.r),
                   onPressed: controller.refreshFileTree,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -121,7 +78,7 @@ class CodeEditorTab extends StatelessWidget {
                 )),
           SizedBox(width: 8.w),
           PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert,
+            icon: Icon(LucideIcons.ellipsisVertical,
                 size: 20.r, color: Get.textTheme.bodyMedium?.color),
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'expand', child: Text('Expand All')),
@@ -148,64 +105,49 @@ class CodeEditorTab extends StatelessWidget {
 /// Collapsible file tree panel
 class _FileTreePanel extends StatelessWidget {
   final bool isCollapsible;
-
   const _FileTreePanel({this.isCollapsible = true});
 
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<FileTreeController>();
 
-    return Obx(() {
-      if (controller.isLoading.value) {
-        return SizedBox(
-          height: isCollapsible ? 150.h : null,
-          child: const Center(child: CircularProgressIndicator()),
-        );
-      }
+    return Column(
+      children: [
+        // Fixed header
+        const BuildFileTree(),
 
-      if (controller.fileTree.isEmpty) {
-        return SizedBox(
-          height: isCollapsible ? 100.h : null,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.folder_open,
-                    size: 40.r, color: Get.textTheme.bodyMedium?.color),
-                SizedBox(height: 8.h),
-                Text(
-                  'No files found',
-                  style: GoogleFonts.inter(
-                    fontSize: 13.sp,
-                    color: AppColors.textSecondary,
-                  ),
+        // Scrollable area that RESIZES correctly
+        Expanded(
+          child: Obx(() {
+            if (controller.isLoading.value) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (controller.fileTree.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.folderOpen, size: 40),
+                    const SizedBox(height: 8),
+                    const Text('No files found'),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        );
-      }
+              );
+            }
 
-      final tree = controller.filteredTree;
+            final tree = controller.filteredTree;
 
-      if (isCollapsible) {
-        return SizedBox(
-          height: 200.h,
-          child: ListView(
-            padding: EdgeInsets.symmetric(vertical: 8.h),
-            children: tree
-                .map((node) => _FileTreeNode(node: node, depth: 0))
-                .toList(),
-          ),
-        );
-      }
-
-      return ListView(
-        padding: EdgeInsets.symmetric(vertical: 8.h),
-        children:
-            tree.map((node) => _FileTreeNode(node: node, depth: 0)).toList(),
-      );
-    });
+            return ListView(
+              padding: EdgeInsets.symmetric(vertical: 8.h),
+              children: tree
+                  .map((node) => _FileTreeNode(node: node, depth: 0))
+                  .toList(),
+            );
+          }),
+        ),
+      ],
+    );
   }
 }
 
@@ -238,20 +180,34 @@ class _FileTreeNode extends StatelessWidget {
                   : Colors.transparent,
               child: Row(
                 children: [
-                  if (node.isDirectory)
-                    Icon(
-                      node.isExpanded.value
-                          ? Icons.keyboard_arrow_down
-                          : Icons.keyboard_arrow_right,
-                      size: 16.r,
-                      color: Get.textTheme.bodyMedium?.color,
-                    ),
-                  if (node.isFile) SizedBox(width: 16.w),
-                  Text(
-                    node.icon,
-                    style: TextStyle(fontSize: 14.sp),
+                  // expand / collapse arrow
+                  SizedBox(
+                    width: 20.w,
+                    child: node.isDirectory
+                        ? Icon(
+                            node.isExpanded.value
+                                ? LucideIcons.chevronDown
+                                : LucideIcons.chevronRight,
+                            size: 18.r,
+                            color: Get.textTheme.bodyMedium?.color
+                                ?.withOpacity(0.7),
+                          )
+                        : null,
                   ),
+
+                  // file/folder icon with proper Material icons
+                  SizedBox(
+                    width: 24.w,
+                    child: Icon(
+                      _getFileIcon(node),
+                      size: 16.r,
+                      color: _getFileIconColor(node),
+                    ),
+                  ),
+
                   SizedBox(width: 8.w),
+
+                  // ✅ THIS IS THE MOST IMPORTANT CHANGE
                   Expanded(
                     child: Text(
                       node.name,
@@ -265,12 +221,16 @@ class _FileTreeNode extends StatelessWidget {
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      softWrap: false,
                     ),
                   ),
+
+                  // modified dot
                   if (node.modified)
                     Container(
                       width: 6.r,
                       height: 6.r,
+                      margin: EdgeInsets.only(left: 6.w),
                       decoration: BoxDecoration(
                         color: AppColors.warning,
                         shape: BoxShape.circle,
@@ -286,6 +246,102 @@ class _FileTreeNode extends StatelessWidget {
         ],
       );
     });
+  }
+
+  /// Get appropriate icon based on file type
+  IconData _getFileIcon(FileNode node) {
+    if (node.isDirectory) {
+      return node.isExpanded.value
+          ? LucideIcons.folderOpen
+          : LucideIcons.folder;
+    }
+
+    final extension = node.name.split('.').last.toLowerCase();
+    switch (extension) {
+      case 'dart':
+        return LucideIcons.code;
+      case 'py':
+        return LucideIcons.code;
+      case 'js':
+      case 'ts':
+      case 'jsx':
+      case 'tsx':
+        return LucideIcons.fileCode;
+      case 'html':
+        return LucideIcons.fileCode;
+      case 'css':
+      case 'scss':
+      case 'sass':
+        return LucideIcons.palette;
+      case 'json':
+        return LucideIcons.braces;
+      case 'yaml':
+      case 'yml':
+        return LucideIcons.settings;
+      case 'md':
+        return LucideIcons.fileText;
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'gif':
+      case 'svg':
+        return LucideIcons.image;
+      case 'pdf':
+        return LucideIcons.file;
+      case 'zip':
+      case 'tar':
+      case 'gz':
+        return LucideIcons.archive;
+      case 'sh':
+        return LucideIcons.terminal;
+      case 'lock':
+        return LucideIcons.lock;
+      default:
+        return LucideIcons.file;
+    }
+  }
+
+  /// Get color for file icon based on type
+  Color _getFileIconColor(FileNode node) {
+    if (node.isDirectory) {
+      return AppColors.primary;
+    }
+
+    final extension = node.name.split('.').last.toLowerCase();
+    switch (extension) {
+      case 'dart':
+        return const Color(0xFF0175C2); // Dart blue
+      case 'py':
+        return const Color(0xFF3776AB); // Python blue
+      case 'js':
+      case 'ts':
+      case 'jsx':
+      case 'tsx':
+        return const Color(0xFFF7DF1E); // JavaScript yellow
+      case 'html':
+        return const Color(0xFFE34C26); // HTML orange
+      case 'css':
+      case 'scss':
+      case 'sass':
+        return const Color(0xFF264DE4); // CSS blue
+      case 'json':
+        return const Color(0xFF00D084); // JSON green
+      case 'yaml':
+      case 'yml':
+        return const Color(0xFFCB171E); // YAML red
+      case 'md':
+        return Get.textTheme.bodyMedium?.color ?? Colors.grey;
+      case 'png':
+      case 'jpg':
+      case 'jpeg':
+      case 'gif':
+      case 'svg':
+        return const Color(0xFF9C27B0); // Purple for images
+      case 'sh':
+        return const Color(0xFF4EAA25); // Green for shell
+      default:
+        return Get.textTheme.bodyMedium?.color?.withOpacity(0.6) ?? Colors.grey;
+    }
   }
 }
 
@@ -303,7 +359,8 @@ class _CodeEditorPanel extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.code, size: 64.r, color: AppColors.textSecondary),
+              Icon(LucideIcons.code,
+                  size: 64.r, color: AppColors.textSecondary),
               SizedBox(height: 16.h),
               Text(
                 'Select a file to edit',
@@ -368,7 +425,8 @@ class _CodeEditorPanel extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.description, size: 16.r, color: Get.textTheme.bodyMedium?.color),
+          Icon(LucideIcons.file,
+              size: 16.r, color: Get.textTheme.bodyMedium?.color),
           SizedBox(width: 8.w),
           Expanded(
             child: Obx(() => Text(
@@ -413,7 +471,7 @@ class _CodeEditorPanel extends StatelessWidget {
                           valueColor: AlwaysStoppedAnimation(Colors.white),
                         ),
                       )
-                    : Icon(Icons.save, size: 16.r),
+                    : Icon(LucideIcons.save, size: 16.r),
                 label: Text(
                   controller.isSaving.value ? 'Saving...' : 'Save',
                   style: GoogleFonts.inter(fontSize: 12.sp),
@@ -457,7 +515,8 @@ class _CommitPanel extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                 child: Row(
                   children: [
-                    Icon(Icons.commit, size: 20.r, color: AppColors.primary),
+                    Icon(LucideIcons.gitCommitHorizontal,
+                        size: 20.r, color: AppColors.primary),
                     SizedBox(width: 8.w),
                     Text(
                       'Commit Changes',
@@ -489,8 +548,8 @@ class _CommitPanel extends StatelessWidget {
                     const Spacer(),
                     Icon(
                       isExpanded
-                          ? Icons.keyboard_arrow_down
-                          : Icons.keyboard_arrow_up,
+                          ? LucideIcons.chevronDown
+                          : LucideIcons.chevronUp,
                       size: 20.r,
                       color: Get.textTheme.bodyMedium?.color,
                     ),
@@ -595,7 +654,7 @@ class _CommitPanel extends StatelessWidget {
                                     AlwaysStoppedAnimation(Colors.white),
                               ),
                             )
-                          : Icon(Icons.check, size: 18.r),
+                          : Icon(LucideIcons.check, size: 18.r),
                       label: Text(
                         controller.isCommitting.value
                             ? 'Committing...'

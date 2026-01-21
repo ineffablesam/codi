@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db_session
 from app.models.user import User
-from app.schemas.user import TokenResponse, UserResponse
+from app.schemas.user import OnboardingUpdate, TokenResponse, UserResponse
 from app.services.domain.encryption import encryption_service
 from app.services.external.github import GitHubService
 from app.utils.logging import get_logger
@@ -196,7 +196,7 @@ async def get_current_user_info(
 
 @router.patch("/me/onboarding", response_model=UserResponse)
 async def complete_onboarding(
-    onboarding_data: "OnboardingUpdate",
+    onboarding_data: OnboardingUpdate,
     session: AsyncSession = Depends(get_db_session),
     credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
 ) -> UserResponse:
@@ -209,7 +209,6 @@ async def complete_onboarding(
         Updated user information
     """
     from app.api.v1.deps import get_current_user
-    from app.schemas.user import OnboardingUpdate
 
     user = await get_current_user(credentials, session)
 

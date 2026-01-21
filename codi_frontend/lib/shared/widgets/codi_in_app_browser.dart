@@ -14,7 +14,8 @@ class CodiInAppBrowser extends StatefulWidget {
   final String url;
   final String title;
   final bool showProgress;
-  final String? successUrlPattern; // URL pattern that indicates success (for OAuth)
+  final String?
+      successUrlPattern; // URL pattern that indicates success (for OAuth)
   final void Function(String url)? onSuccess;
   final void Function(String? errorCode)? onError;
 
@@ -57,7 +58,7 @@ class CodiInAppBrowser extends StatefulWidget {
     String title = 'Connect Account',
   }) async {
     String? resultCode;
-    
+
     await Get.to(
       () => CodiInAppBrowser(
         url: authUrl,
@@ -75,7 +76,7 @@ class CodiInAppBrowser extends StatefulWidget {
       ),
       transition: Transition.rightToLeft,
     );
-    
+
     return resultCode;
   }
 
@@ -121,7 +122,8 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
             LinearProgressIndicator(
               value: _progress,
               backgroundColor: AppColors.border.withOpacity(0.2),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(AppColors.primary),
               minHeight: 3.h,
             ),
           // WebView
@@ -141,13 +143,13 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
               onLoadStart: (controller, url) {
                 print('DEBUG: Browser onLoadStart: $url');
                 final urlString = url?.toString() ?? '';
-                
+
                 if (!mounted) return;
                 setState(() {
                   _isLoading = true;
                   _currentUrl = urlString;
                 });
-                
+
                 // Check for OAuth success pattern
                 if (_isSuccessUrl(urlString)) {
                   print('DEBUG: OAuth success pattern match in onLoadStart');
@@ -157,7 +159,7 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
               onLoadStop: (controller, url) async {
                 final urlString = url?.toString() ?? '';
                 print('DEBUG: Browser onLoadStop: $urlString');
-                
+
                 // Check for OAuth success pattern (fallback)
                 if (_isSuccessUrl(urlString)) {
                   print('DEBUG: OAuth success pattern match in onLoadStop');
@@ -169,11 +171,11 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
                 setState(() {
                   _isLoading = false;
                 });
-                
+
                 final title = await controller.getTitle();
                 final canGoBack = await controller.canGoBack();
                 final canGoForward = await controller.canGoForward();
-                
+
                 if (!mounted) return;
                 setState(() {
                   _pageTitle = title ?? '';
@@ -193,14 +195,15 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 final url = navigationAction.request.url?.toString() ?? '';
                 print('DEBUG: Browser shouldOverrideUrlLoading: $url');
-                
+
                 // Check for OAuth success pattern
                 if (_isSuccessUrl(url)) {
-                  print('DEBUG: OAuth success pattern match in shouldOverrideUrlLoading');
+                  print(
+                      'DEBUG: OAuth success pattern match in shouldOverrideUrlLoading');
                   widget.onSuccess?.call(url);
                   return NavigationActionPolicy.CANCEL;
                 }
-                
+
                 // Check for error patterns in OAuth
                 if (url.contains('error=')) {
                   print('DEBUG: OAuth error pattern match: $url');
@@ -208,7 +211,7 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
                   widget.onError?.call(uri.queryParameters['error']);
                   return NavigationActionPolicy.CANCEL;
                 }
-                
+
                 return NavigationActionPolicy.ALLOW;
               },
             ),
@@ -300,14 +303,13 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
         ),
       ),
       child: SafeArea(
+        bottom: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             // Back
             IconButton(
-              onPressed: _canGoBack
-                  ? () => _controller?.goBack()
-                  : null,
+              onPressed: _canGoBack ? () => _controller?.goBack() : null,
               icon: Icon(
                 Icons.arrow_back_ios,
                 color: _canGoBack
@@ -318,9 +320,7 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
             ),
             // Forward
             IconButton(
-              onPressed: _canGoForward
-                  ? () => _controller?.goForward()
-                  : null,
+              onPressed: _canGoForward ? () => _controller?.goForward() : null,
               icon: Icon(
                 Icons.arrow_forward_ios,
                 color: _canGoForward
@@ -333,7 +333,8 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
             Row(
               children: [
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [AppColors.primary, AppColors.info],

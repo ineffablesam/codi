@@ -1,190 +1,99 @@
 /// Project creation wizard screen
 library;
 
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/sf_font.dart';
 import '../controllers/project_wizard_controller.dart';
 import '../controllers/projects_controller.dart';
 import '../services/backend_connection_service.dart';
 import '../widgets/animated_selection_card.dart';
 import '../widgets/backend_provider_card.dart';
 
-/// Multi-step project creation wizard with animations
-class ProjectWizardScreen extends StatefulWidget {
+/// Multi-step project creation wizard with compact dark theme
+class ProjectWizardScreen extends StatelessWidget {
   const ProjectWizardScreen({super.key});
 
   @override
-  State<ProjectWizardScreen> createState() => _ProjectWizardScreenState();
-}
-
-class _ProjectWizardScreenState extends State<ProjectWizardScreen>
-    with TickerProviderStateMixin {
-  late ProjectWizardController _wizard;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
-  late AnimationController _slideController;
-  late Animation<Offset> _slideAnimation;
-
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _appIdeaController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-
-  // Backend connection tracking
-  late BackendConnectionService _backendService;
-  final RxMap<String, bool> _connectionStatus = <String, bool>{}.obs;
-  final RxMap<String, bool> _isConnecting = <String, bool>{}.obs;
-
-  @override
-  void initState() {
-    super.initState();
-    _wizard = Get.put(ProjectWizardController());
-    _backendService = Get.put(BackendConnectionService());
-
-    // Check connection status for each provider
-    _checkBackendConnections();
-
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    );
-
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.05, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-
-    _fadeController.forward();
-    _slideController.forward();
-
-    _wizard.currentStep.listen((_) {
-      _fadeController.reset();
-      _slideController.reset();
-      _fadeController.forward();
-      _slideController.forward();
-    });
-  }
-
-  Future<void> _checkBackendConnections() async {
-    // Check backends
-    for (final backend in ProjectWizardController.backends) {
-      if (backend.id != 'serverpod') {
-        final status = await _backendService.checkConnectionStatus(backend.id);
-        _connectionStatus[backend.id] = status.isConnected;
-      }
-    }
-    // Check deployments (Vercel)
-    final status = await _backendService.checkConnectionStatus('vercel');
-    _connectionStatus['vercel'] = status.isConnected;
-  }
-
-  Future<void> _connectBackend(String provider) async {
-    _isConnecting[provider] = true;
-    final success = await _backendService.connectProvider(provider);
-    _isConnecting[provider] = false;
-    if (success) {
-      _connectionStatus[provider] = true;
-      Get.snackbar(
-        'Connected!',
-        '${provider.capitalizeFirst} account connected successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: AppColors.success.withOpacity(0.9),
-        colorText: Colors.white,
-      );
-    }
-  }
-
-  Future<void> _disconnectBackend(String provider) async {
-    final success = await _backendService.disconnectProvider(provider);
-    if (success) {
-      _connectionStatus[provider] = false;
-    }
-  }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    _slideController.dispose();
-    _nameController.dispose();
-    _descriptionController.dispose();
-    _appIdeaController.dispose();
-    Get.delete<ProjectWizardController>();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: _buildStepContent(),
-            ),
-            _buildFooter(),
-          ],
+    final wizard = Get.put(ProjectWizardController());
+    Get.put(BackendConnectionService());
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: Get.theme.scaffoldBackgroundColor,
+        body: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              _buildHeader(wizard),
+              Expanded(
+                child: _buildStepContent(wizard),
+              ),
+              _buildFooter(wizard),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(ProjectWizardController wizard) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 24.h),
+      padding: EdgeInsets.fromLTRB(12.w, 8.h, 12.w, 16.h),
       child: Column(
         children: [
           // Top bar with close and progress
           Row(
             children: [
-              IconButton(
-                onPressed: () => Get.back(),
-                icon: Icon(
-                  Icons.close,
-                  color: AppColors.textSecondary,
-                  size: 24.r,
+              GestureDetector(
+                onTap: () => Get.back(),
+                child: Container(
+                  width: 36.r,
+                  height: 36.r,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceDark,
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(
+                    Icons.chevron_left_rounded,
+                    color: AppColors.textInverse,
+                    size: 20.r,
+                  ),
                 ),
               ),
+              SizedBox(width: 12.w),
               Expanded(
-                child: _buildProgressIndicator(),
+                child: _buildProgressIndicator(wizard),
               ),
-              SizedBox(width: 48.w), // Balance
+              SizedBox(width: 48.w),
             ],
           ),
-          SizedBox(height: 24.h),
+          SizedBox(height: 16.h),
           // Title and subtitle
           Obx(() => Column(
                 children: [
                   Text(
-                    _wizard.stepTitle,
-                    style: GoogleFonts.inter(
-                      fontSize: 28.sp,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -0.5,
+                    wizard.stepTitle,
+                    style: SFPro.bold(
+                      fontSize: 22.sp,
+                      color: Get.theme.textTheme.bodyLarge?.color,
                     ),
                   ),
-                  SizedBox(height: 8.h),
+                  SizedBox(height: 4.h),
                   Text(
-                    _wizard.stepSubtitle,
-                    style: GoogleFonts.inter(
-                      fontSize: 16.sp,
+                    wizard.stepSubtitle,
+                    style: SFPro.regular(
+                      fontSize: 14.sp,
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -195,15 +104,14 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
     );
   }
 
-  Widget _buildProgressIndicator() {
+  Widget _buildProgressIndicator(ProjectWizardController wizard) {
     return Obx(() {
-      final progress = _wizard.progress;
+      final progress = wizard.progress;
       return Container(
-        height: 6.h,
-        margin: EdgeInsets.symmetric(horizontal: 16.w),
+        height: 4.h,
         decoration: BoxDecoration(
-          color: AppColors.border.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(3.r),
+          color: AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(2.r),
         ),
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -214,17 +122,8 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
                   curve: Curves.easeOutCubic,
                   width: constraints.maxWidth * progress,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.info],
-                    ),
-                    borderRadius: BorderRadius.circular(3.r),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(2.r),
                   ),
                 ),
               ],
@@ -235,98 +134,162 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
     });
   }
 
-  Widget _buildStepContent() {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
+  Widget _buildStepContent(ProjectWizardController wizard) {
+    return Obx(() {
+      final step = wizard.currentStep.value;
+
+      // Build the current step widget
+      Widget currentStepWidget;
+      switch (step) {
+        case WizardStep.framework:
+          currentStepWidget = _buildFrameworkStep(wizard);
+          break;
+        case WizardStep.backend:
+          currentStepWidget = _buildBackendStep(wizard);
+          break;
+        case WizardStep.deployment:
+          currentStepWidget = _buildDeploymentStep(wizard);
+          break;
+        case WizardStep.details:
+          currentStepWidget = _buildDetailsStep(wizard);
+          break;
+      }
+
+      return PageTransitionSwitcher(
+        duration: const Duration(milliseconds: 350),
+        reverse: wizard.currentStep.value.index < wizard.lastStep.value.index,
+        transitionBuilder: (child, animation, secondaryAnimation) {
+          return SharedAxisTransition(
+            fillColor: Colors.transparent,
+            animation: animation,
+            secondaryAnimation: secondaryAnimation,
+            transitionType: SharedAxisTransitionType.horizontal,
+            child: child,
+          );
+        },
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 20.w),
-          child: Obx(() {
-            switch (_wizard.currentStep.value) {
-              case WizardStep.framework:
-                return _buildFrameworkStep();
-              case WizardStep.backend:
-                return _buildBackendStep();
-              case WizardStep.deployment:
-                return _buildDeploymentStep();
-              case WizardStep.details:
-                return _buildDetailsStep();
-            }
-          }),
+          key: ValueKey(step),
+          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          child: currentStepWidget,
         ),
-      ),
-    );
+      );
+    });
   }
 
-  Widget _buildFrameworkStep() {
+  Widget _buildFrameworkStep(ProjectWizardController wizard) {
     return Column(
+      mainAxisSize: MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.start,
       children: [
         ...ProjectWizardController.frameworks.map((framework) {
           return Padding(
-            padding: EdgeInsets.only(bottom: 16.h),
+            padding: EdgeInsets.only(bottom: 10.h),
             child: Obx(() => AnimatedSelectionCard(
                   id: framework.id,
-                  icon: framework.icon,
+                  iconWidget: Icon(framework.icon,
+                      color: framework.gradient.first, size: 20.r),
                   title: framework.name,
                   subtitle: framework.description,
                   tags: framework.platforms,
                   gradientColors: framework.gradient,
-                  isSelected: _wizard.selectedFramework.value == framework.id,
-                  onTap: () => _wizard.selectedFramework.value = framework.id,
+                  isSelected: wizard.selectedFramework.value == framework.id,
+                  onTap: () => wizard.selectedFramework.value = framework.id,
                 )),
           );
         }),
-        SizedBox(height: 40.h),
+        SizedBox(height: 100.h),
       ],
     );
   }
 
-  Widget _buildBackendStep() {
+  Widget _buildBackendStep(ProjectWizardController wizard) {
+    final backendService = Get.find<BackendConnectionService>();
+    final connectionStatus = <String, bool>{}.obs;
+    final isConnecting = <String, bool>{}.obs;
+
+    for (final backend in ProjectWizardController.backends) {
+      if (backend.id != 'serverpod') {
+        backendService.checkConnectionStatus(backend.id).then((status) {
+          connectionStatus[backend.id] = status.isConnected;
+        });
+      }
+    }
+
     return Column(
       children: [
-        // Skip option
         Obx(() => SkipOptionCard(
               title: 'No Backend',
               subtitle: 'I\'ll set this up later',
-              isSelected: _wizard.selectedBackend.value == null,
-              onTap: () => _wizard.selectedBackend.value = null,
+              isSelected: wizard.selectedBackend.value == null,
+              onTap: () => wizard.selectedBackend.value = null,
             )),
-        SizedBox(height: 20.h),
-        Divider(color: AppColors.border.withOpacity(0.3)),
-        SizedBox(height: 20.h),
-        // Backend providers with Connect buttons
+        SizedBox(height: 12.h),
+        Container(
+          height: 1,
+          color: AppColors.surfaceDark,
+        ),
+        SizedBox(height: 12.h),
         ...ProjectWizardController.backends.map((backend) {
           final isServerpod = backend.id == 'serverpod';
           return Padding(
-            padding: EdgeInsets.only(bottom: 16.h),
+            padding: EdgeInsets.only(bottom: 10.h),
             child: Obx(() => BackendProviderCard(
                   id: backend.id,
-                  icon: backend.icon,
+                  iconWidget: Icon(backend.icon,
+                      color: backend.gradient.first, size: 18.r),
                   title: backend.name,
                   description: backend.description,
                   features: backend.features,
                   gradientColors: backend.gradient,
-                  isSelected: _wizard.selectedBackend.value == backend.id,
-                  isConnected: _connectionStatus[backend.id] ?? false,
-                  isConnecting: _isConnecting[backend.id] ?? false,
+                  isSelected: wizard.selectedBackend.value == backend.id,
+                  isConnected: connectionStatus[backend.id] ?? false,
+                  isConnecting: isConnecting[backend.id] ?? false,
                   showManualConfig: isServerpod,
-                  onSelect: () => _wizard.selectedBackend.value = backend.id,
-                  onConnect: isServerpod ? null : () => _connectBackend(backend.id),
-                  onDisconnect: isServerpod ? null : () => _disconnectBackend(backend.id),
+                  onSelect: () => wizard.selectedBackend.value = backend.id,
+                  onConnect: isServerpod
+                      ? null
+                      : () async {
+                          isConnecting[backend.id] = true;
+                          final success =
+                              await backendService.connectProvider(backend.id);
+                          isConnecting[backend.id] = false;
+                          if (success) {
+                            connectionStatus[backend.id] = true;
+                            Get.snackbar(
+                              'Connected!',
+                              '${backend.name} connected',
+                              snackPosition: SnackPosition.BOTTOM,
+                              backgroundColor:
+                                  AppColors.success.withOpacity(0.9),
+                              colorText: Colors.white,
+                              margin: EdgeInsets.all(16.r),
+                            );
+                          }
+                        },
+                  onDisconnect: isServerpod
+                      ? null
+                      : () async {
+                          final success = await backendService
+                              .disconnectProvider(backend.id);
+                          if (success) {
+                            connectionStatus[backend.id] = false;
+                          }
+                        },
                   onManualConfig: isServerpod
                       ? () => Get.dialog(
                             ServerpodConfigDialog(
                               onSave: (serverUrl, apiKey) {
-                                // Store for later use during project creation
-                                _wizard.serverpodServerUrl.value = serverUrl;
-                                _wizard.serverpodApiKey.value = apiKey ?? '';
+                                wizard.serverpodServerUrl.value = serverUrl;
+                                wizard.serverpodApiKey.value = apiKey ?? '';
                                 Get.snackbar(
                                   'Configured!',
                                   'Serverpod settings saved',
                                   snackPosition: SnackPosition.BOTTOM,
-                                  backgroundColor: AppColors.success.withOpacity(0.9),
+                                  backgroundColor:
+                                      AppColors.success.withOpacity(0.9),
                                   colorText: Colors.white,
+                                  margin: EdgeInsets.all(16.r),
                                 );
                               },
                             ),
@@ -335,80 +298,104 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
                 )),
           );
         }),
-        SizedBox(height: 40.h),
+        SizedBox(height: 20.h),
       ],
     );
   }
 
-  Widget _buildDeploymentStep() {
+  Widget _buildDeploymentStep(ProjectWizardController wizard) {
+    final backendService = Get.find<BackendConnectionService>();
+    final connectionStatus = <String, bool>{}.obs;
+    final isConnecting = <String, bool>{}.obs;
+
+    backendService.checkConnectionStatus('vercel').then((status) {
+      connectionStatus['vercel'] = status.isConnected;
+    });
+
     return Column(
       children: [
         ...ProjectWizardController.deployments.map((deployment) {
           if (deployment.id == 'vercel') {
-             return Padding(
-              padding: EdgeInsets.only(bottom: 16.h),
+            return Padding(
+              padding: EdgeInsets.only(bottom: 10.h),
               child: Obx(() => BackendProviderCard(
                     id: deployment.id,
-                    icon: deployment.icon,
+                    iconWidget: Icon(deployment.icon,
+                        color: deployment.gradient.first, size: 18.r),
                     title: deployment.name,
                     description: deployment.description,
                     features: deployment.features,
                     gradientColors: deployment.gradient,
-                    isSelected: _wizard.selectedDeployment.value == deployment.id,
-                    isConnected: _connectionStatus[deployment.id] ?? false,
-                    isConnecting: _isConnecting[deployment.id] ?? false,
+                    isSelected:
+                        wizard.selectedDeployment.value == deployment.id,
+                    isConnected: connectionStatus[deployment.id] ?? false,
+                    isConnecting: isConnecting[deployment.id] ?? false,
                     showManualConfig: false,
-                    onSelect: () => _wizard.selectedDeployment.value = deployment.id,
-                    onConnect: () => _connectBackend(deployment.id),
-                    onDisconnect: () => _disconnectBackend(deployment.id),
+                    onSelect: () =>
+                        wizard.selectedDeployment.value = deployment.id,
+                    onConnect: () async {
+                      isConnecting[deployment.id] = true;
+                      final success =
+                          await backendService.connectProvider(deployment.id);
+                      isConnecting[deployment.id] = false;
+                      if (success) {
+                        connectionStatus[deployment.id] = true;
+                        Get.snackbar(
+                          'Connected!',
+                          '${deployment.name} connected',
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: AppColors.success.withOpacity(0.9),
+                          colorText: Colors.white,
+                          margin: EdgeInsets.all(16.r),
+                        );
+                      }
+                    },
+                    onDisconnect: () async {
+                      final success = await backendService
+                          .disconnectProvider(deployment.id);
+                      if (success) {
+                        connectionStatus[deployment.id] = false;
+                      }
+                    },
                   )),
             );
           }
           return Padding(
-            padding: EdgeInsets.only(bottom: 16.h),
+            padding: EdgeInsets.only(bottom: 10.h),
             child: Obx(() => AnimatedSelectionCard(
                   id: deployment.id,
-                  icon: deployment.icon,
+                  iconWidget: Icon(deployment.icon,
+                      color: deployment.gradient.first, size: 20.r),
                   title: deployment.name,
                   subtitle: deployment.description,
                   tags: deployment.features,
                   gradientColors: deployment.gradient,
-                  isSelected: _wizard.selectedDeployment.value == deployment.id,
-                  onTap: () => _wizard.selectedDeployment.value = deployment.id,
+                  isSelected: wizard.selectedDeployment.value == deployment.id,
+                  onTap: () => wizard.selectedDeployment.value = deployment.id,
                 )),
           );
         }),
-        SizedBox(height: 40.h),
+        SizedBox(height: 160.h),
       ],
     );
   }
 
-  Widget _buildDetailsStep() {
+  Widget _buildDetailsStep(ProjectWizardController wizard) {
     return Form(
-      key: _formKey,
+      key: wizard.formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Summary card
-          _buildSummaryCard(),
-          SizedBox(height: 32.h),
+          _buildSummaryCard(wizard),
+          SizedBox(height: 20.h),
 
           // Project name
-          Text(
-            'Project Name',
-            style: GoogleFonts.inter(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 8.h),
-          TextFormField(
-            controller: _nameController,
-            decoration: InputDecoration(
-              hintText: 'my-awesome-app',
-              prefixIcon: Icon(Icons.folder_outlined, size: 20.r),
-            ),
+          _buildFieldLabel('Project Name'),
+          SizedBox(height: 6.h),
+          _buildTextField(
+            controller: wizard.nameController,
+            hint: 'my-awesome-app',
+            icon: LucideIcons.folder,
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Please enter a project name';
@@ -418,196 +405,185 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
               }
               return null;
             },
-            onChanged: (value) => _wizard.projectName.value = value,
-            textInputAction: TextInputAction.next,
             autofocus: true,
           ),
-          SizedBox(height: 24.h),
+          SizedBox(height: 16.h),
 
           // Description
-          Text(
-            'Description (Optional)',
-            style: GoogleFonts.inter(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 8.h),
-          TextFormField(
-            controller: _descriptionController,
-            decoration: InputDecoration(
-              hintText: 'A brief description of your project',
-              prefixIcon: Icon(Icons.description_outlined, size: 20.r),
-            ),
+          _buildFieldLabel('Description (Optional)'),
+          SizedBox(height: 6.h),
+          _buildTextField(
+            controller: wizard.descriptionController,
+            hint: 'A brief description',
+            icon: LucideIcons.fileText,
             maxLines: 2,
-            onChanged: (value) => _wizard.projectDescription.value = value,
           ),
-          SizedBox(height: 24.h),
+          SizedBox(height: 16.h),
 
           // App Idea
-          Text(
-            'App Idea (Optional)',
-            style: GoogleFonts.inter(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
+          _buildFieldLabel('App Idea (Optional)'),
+          SizedBox(height: 6.h),
+          _buildTextField(
+            controller: wizard.appIdeaController,
+            hint: 'e.g., A church app with events, sermons, donations',
+            icon: LucideIcons.lightbulb,
+            maxLines: 3,
           ),
-          SizedBox(height: 8.h),
-          TextFormField(
-            controller: _appIdeaController,
-            decoration: InputDecoration(
-              hintText: 'e.g., A church app with events calendar, sermon videos, and donation features',
-              prefixIcon: Icon(Icons.lightbulb_outline, size: 20.r),
-            ),
-            maxLines: 4,
-            onChanged: (value) => _wizard.appIdea.value = value,
-          ),
-          SizedBox(height: 8.h),
+          SizedBox(height: 4.h),
           Text(
-            'Provide an idea and the AI will automatically build your app',
-            style: GoogleFonts.inter(
-              fontSize: 12.sp,
+            'AI will automatically build your app based on this idea',
+            style: SFPro.regular(
+              fontSize: 11.sp,
               color: AppColors.textSecondary,
             ),
           ),
-          SizedBox(height: 24.h),
+          SizedBox(height: 16.h),
 
           // Private toggle
-          _buildPrivateToggle(),
-          SizedBox(height: 40.h),
+          _buildPrivateToggle(wizard),
+          SizedBox(height: 24.h),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildFieldLabel(String label) {
+    return Text(
+      label,
+      style: SFPro.medium(
+        fontSize: 13.sp,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    String? Function(String?)? validator,
+    int maxLines = 1,
+    bool autofocus = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: SFPro.regular(fontSize: 14.sp, color: AppColors.textInverse),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: SFPro.regular(
+            fontSize: 14.sp, color: AppColors.textSecondary.withOpacity(0.5)),
+        prefixIcon: Icon(icon, size: 18.r, color: AppColors.textSecondary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10.r),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10.r),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10.r),
+          borderSide:
+              BorderSide(color: AppColors.primary.withOpacity(0.5), width: 1.5),
+        ),
+        filled: true,
+        fillColor: AppColors.surfaceDark,
+        contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+      ),
+      validator: validator,
+      maxLines: maxLines,
+      textInputAction: TextInputAction.next,
+      autofocus: autofocus,
+    );
+  }
+
+  Widget _buildSummaryCard(ProjectWizardController wizard) {
     final framework = ProjectWizardController.frameworks
-        .firstWhere((f) => f.id == _wizard.selectedFramework.value);
-    final backend = _wizard.selectedBackend.value != null
+        .firstWhere((f) => f.id == wizard.selectedFramework.value);
+    final backend = wizard.selectedBackend.value != null
         ? ProjectWizardController.backends
-            .firstWhere((b) => b.id == _wizard.selectedBackend.value)
+            .firstWhere((b) => b.id == wizard.selectedBackend.value)
         : null;
     final deployment = ProjectWizardController.deployments
-        .firstWhere((d) => d.id == _wizard.selectedDeployment.value);
+        .firstWhere((d) => d.id == wizard.selectedDeployment.value);
 
     return Container(
-      padding: EdgeInsets.all(20.r),
+      padding: EdgeInsets.all(14.r),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withOpacity(0.1),
-            AppColors.info.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(
-          color: AppColors.primary.withOpacity(0.2),
-        ),
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.circular(12.r),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            'Your Setup',
-            style: GoogleFonts.inter(
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
-              letterSpacing: 1,
-            ),
-          ),
-          SizedBox(height: 16.h),
-          Row(
-            children: [
-              _buildSummaryItem(framework.icon, framework.name, 'Framework'),
-              SizedBox(width: 16.w),
-              if (backend != null)
-                _buildSummaryItem(backend.icon, backend.name, 'Backend'),
-              if (backend != null) SizedBox(width: 16.w),
-              _buildSummaryItem(deployment.icon, deployment.name, 'Deploy'),
-            ],
-          ),
+          _buildSummaryItem(framework.icon, framework.name),
+          if (backend != null) ...[
+            SizedBox(width: 12.w),
+            Icon(LucideIcons.chevronRight,
+                size: 14.r, color: AppColors.textSecondary.withOpacity(0.5)),
+            SizedBox(width: 12.w),
+            _buildSummaryItem(backend.icon, backend.name),
+          ],
+          SizedBox(width: 12.w),
+          Icon(LucideIcons.chevronRight,
+              size: 14.r, color: AppColors.textSecondary.withOpacity(0.5)),
+          SizedBox(width: 12.w),
+          _buildSummaryItem(deployment.icon, deployment.name),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryItem(String icon, String title, String label) {
-    return Column(
+  Widget _buildSummaryItem(IconData icon, String title) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 48.r,
-          height: 48.r,
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(color: AppColors.border.withOpacity(0.3)),
-          ),
-          child: Center(
-            child: Text(icon, style: TextStyle(fontSize: 24.sp)),
-          ),
-        ),
-        SizedBox(height: 8.h),
+        Icon(icon, size: 16.r, color: AppColors.textSecondary),
+        SizedBox(width: 6.w),
         Text(
           title,
-          style: GoogleFonts.inter(
+          style: SFPro.medium(
             fontSize: 12.sp,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 10.sp,
-            color: AppColors.textSecondary,
+            color: AppColors.textInverse,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPrivateToggle() {
+  Widget _buildPrivateToggle(ProjectWizardController wizard) {
     return Obx(() {
-      final isPrivate = _wizard.isPrivate.value;
+      final isPrivate = wizard.isPrivate.value;
       return GestureDetector(
-        onTap: () => _wizard.isPrivate.value = !_wizard.isPrivate.value,
+        onTap: () => wizard.isPrivate.value = !wizard.isPrivate.value,
         child: Container(
-          padding: EdgeInsets.all(16.r),
+          padding: EdgeInsets.all(12.r),
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(color: AppColors.border.withOpacity(0.3)),
+            color: AppColors.surfaceDark,
+            borderRadius: BorderRadius.circular(10.r),
           ),
           child: Row(
             children: [
               Icon(
-                isPrivate ? Icons.lock : Icons.lock_open,
-                size: 24.r,
+                isPrivate ? LucideIcons.lock : LucideIcons.lockOpen,
+                size: 18.r,
                 color: AppColors.textSecondary,
               ),
-              SizedBox(width: 12.w),
+              SizedBox(width: 10.w),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Private Repository',
-                      style: GoogleFonts.inter(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                      style: SFPro.medium(
+                        fontSize: 13.sp,
+                        color: AppColors.textInverse,
                       ),
                     ),
-                    SizedBox(height: 2.h),
                     Text(
                       'Only you can see this repository',
-                      style: GoogleFonts.inter(
-                        fontSize: 12.sp,
+                      style: SFPro.regular(
+                        fontSize: 11.sp,
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -616,7 +592,7 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
               ),
               Switch(
                 value: isPrivate,
-                onChanged: (value) => _wizard.isPrivate.value = value,
+                onChanged: (value) => wizard.isPrivate.value = value,
                 activeColor: AppColors.primary,
               ),
             ],
@@ -626,94 +602,116 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
     });
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(ProjectWizardController wizard) {
     return Container(
-      padding: EdgeInsets.all(20.r),
+      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
       decoration: BoxDecoration(
-        color: AppColors.background,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
+        color: Get.theme.scaffoldBackgroundColor,
+        border: Border(
+          top: BorderSide(
+            color: AppColors.textTertiary.withOpacity(0.4),
+            width: 1,
           ),
-        ],
+        ),
       ),
       child: Obx(() {
-        final currentStep = _wizard.currentStep.value;
+        final currentStep = wizard.currentStep.value;
         final isLastStep = currentStep == WizardStep.details;
-        final canGoBack = _wizard.canGoBack;
-        final canProceed = _wizard.canProceed;
+        final canGoBack = wizard.canGoBack;
+        final canProceed = wizard.canProceed;
         final projectsController = Get.find<ProjectsController>();
         final isCreating = projectsController.isCreating.value;
 
         return Row(
           children: [
-            // Back button
-            if (canGoBack)
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _wizard.previousStep,
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 16.h),
-                    side: BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                  ),
-                  child: Text(
-                    'Back',
-                    style: GoogleFonts.inter(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ),
-            if (canGoBack) SizedBox(width: 12.w),
-            // Next/Create button
-            Expanded(
-              flex: canGoBack ? 2 : 1,
-              child: ElevatedButton(
-                onPressed: canProceed
-                    ? (isLastStep ? _createProject : _wizard.nextStep)
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(vertical: 16.h),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                ),
-                child: isCreating
-                    ? SizedBox(
-                        width: 24.r,
-                        height: 24.r,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+            AnimatedScale(
+              scale: canGoBack ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: canGoBack ? 48.r : 0,
+                height: 48.r,
+                curve: Curves.easeOut,
+                child: canGoBack
+                    ? GestureDetector(
+                        onTap: wizard.previousStep,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceDark,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Icon(
+                            Icons.chevron_left_rounded,
+                            color: AppColors.textInverse,
+                            size: 20.r,
+                          ),
                         ),
                       )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            isLastStep ? 'Create Project' : 'Continue',
-                            style: GoogleFonts.inter(
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.w600,
+                    : const SizedBox.shrink(),
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: canGoBack ? 12.w : 0,
+              curve: Curves.easeOut,
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: canProceed
+                    ? (isLastStep
+                        ? () => _createProject(wizard)
+                        : wizard.nextStep)
+                    : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 48.h,
+                  curve: Curves.easeOut,
+                  decoration: BoxDecoration(
+                    color: canProceed
+                        ? AppColors.primary
+                        : AppColors.primary.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: isCreating
+                          ? SizedBox(
+                              key: const ValueKey('loading'),
+                              width: 20.r,
+                              height: 20.r,
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Row(
+                              key: ValueKey(isLastStep),
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  isLastStep ? 'Create Project' : 'Continue',
+                                  style: SFPro.semibold(
+                                    fontSize: 15.sp,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(width: 6.w),
+                                Icon(
+                                  isLastStep
+                                      ? LucideIcons.rocket
+                                      : Icons.arrow_forward_rounded,
+                                  size: 18.r,
+                                  color: Colors.white,
+                                ),
+                              ],
                             ),
-                          ),
-                          if (!isLastStep) ...[
-                            SizedBox(width: 8.w),
-                            Icon(Icons.arrow_forward, size: 20.r),
-                          ] else ...[
-                            SizedBox(width: 8.w),
-                            Icon(Icons.rocket_launch, size: 20.r),
-                          ],
-                        ],
-                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -722,22 +720,24 @@ class _ProjectWizardScreenState extends State<ProjectWizardScreen>
     );
   }
 
-  Future<void> _createProject() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  Future<void> _createProject(ProjectWizardController wizard) async {
+    if (!(wizard.formKey.currentState?.validate() ?? false)) return;
 
     final controller = Get.find<ProjectsController>();
 
     await controller.createProject(
-      name: _nameController.text.trim(),
-      description: _descriptionController.text.trim().isEmpty
+      name: wizard.projectName.value.trim(),
+      description: wizard.projectDescription.value.trim().isEmpty
           ? null
-          : _descriptionController.text.trim(),
-      isPrivate: _wizard.isPrivate.value,
-      platformType: _wizard.platformType,
-      framework: _wizard.selectedFramework.value,
-      backendType: _wizard.selectedBackend.value,
-      deploymentPlatform: _wizard.selectedDeployment.value,
-      appIdea: _wizard.appIdea.value.trim().isEmpty ? null : _wizard.appIdea.value.trim(),
+          : wizard.projectDescription.value.trim(),
+      isPrivate: wizard.isPrivate.value,
+      platformType: wizard.platformType,
+      framework: wizard.selectedFramework.value,
+      backendType: wizard.selectedBackend.value,
+      deploymentPlatform: wizard.selectedDeployment.value,
+      appIdea: wizard.appIdea.value.trim().isEmpty
+          ? null
+          : wizard.appIdea.value.trim(),
     );
   }
 }

@@ -1,10 +1,7 @@
 /// Login screen
 library;
 
-import 'dart:ui';
-
 import 'package:animate_do/animate_do.dart';
-import 'package:animated_custom_dropdown/custom_dropdown.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,19 +9,15 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../../config/env.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/sf_font.dart';
 import '../../../shared/controller/ui_controller.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/login_video_controller.dart';
-import '../controllers/onboarding_controller.dart';
 import '../widgets/github_login_button.dart';
 import '../widgets/google_login_button.dart';
 import '../widgets/onboarding_form_widget.dart';
-import '../widgets/selectable_option_button.dart';
 
 /// Login screen with Google and GitHub sign-in OAuth
 class LoginScreen extends StatelessWidget {
@@ -80,9 +73,42 @@ class LoginScreen extends StatelessWidget {
             Obx(() {
               final isLoading = authController.isLoading.value;
               final isNewUser = authController.isNewUser.value;
+              final isProcessingAuth = authController.isProcessingAuth.value;
+              final showOnboardingForm = authController.showOnboardingForm.value;
 
-              // Show loading states after authentication starts
-              if (isLoading) {
+              // Priority 1: Show onboarding form if it should be displayed
+              // This takes priority because the form needs to stay visible after animations
+              if (showOnboardingForm && isNewUser) {
+                // Stop video when showing form
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  videoController.stopVideo();
+                });
+                return const OnboardingFormWidget()
+                    .animate()
+                    .fadeIn(duration: const Duration(milliseconds: 800));
+              }
+
+              // Priority 2: While processing OAuth callback, show loading
+              if (isProcessingAuth) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 30.w,
+                        height: 30.w,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3.w,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // Priority 3: Show new user animation sequence during loading
+              if (isLoading && isNewUser) {
                 // Schedule video play after build completes
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   // Reset video state first (in case it was stopped previously)
@@ -91,9 +117,7 @@ class LoginScreen extends StatelessWidget {
                   }
                   videoController.playVideo();
                 });
-                return isNewUser
-                    ? _buildWelcomeNewUserView(authController)
-                    : _buildExistingUserView(authController);
+                return _buildWelcomeNewUserView(authController);
               }
 
               // Default: Show login buttons
@@ -364,18 +388,10 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  /// Build new user onboarding Message View
+  /// Build new user welcome animation sequence
+  /// Only shows the animation - form is handled by main Obx builder when showOnboardingForm is true
   Widget _buildWelcomeNewUserView(AuthController authController) {
-    final videoController = Get.find<LoginVideoController>();
-    final size = MediaQuery.of(Get.context!).size;
-    final ui = Get.find<UIController>();
-    const List<String> _whatBringsYoutoCodi = [
-      '📱Build an app',
-      '🌐Create a website',
-      '📚 Learn to code',
-      '🎨Just exploring',
-    ];
-    return Obx(() => Padding(
+    return Padding(
       key: ValueKey('new_user_flow_${authController.resetKey.value}'),
       padding: EdgeInsets.symmetric(
         horizontal: 16.w,
@@ -406,7 +422,7 @@ class LoginScreen extends StatelessWidget {
       )
           .animate()
           .fadeIn(duration: const Duration(milliseconds: 800))
-          .then(delay: const Duration(seconds: 3))
+          .then(delay: const Duration(seconds: 2))
           .fadeOut(duration: const Duration(milliseconds: 600))
           .swap(
             builder: (_, __) => Column(
@@ -433,27 +449,12 @@ class LoginScreen extends StatelessWidget {
               ],
             )
                 .animate()
-                .fadeIn(
-                  duration: const Duration(milliseconds: 800),
-                )
-                .then(delay: const Duration(seconds: 3))
-                .fadeOut(duration: const Duration(milliseconds: 600))
-                .swap(
-                  builder: (_, __) {
-                    return const OnboardingFormWidget()
-                        .animate(
-                          onPlay: (controller) {
-                            // Stop video when form fadeIn animation starts
-                            videoController.stopVideo();
-                          },
-                        )
-                        .fadeIn(duration: const Duration(milliseconds: 800));
-                  },
-                ),
-          ),
+                .fadeIn(duration: const Duration(milliseconds: 800)),
           ),
     );
   }
+
+
   /// Build existing user view with rotating messages
   Widget _buildExistingUserView(AuthController authController) {
     final messages = [

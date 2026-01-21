@@ -1,11 +1,14 @@
 /// Simplified agent chat panel
 library;
 
+import 'package:codi_frontend/features/editor/widgets/chat/generating_indicator.dart';
 import 'package:codi_frontend/features/editor/widgets/chat/operation_messages.dart';
 import 'package:codi_frontend/features/editor/widgets/chat/success_message.dart';
 import 'package:codi_frontend/features/editor/widgets/chat/thinking_message.dart';
+import 'package:codi_frontend/features/editor/widgets/chat/tool_execution_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,6 +19,357 @@ import '../../../core/constants/app_strings.dart';
 import '../constants/chat_icons.dart';
 import '../controllers/agent_chat_controller.dart';
 import '../models/agent_message_model.dart';
+
+/// Helper class for grouping tool messages
+class _ToolGroup {
+  final List<AgentMessage> messages;
+  _ToolGroup(this.messages);
+}
+
+/// Helper class for pairing tool execution with its result
+class _ToolPair {
+  final AgentMessage execution;
+  final AgentMessage? result;
+  _ToolPair(this.execution, this.result);
+}
+
+/// Helper class for a sequential group of the same tool type
+class _SequentialToolGroup {
+  final String tool;
+  final List<_ToolPair> pairs;
+  _SequentialToolGroup(this.tool, this.pairs);
+}
+
+/// Expandable widget for grouped tool messages with hierarchical nesting
+class _ExpandableToolGroup extends StatefulWidget {
+  final _ToolGroup group;
+  final IconData Function(String) getIcon;
+  final bool isLatest;
+
+  const _ExpandableToolGroup({
+    required this.group,
+    required this.getIcon,
+    this.isLatest = false,
+  });
+
+  @override
+  State<_ExpandableToolGroup> createState() => _ExpandableToolGroupState();
+}
+
+class _ExpandableToolGroupState extends State<_ExpandableToolGroup> {
+  bool _isExpanded = false;
+  int? _expandedGroupIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    // Latest group starts expanded
+    _isExpanded = widget.isLatest;
+  }
+
+  @override
+  void didUpdateWidget(_ExpandableToolGroup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Auto-expand when this becomes the latest group
+    if (widget.isLatest && !oldWidget.isLatest) {
+      setState(() => _isExpanded = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 1. First, pair all executions with results into a flat list of _ToolPair
+    final allPairs = <_ToolPair>[];
+    AgentMessage? pendingExecution;
+    for (final msg in widget.group.messages) {
+      if (msg.type == MessageType.toolExecution) {
+        if (pendingExecution != null) {
+          allPairs.add(_ToolPair(pendingExecution, null));
+        }
+        pendingExecution = msg;
+      } else if (msg.type == MessageType.toolResult &&
+          pendingExecution != null) {
+        allPairs.add(_ToolPair(pendingExecution, msg));
+        pendingExecution = null;
+      }
+    }
+    if (pendingExecution != null) {
+      allPairs.add(_ToolPair(pendingExecution, null));
+    }
+
+    // 2. Group the consecutive _ToolPair objects by tool type
+    final sequentialGroups = <_SequentialToolGroup>[];
+    for (final pair in allPairs) {
+      final tool = pair.execution.tool ?? 'unknown';
+      if (sequentialGroups.isNotEmpty && sequentialGroups.last.tool == tool) {
+        sequentialGroups.last.pairs.add(pair);
+      } else {
+        sequentialGroups.add(_SequentialToolGroup(tool, [pair]));
+      }
+    }
+
+    // Count total executions
+    final totalExecutions = allPairs.length;
+
+    // Latest group index for auto-expansion and highlighting
+    final latestGroupIndex = sequentialGroups.length - 1;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4.h, left: 40.w),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(6.r),
+          border: Border.all(color: Colors.grey[800]!, width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top level header
+            GestureDetector(
+              onTap: () => setState(() => _isExpanded = !_isExpanded),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.layers,
+                      size: 12.r,
+                      color: Colors.blue[400],
+                    ),
+                    SizedBox(width: 6.w),
+                    Text(
+                      '$totalExecutions operations',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[300],
+                      ),
+                    ),
+                    const Spacer(),
+                    AnimatedRotation(
+                      turns: _isExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        LucideIcons.chevronDown,
+                        size: 12.r,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Second level: Tool type groups
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: _isExpanded
+                  ? Padding(
+                      padding:
+                          EdgeInsets.only(left: 8.w, right: 8.w, bottom: 8.h),
+                      child: Column(
+                        children: sequentialGroups.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final sGroup = entry.value;
+                          final toolName = sGroup.tool
+                              .split('_')
+                              .map((w) => w.isNotEmpty
+                                  ? '${w[0].toUpperCase()}${w.substring(1)}'
+                                  : '')
+                              .join(' ');
+                          final messages = sGroup.pairs;
+                          final isLatestType = index == latestGroupIndex;
+                          final isTypeExpanded =
+                              _expandedGroupIndex == index || isLatestType;
+
+                          return Container(
+                            margin: EdgeInsets.only(bottom: 2.h),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[850],
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                            child: Column(
+                              children: [
+                                // Tool type header
+                                GestureDetector(
+                                  onTap: () => setState(() {
+                                    _expandedGroupIndex =
+                                        isTypeExpanded ? -1 : index;
+                                  }),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8.w,
+                                      vertical: 6.h,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          widget.getIcon(sGroup.tool),
+                                          size: 10.r,
+                                          color: isLatestType && widget.isLatest
+                                              ? Colors.blue[400]
+                                              : Colors.grey[500],
+                                        ),
+                                        SizedBox(width: 6.w),
+                                        Text(
+                                          '$toolName × ${messages.length}',
+                                          style: GoogleFonts.jetBrainsMono(
+                                            fontSize: 9.sp,
+                                            color:
+                                                isLatestType && widget.isLatest
+                                                    ? Colors.grey[300]
+                                                    : Colors.grey[500],
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        if (messages.length > 1)
+                                          AnimatedRotation(
+                                            turns: isTypeExpanded ? 0.5 : 0,
+                                            duration: const Duration(
+                                                milliseconds: 150),
+                                            child: Icon(
+                                              LucideIcons.chevronDown,
+                                              size: 10.r,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Third level: Individual files with results
+                                AnimatedSize(
+                                  duration: const Duration(milliseconds: 150),
+                                  curve: Curves.easeInOut,
+                                  child: isTypeExpanded && messages.length > 0
+                                      ? Padding(
+                                          padding: EdgeInsets.only(
+                                            left: 16.w,
+                                            right: 8.w,
+                                            bottom: 4.h,
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: messages.map((pair) {
+                                              final isLast =
+                                                  pair == messages.last &&
+                                                      isLatestType &&
+                                                      widget.isLatest;
+                                              final hasResult =
+                                                  pair.result != null &&
+                                                      pair.result!.toolResult !=
+                                                          null &&
+                                                      pair.result!.toolResult!
+                                                          .isNotEmpty;
+
+                                              return Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  // File/operation row
+                                                  Padding(
+                                                    padding: EdgeInsets.only(
+                                                        bottom: 2.h),
+                                                    child: Row(
+                                                      children: [
+                                                        Container(
+                                                          width: 4.r,
+                                                          height: 4.r,
+                                                          decoration:
+                                                              BoxDecoration(
+                                                            shape:
+                                                                BoxShape.circle,
+                                                            color: isLast
+                                                                ? Colors
+                                                                    .blue[400]
+                                                                : Colors
+                                                                    .grey[600],
+                                                          ),
+                                                        ),
+                                                        SizedBox(width: 6.w),
+                                                        Expanded(
+                                                          child: Text(
+                                                            pair.execution
+                                                                    .filePath ??
+                                                                pair.execution
+                                                                    .text,
+                                                            style: GoogleFonts
+                                                                .jetBrainsMono(
+                                                              fontSize: 8.sp,
+                                                              color: isLast
+                                                                  ? Colors
+                                                                      .grey[300]
+                                                                  : Colors.grey[
+                                                                      600],
+                                                            ),
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                          ),
+                                                        ),
+                                                        if (hasResult)
+                                                          Icon(
+                                                            LucideIcons.check,
+                                                            size: 8.r,
+                                                            color: Colors
+                                                                .green[400],
+                                                          ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  // Result preview (truncated)
+                                                  if (hasResult &&
+                                                      pair.result!.toolResult!
+                                                              .length >
+                                                          10)
+                                                    Padding(
+                                                      padding: EdgeInsets.only(
+                                                          left: 10.w,
+                                                          bottom: 4.h),
+                                                      child: Text(
+                                                        pair.result!.toolResult!
+                                                                    .length >
+                                                                100
+                                                            ? '${pair.result!.toolResult!.substring(0, 100)}...'
+                                                            : pair.result!
+                                                                .toolResult!,
+                                                        style: GoogleFonts
+                                                            .jetBrainsMono(
+                                                          fontSize: 7.sp,
+                                                          color:
+                                                              Colors.grey[700],
+                                                        ),
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                    ),
+                                                ],
+                                              );
+                                            }).toList(),
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class AgentChatPanel extends StatelessWidget {
   const AgentChatPanel({super.key});
@@ -41,16 +395,104 @@ class AgentChatPanel extends StatelessWidget {
         return _buildEmptyState(controller);
       }
 
+      // Group consecutive tool messages
+      final groupedMessages = _groupMessages(controller.messages);
+
+      final showIndicator = controller.showGeneratingIndicator.value;
+
       return ListView.builder(
         controller: controller.scrollController,
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
-        itemCount: controller.messages.length,
+        itemCount: groupedMessages.length + (showIndicator ? 1 : 0),
         itemBuilder: (context, index) {
-          final message = controller.messages[index];
-          return _buildMessage(message);
+          if (index == groupedMessages.length) {
+            // Show "Crawling" for browser mode, "Generating" otherwise
+            final indicatorText = controller.isBrowserAgentMode.value 
+                ? 'Crawling' 
+                : 'Generating';
+            return GeneratingIndicator(text: indicatorText);
+          }
+
+          final item = groupedMessages[index];
+          if (item is _ToolGroup) {
+            // Check if this is the last group AND agent is still working
+            final isLastGroup = index == groupedMessages.length - 1 ||
+                !groupedMessages.skip(index + 1).any((m) => m is _ToolGroup);
+            // Only show as "active" if agent is still working
+            final isLatest = isLastGroup && controller.isAgentWorking.value;
+            return _buildToolGroup(item, isLatest: isLatest);
+          }
+          return _buildMessage(item as AgentMessage);
         },
       );
     });
+  }
+
+  /// Group consecutive tool execution/result messages
+  List<dynamic> _groupMessages(List<AgentMessage> messages) {
+    final result = <dynamic>[];
+    List<AgentMessage> currentToolGroup = [];
+
+    for (final message in messages) {
+      // Group both tool executions and their results
+      if (message.type == MessageType.toolExecution ||
+          message.type == MessageType.toolResult) {
+        currentToolGroup.add(message);
+      } else {
+        // Flush tool group if any
+        if (currentToolGroup.isNotEmpty) {
+          if (currentToolGroup.length >= 2) {
+            result.add(_ToolGroup(currentToolGroup.toList()));
+          } else {
+            result.addAll(currentToolGroup);
+          }
+          currentToolGroup.clear();
+        }
+        result.add(message);
+      }
+    }
+
+    // Flush remaining tool group
+    if (currentToolGroup.isNotEmpty) {
+      if (currentToolGroup.length >= 2) {
+        result.add(_ToolGroup(currentToolGroup.toList()));
+      } else {
+        result.addAll(currentToolGroup);
+      }
+    }
+
+    return result;
+  }
+
+  Widget _buildToolGroup(_ToolGroup group, {bool isLatest = false}) {
+    return _ExpandableToolGroup(
+      group: group,
+      getIcon: _getToolIcon,
+      isLatest: isLatest,
+    );
+  }
+
+  IconData _getToolIcon(String toolName) {
+    switch (toolName) {
+      case 'read_file':
+        return LucideIcons.fileText;
+      case 'write_file':
+        return LucideIcons.filePlus;
+      case 'edit_file':
+        return LucideIcons.pen;
+      case 'list_files':
+        return LucideIcons.folderOpen;
+      case 'search_files':
+        return LucideIcons.search;
+      case 'run_bash':
+        return LucideIcons.terminal;
+      case 'git_commit':
+        return LucideIcons.gitCommitHorizontal;
+      case 'docker_preview':
+        return LucideIcons.cloud;
+      default:
+        return LucideIcons.wrench;
+    }
   }
 
   Widget _buildMessage(AgentMessage message) {
@@ -62,8 +504,10 @@ class AgentChatPanel extends StatelessWidget {
         break;
 
       case MessageType.agentStatus:
-        if (message.status == 'thinking' || message.status == 'started') {
-          messageWidget = ThinkingMessage(message: message);
+        if (message.status == 'thinking' ||
+            message.status == 'started' ||
+            message.status == 'planning') {
+          messageWidget = const ThinkingMessage();
         } else {
           messageWidget = _buildAgentStatusMessage(message);
         }
@@ -209,28 +653,65 @@ class AgentChatPanel extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(16.r),
               decoration: BoxDecoration(
-                color: Get.theme.cardTheme.color,
-                border: Border.all(color: Get.theme.dividerColor),
+                color: Colors.grey[900],
+                border: Border.all(color: Colors.grey[800]!),
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(4.r),
                   topRight: Radius.circular(16.r),
                   bottomLeft: Radius.circular(16.r),
                   bottomRight: Radius.circular(16.r),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
               ),
-              child: Text(
-                message.text,
-                style: GoogleFonts.inter(
-                  fontSize: 14.sp,
-                  color: Get.textTheme.bodyLarge?.color,
-                  height: 1.5,
+              child: MarkdownBody(
+                data: message.text,
+                styleSheet: MarkdownStyleSheet(
+                  p: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    color: Colors.grey[300],
+                    height: 1.5,
+                  ),
+                  h1: GoogleFonts.inter(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  h2: GoogleFonts.inter(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  h3: GoogleFonts.inter(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  code: GoogleFonts.jetBrainsMono(
+                    fontSize: 12.sp,
+                    backgroundColor: Colors.grey[850],
+                    color: Colors.blue[300],
+                  ),
+                  codeblockDecoration: BoxDecoration(
+                    color: Colors.grey[850],
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  blockquoteDecoration: BoxDecoration(
+                    color: Colors.grey[850],
+                    border: Border(
+                      left: BorderSide(color: Colors.grey[600]!, width: 4),
+                    ),
+                  ),
+                  listBullet: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    color: Colors.grey[400],
+                  ),
+                  strong: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  em: GoogleFonts.inter(
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[300],
+                  ),
                 ),
               ),
             ),
@@ -241,24 +722,11 @@ class AgentChatPanel extends StatelessWidget {
   }
 
   Widget _buildToolExecutionMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8.h, left: 40.w),
-      child: Row(
-        children: [
-          Icon(StatusIcons.tool, size: 16.r, color: AppColors.info),
-          SizedBox(width: 8.w),
-          Text(
-            message.text.isNotEmpty
-                ? message.text
-                : 'Using ${message.tool ?? "tool"}...',
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-              fontSize: 12.sp,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
+    return ToolExecutionCard(
+      toolName: message.tool ?? 'unknown',
+      details: message.text.isNotEmpty ? message.text : null,
+      filePath: message.filePath,
+      initiallyExpanded: !message.isCollapsed,
     );
   }
 
@@ -267,79 +735,12 @@ class AgentChatPanel extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final toolResult = message.toolResult!;
-
-    // For list_files, we might want to show a more compact view
-    if (message.tool == 'list_files') {
-      final files =
-          toolResult.split('\n').where((f) => f.trim().isNotEmpty).toList();
-      if (files.isNotEmpty) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: 8.h, left: 60.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Found ${files.length} items:',
-                style: GoogleFonts.inter(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary),
-              ),
-              SizedBox(height: 4.h),
-              ...files.take(5).map((f) => Padding(
-                    padding: EdgeInsets.only(bottom: 2.h),
-                    child: Row(
-                      children: [
-                        Icon(LucideIcons.file, size: 10.r, color: Colors.grey),
-                        SizedBox(width: 4.w),
-                        Expanded(
-                          child: Text(
-                            f.trim(),
-                            style: GoogleFonts.jetBrainsMono(
-                                fontSize: 10.sp, color: AppColors.textPrimary),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-              if (files.length > 5)
-                Text(
-                  '...and ${files.length - 5} more',
-                  style: GoogleFonts.inter(
-                      fontSize: 10.sp,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.grey),
-                ),
-            ],
-          ),
-        );
-      }
-    }
-
-    // Generic tool result (truncated)
-    final displayResult = toolResult.length > 200
-        ? '${toolResult.substring(0, 200)}...'
-        : toolResult;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8.h, left: 60.w),
-      child: Container(
-        padding: EdgeInsets.all(8.r),
-        decoration: BoxDecoration(
-          color: Get.theme.canvasColor,
-          border: Border.all(color: Get.theme.dividerColor),
-        ),
-        child: Text(
-          displayResult,
-          style: GoogleFonts.jetBrainsMono(
-            fontSize: 10.sp,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ),
+    // Use ToolExecutionCard for all tool results
+    return ToolExecutionCard(
+      toolName: message.tool ?? 'result',
+      details: message.toolResult,
+      filePath: message.filePath,
+      initiallyExpanded: !message.isCollapsed,
     );
   }
 
@@ -375,7 +776,7 @@ class AgentChatPanel extends StatelessWidget {
     // Count tasks from markdown - match various formats:
     // "1. [ ] Task" or "- [ ] Task"
     int taskCount = 0;
-    
+
     // First try: numbered tasks with checkboxes like "1. [ ] Task"
     final numberedCheckboxTasks = RegExp(
       r'^\s*\d+\.\s*\[\s*[x ]?\s*\]',
@@ -383,7 +784,7 @@ class AgentChatPanel extends StatelessWidget {
       caseSensitive: false,
     ).allMatches(planMarkdown);
     taskCount = numberedCheckboxTasks.length;
-    
+
     // Fallback: bullet points with checkboxes like "- [ ] Task"
     if (taskCount == 0) {
       final bulletCheckboxTasks = RegExp(
@@ -464,9 +865,10 @@ class AgentChatPanel extends StatelessWidget {
                                 ),
                               ),
                               Obx(() {
-                                final isPending = message.planId == controller.currentPendingPlanId.value;
+                                final isPending = message.planId ==
+                                    controller.currentPendingPlanId.value;
                                 if (!isPending) return const SizedBox.shrink();
-                                
+
                                 return Container(
                                   padding: EdgeInsets.symmetric(
                                       horizontal: 8.w, vertical: 4.h),
@@ -626,17 +1028,16 @@ class AgentChatPanel extends StatelessWidget {
 
   Widget _buildInputArea(AgentChatController controller) {
     return Container(
-      padding: EdgeInsets.all(16.r),
+      padding: EdgeInsets.only(
+        left: 16.w,
+        right: 16.w,
+        top: 12.h,
+        bottom: 32.h,
+      ),
       decoration: BoxDecoration(
         color: Get.theme.cardTheme.color,
-        border: Border(top: BorderSide(color: Get.theme.dividerColor)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: Offset(0, -2),
-          ),
-        ],
+        border: Border(
+            top: BorderSide(color: Get.theme.dividerColor.withOpacity(0.2))),
       ),
       child: SafeArea(
         child: Column(
@@ -651,8 +1052,8 @@ class AgentChatPanel extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8.r),
-                      border:
-                          Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      border: Border.all(
+                          color: Get.theme.dividerColor.withOpacity(0.2)),
                     ),
                     child: Row(
                       children: [
@@ -663,7 +1064,7 @@ class AgentChatPanel extends StatelessWidget {
                           child: Text(
                             'Browser Agent Mode - AI will control the browser',
                             style: GoogleFonts.inter(
-                              fontSize: 12.sp,
+                              fontSize: 10.sp,
                               color: AppColors.primary,
                               fontWeight: FontWeight.w500,
                             ),
@@ -699,7 +1100,7 @@ class AgentChatPanel extends StatelessWidget {
                           border: Border.all(
                             color: controller.isBrowserAgentMode.value
                                 ? AppColors.primary
-                                : Get.theme.dividerColor,
+                                : Get.theme.dividerColor.withOpacity(0.2),
                             width: controller.isBrowserAgentMode.value ? 2 : 1,
                           ),
                         ),
@@ -715,45 +1116,59 @@ class AgentChatPanel extends StatelessWidget {
 
                 // Text input
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Get.theme.inputDecorationTheme.fillColor,
-                      borderRadius: BorderRadius.circular(24.r),
-                      border: Border.all(color: Get.theme.dividerColor),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(width: 16.w),
-                        Icon(
-                          StatusIcons.message,
-                          size: 20.r,
-                          color: AppColors.textTertiary,
+                  child: Obx(
+                    () => AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      decoration: BoxDecoration(
+                        color: Get.theme.inputDecorationTheme.fillColor,
+                        borderRadius: BorderRadius.circular(24.r),
+                        border: Border.all(
+                          color: controller.isFocused.value
+                              ? AppColors.primary
+                              : Get.theme.dividerColor.withOpacity(0.2),
+                          width: controller.isFocused.value ? 1.5 : 1,
                         ),
-                        SizedBox(width: 10.w),
-                        Expanded(
-                          child: Obx(() => TextField(
-                                controller: controller.textController,
-                                decoration: InputDecoration(
-                                  hintText: controller.isBrowserAgentMode.value
-                                      ? 'Tell the browser what to do...'
-                                      : AppStrings.typeMessage,
-                                  hintStyle: GoogleFonts.inter(
-                                    fontSize: 14.sp,
-                                    color: AppColors.textTertiary,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding:
-                                      EdgeInsets.symmetric(vertical: 12.h),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 16.w),
+                          // Icon(
+                          //   StatusIcons.message,
+                          //   size: 20.r,
+                          //   color: AppColors.textTertiary,
+                          // ),
+                          // SizedBox(width: 10.w),
+                          Expanded(
+                            child: TextField(
+                              focusNode: controller.focusNode,
+                              controller: controller.textController,
+                              decoration: InputDecoration(
+                                hintText: controller.isBrowserAgentMode.value
+                                    ? 'Tell the browser what to do...'
+                                    : AppStrings.typeMessage,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24.r),
+                                  borderSide:
+                                      BorderSide.none, // remove inner line
                                 ),
-                                style: GoogleFonts.inter(fontSize: 14.sp),
-                                maxLines: 4,
-                                minLines: 1,
-                                textInputAction: TextInputAction.send,
-                                onSubmitted: controller.sendMessage,
-                              )),
-                        ),
-                        SizedBox(width: 8.w),
-                      ],
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24.r),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(24.r),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: EdgeInsets.symmetric(
+                                    vertical: 12.h, horizontal: 0),
+                              ),
+                              maxLines: 4,
+                              minLines: 1,
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -824,63 +1239,65 @@ class AgentChatPanel extends StatelessWidget {
   Widget _buildEmptyState(AgentChatController controller) {
     return Center(
       child: Padding(
-        padding: EdgeInsets.all(32.r),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100.r,
-              height: 100.r,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.05),
-                    AppColors.accent.withOpacity(0.05),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+        padding: EdgeInsets.all(20.r),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 100.r,
+                height: 100.r,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withOpacity(0.05),
+                      AppColors.accent.withOpacity(0.05),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
                 ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                AgentAvatarIcons.ai,
-                size: 48.r,
-                color: AppColors.primary.withOpacity(0.8),
-              ),
-            ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
-            SizedBox(height: 24.h),
-            Text(
-              AppStrings.startConversation,
-              style: GoogleFonts.inter(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w600,
-                color: Get.textTheme.titleLarge?.color,
-              ),
-            ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
-            SizedBox(height: 8.h),
-            Text(
-              AppStrings.startConversationSubtitle,
-              style: GoogleFonts.inter(
-                fontSize: 14.sp,
-                color: Get.textTheme.bodyMedium?.color,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
-            SizedBox(height: 32.h),
-            Wrap(
-              spacing: 12.w,
-              runSpacing: 12.h,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildSuggestionChip(
-                    StatusIcons.plus, 'Add feature', controller),
-                _buildSuggestionChip(
-                    StatusIcons.palette, 'Change design', controller),
-                _buildSuggestionChip(StatusIcons.bug, 'Fix bug', controller),
-              ],
-            ).animate().fadeIn(delay: 500.ms),
-          ],
+                child: Icon(
+                  AgentAvatarIcons.ai,
+                  size: 48.r,
+                  color: AppColors.primary.withOpacity(0.8),
+                ),
+              ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
+              SizedBox(height: 24.h),
+              Text(
+                AppStrings.startConversation,
+                style: GoogleFonts.inter(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Get.textTheme.titleLarge?.color,
+                ),
+              ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
+              SizedBox(height: 8.h),
+              Text(
+                AppStrings.startConversationSubtitle,
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  color: Get.textTheme.bodyMedium?.color,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
+              SizedBox(height: 32.h),
+              Wrap(
+                spacing: 12.w,
+                runSpacing: 12.h,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildSuggestionChip(
+                      StatusIcons.plus, 'Add feature', controller),
+                  _buildSuggestionChip(
+                      StatusIcons.palette, 'Change design', controller),
+                  _buildSuggestionChip(StatusIcons.bug, 'Fix bug', controller),
+                ],
+              ).animate().fadeIn(delay: 500.ms),
+            ],
+          ),
         ),
       ),
     );
