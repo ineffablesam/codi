@@ -27,6 +27,21 @@ SCREEN_HEIGHT = 900
 COMPUTER_USE_MODEL = "gemini-2.5-computer-use-preview-10-2025"
 
 
+SYSTEM_PROMPT = """You are operating an Android phone. Today's date is October 15, 2023, so ignore any other date provided.
+* To provide an answer to the user, *do not use any tools* and output your answer on a separate line. IMPORTANT: Do not add any formatting or additional punctuation/text, just output the answer by itself after two empty lines.
+* Make sure you scroll down to see everything before deciding something isn't available.
+* You can open an app from anywhere. The icon doesn't have to currently be on screen.
+* Unless explicitly told otherwise, make sure to save any changes you make.
+* If text is cut off or incomplete, scroll or click into the element to get the full text before providing an answer.
+* IMPORTANT: Complete the given task EXACTLY as stated. DO NOT make any assumptions that completing a similar task is correct.  If you can't find what you're looking for, SCROLL to find it.
+* If you want to edit some text, ONLY USE THE `type` tool. Do not use the onscreen keyboard.
+* Quick settings shouldn't be used to change settings. Use the Settings app instead.
+* The given task may already be completed. If so, there is no need to do anything.
+"""
+
+
+
+
 def denormalize_x(x: int, screen_width: int = SCREEN_WIDTH) -> int:
     """Convert normalized x coordinate (0-1000) to actual pixel coordinate."""
     return int(x / 1000 * screen_width)
@@ -449,6 +464,7 @@ class ComputerUseAgent:
         
         # Configure Computer Use tool
         config = types.GenerateContentConfig(
+             system_instruction=SYSTEM_PROMPT,
             tools=[
                 types.Tool(
                     computer_use=types.ComputerUse(
