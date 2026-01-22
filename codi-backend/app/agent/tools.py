@@ -660,6 +660,33 @@ Please check the logs or wait a moment before trying again."""
         import uuid
         
         async with get_db_context() as session:
+            # Delete existing container record if exists (new container has different ID)
+            # Must be done first since Deployment references Container
+            existing_container_result = await session.execute(
+                select(Container).where(Container.name == container_name)
+            )
+            existing_container = existing_container_result.scalar_one_or_none()
+            
+            if existing_container:
+                await session.delete(existing_container)
+                await session.flush()
+            
+            # Create new container record (must exist before Deployment due to FK)
+            container = Container(
+                id=container_info.id,
+                project_id=context.project_id,
+                name=container_name,
+                image=image_tag.split(":")[0],
+                image_tag=image_tag.split(":")[-1] if ":" in image_tag else "latest",
+                status=ContainerStatus.RUNNING,
+                git_branch=context.current_branch,
+                port=target_port,
+                is_preview=False,
+                started_at=datetime.utcnow(),
+            )
+            session.add(container)
+            await session.flush()
+            
             # Archive any existing deployment with same subdomain
             existing_deployment_result = await session.execute(
                 select(Deployment).where(Deployment.subdomain == context.project_slug)
@@ -673,7 +700,7 @@ Please check the logs or wait a moment before trying again."""
                 session.add(existing_deployment)
                 await session.flush()
             
-            # Create deployment record
+            # Create deployment record (references container_id)
             deployment_id = str(uuid.uuid4())
             deployment = Deployment(
                 id=deployment_id,
@@ -689,21 +716,6 @@ Please check the logs or wait a moment before trying again."""
                 deployed_at=datetime.utcnow(),
             )
             session.add(deployment)
-            
-            # Create container record
-            container = Container(
-                id=container_info.id,
-                project_id=context.project_id,
-                name=container_name,
-                image=image_tag.split(":")[0],
-                image_tag=image_tag.split(":")[-1] if ":" in image_tag else "latest",
-                status=ContainerStatus.RUNNING,
-                git_branch=context.current_branch,
-                port=target_port,
-                is_preview=False,
-                started_at=datetime.utcnow(),
-            )
-            session.add(container)
             
             # Update project with deployment info
             await session.execute(

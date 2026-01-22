@@ -228,6 +228,58 @@ app.get('/session/:id/url', async (req, res) => {
     }
 });
 
+// Send input event (mouse/keyboard) via HTTP
+app.post('/session/:id/input', async (req, res) => {
+    const sessionId = req.params.id;
+    const session = sessions.get(sessionId);
+    if (!session) {
+        return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const event = req.body;
+
+    try {
+        if (event.type === 'input_mouse') {
+            // Mouse handling using Playwright API
+            if (event.eventType === 'mouseMoved') {
+                await session.page.mouse.move(event.x, event.y);
+            } else if (event.eventType === 'mousePressed') {
+                await session.page.mouse.move(event.x, event.y);
+                await session.page.mouse.down({ button: event.button || 'left', clickCount: event.clickCount || 1 });
+            } else if (event.eventType === 'mouseReleased') {
+                await session.page.mouse.move(event.x, event.y);
+                await session.page.mouse.up({ button: event.button || 'left', clickCount: event.clickCount || 1 });
+            }
+        } else if (event.type === 'input_keyboard') {
+            console.log(`[KEYBOARD_DEBUG] HTTP endpoint - Event:`, JSON.stringify(event));
+
+            // Use Playwright keyboard API (NOT CDP!)
+            if (event.eventType === 'type') {
+                const textToType = event.text || event.key;
+                console.log(`[KEYBOARD_DEBUG] HTTP endpoint - Typing: "${textToType}"`);
+                await session.page.keyboard.type(textToType, { delay: 0 });
+                console.log(`[KEYBOARD_DEBUG] HTTP endpoint - Type completed`);
+            } else if (event.eventType === 'press') {
+                console.log(`[KEYBOARD_DEBUG] HTTP endpoint - Pressing: ${event.key}`);
+                await session.page.keyboard.press(event.key);
+            } else if (event.eventType === 'keyDown') {
+                await session.page.keyboard.down(event.key);
+            } else if (event.eventType === 'keyUp') {
+                await session.page.keyboard.up(event.key);
+            } else {
+                console.log(`[KEYBOARD_DEBUG] HTTP endpoint - Unknown eventType: ${event.eventType}`);
+            }
+        } else {
+            return res.status(400).json({ error: `Unknown input type: ${event.type}` });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error(`Input event failed for ${sessionId}:`, error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Execute browser command - UPGRADED with all agent-browser commands
 app.post('/session/:id/command', async (req, res) => {
     const sessionId = req.params.id;
@@ -302,12 +354,39 @@ app.post('/session/:id/command', async (req, res) => {
         // Execute the command using agent-browser's executeCommand
         result = await executeCommand(cmdObj, browser);
 
-        // Update current URL if navigation occurred
-        if (['navigate', 'open', 'goto'].includes(command)) {
-            session.currentUrl = args.url || session.page.url();
+        // Update current URL after navigation/click (could cause page change)
+        const navigationCommands = ['navigate', 'open', 'goto', 'click', 'back', 'forward', 'reload'];
+        if (navigationCommands.includes(command)) {
+            // Wait briefly for page to settle
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            try {
+                const newUrl = session.page.url();
+                if (newUrl && newUrl !== session.currentUrl) {
+                    session.currentUrl = newUrl;
+
+                    // Broadcast URL change to all connected WebSocket clients
+                    const connections = streamConnections.get(sessionId);
+                    if (connections && connections.size > 0) {
+                        const urlMessage = JSON.stringify({
+                            type: 'browser_url_changed',
+                            url: newUrl,
+                            timestamp: Date.now()
+                        });
+                        for (const ws of connections) {
+                            if (ws.readyState === 1) {
+                                ws.send(urlMessage);
+                            }
+                        }
+                        console.log(`[${sessionId}] URL changed to: ${newUrl}`);
+                    }
+                }
+            } catch (urlErr) {
+                console.warn(`[${sessionId}] Could not get URL after ${command}:`, urlErr.message);
+            }
         }
 
-        res.json({ success: true, result });
+        res.json({ success: true, result, currentUrl: session.currentUrl });
     } catch (error) {
         console.error(`Command ${command} failed for ${sessionId}:`, error);
         res.status(500).json({ error: error.message });
@@ -387,22 +466,33 @@ wss.on('connection', (ws, req) => {
         try {
             const event = JSON.parse(data.toString());
             const session = sessions.get(sessionId);
-            if (!session || !session.cdpSession) return;
+            if (!session) return;
+
+            // Note: we use session.page (Playwright API) for all input
 
             if (event.type === 'input_mouse') {
-                await session.cdpSession.send('Input.dispatchMouseEvent', {
-                    type: event.eventType,
-                    x: event.x,
-                    y: event.y,
-                    button: event.button || 'left',
-                    clickCount: event.clickCount || 1
-                });
+                if (event.eventType === 'mouseMoved') {
+                    await session.page.mouse.move(event.x, event.y);
+                } else if (event.eventType === 'mousePressed') {
+                    await session.page.mouse.move(event.x, event.y);
+                    await session.page.mouse.down({ button: event.button || 'left', clickCount: event.clickCount || 1 });
+                } else if (event.eventType === 'mouseReleased') {
+                    await session.page.mouse.move(event.x, event.y);
+                    await session.page.mouse.up({ button: event.button || 'left', clickCount: event.clickCount || 1 });
+                }
             } else if (event.type === 'input_keyboard') {
-                await session.cdpSession.send('Input.dispatchKeyEvent', {
-                    type: event.eventType,
-                    key: event.key,
-                    code: event.code || event.key
-                });
+                if (event.eventType === 'type') {
+                    await session.page.keyboard.type(event.text, { delay: 0 });
+                }
+                else if (event.eventType === 'press') {
+                    await session.page.keyboard.press(event.key);
+                }
+                else if (event.eventType === 'keyDown') {
+                    await session.page.keyboard.down(event.key);
+                }
+                else if (event.eventType === 'keyUp') {
+                    await session.page.keyboard.up(event.key);
+                }
             } else if (event.type === 'set_viewport') {
                 console.log(`Setting viewport for session ${sessionId}: ${event.width}x${event.height}, Mobile: ${event.isMobile}`);
                 await session.page.setViewportSize({ width: event.width, height: event.height });
@@ -433,6 +523,25 @@ wss.on('connection', (ws, req) => {
                         console.log(`Restarted screencast for ${sessionId} with size ${event.width}x${event.height}`);
                     } catch (err) {
                         console.warn(`Failed to update screencast size: ${err.message}`);
+                    }
+                }
+
+                // Broadcast viewport change notification to all connected clients
+                const connections = streamConnections.get(sessionId);
+                if (connections && connections.size > 0) {
+                    const viewportMode = event.isMobile ? 'Mobile' : 'Desktop';
+                    const viewportMessage = JSON.stringify({
+                        type: 'viewport_changed',
+                        mode: viewportMode,
+                        width: event.width,
+                        height: event.height,
+                        message: `Viewport changed to ${viewportMode} (${event.width}x${event.height})`,
+                        timestamp: Date.now()
+                    });
+                    for (const ws of connections) {
+                        if (ws.readyState === 1) {
+                            ws.send(viewportMessage);
+                        }
                     }
                 }
             }

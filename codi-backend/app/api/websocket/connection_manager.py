@@ -186,12 +186,12 @@ class ConnectionManager:
         for ws in disconnected:
             await self.disconnect(ws)
 
-        logger.debug(
-            f"Broadcast to project",
-            project_id=project_id,
-            message_type=message.get("type"),
-            recipients=len(connections) - len(disconnected),
-        )
+        # logger.debug(
+        #     f"Broadcast to project",
+        #     project_id=project_id,
+        #     message_type=message.get("type"),
+        #     recipients=len(connections) - len(disconnected),
+        # )
 
     async def send_agent_status(
         self,

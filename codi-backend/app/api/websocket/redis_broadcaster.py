@@ -90,7 +90,7 @@ class RedisBroadcaster:
         
         try:
             await self._redis.publish(WEBSOCKET_CHANNEL, payload)
-            logger.debug(f"Published message to Redis: project={project_id}, type={message.get('type')}")
+            # logger.debug(f"Published message to Redis: project={project_id}, type={message.get('type')}")
         except Exception as e:
             logger.error(f"Failed to publish to Redis: {e}")
 
@@ -141,7 +141,7 @@ class RedisBroadcaster:
                             project_id = data["project_id"]
                             ws_message = data["message"]
                             
-                            logger.debug(f"Received message from Redis: project={project_id}")
+                            # logger.debug(f"Received message from Redis: project={project_id}")
                             await on_message_callback(project_id, ws_message)
                         except Exception as e:
                             logger.error(f"Error processing Redis message: {e}")
