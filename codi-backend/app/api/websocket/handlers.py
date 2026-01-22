@@ -1,6 +1,11 @@
-"""WebSocket message handlers."""
+"""WebSocket message handlers.
+
+Updated for Gemini 2.5 Computer Use - uses Python Playwright directly instead of Node.js browser-agent.
+"""
+import asyncio
+import base64
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -57,6 +62,8 @@ class WebSocketHandler:
             await self._handle_end_browser_session(data)
         elif message_type == "browser_navigation":
             await self._handle_browser_navigation(data)
+        elif message_type == "stop_browser_agent":
+            await self._handle_stop_browser_agent(data)
         else:
             logger.warning(f"Unknown WebSocket message type: {message_type}")
 
@@ -106,20 +113,33 @@ class WebSocketHandler:
             await self._handle_coding_agent_message(message)
 
     async def _handle_browser_agent_message(self, message: str, data: Dict[str, Any]) -> None:
-        """Handle message routed to browser agent.
+        """Handle message routed to browser agent using Gemini 2.5 Computer Use.
         
         Args:
             message: User's request message
             data: Full message data including optional initial_url
         """
-        from app.agent.browser_agent import BrowserAgent
+        from app.agent.computer_use_agent import ComputerUseAgent
         
         initial_url = data.get("initial_url", "https://google.com")
         
         try:
             # Create and track agent instance for interactions
-            agent = BrowserAgent(project_id=self.project_id, user_id=self.user_id)
+            agent = ComputerUseAgent(
+                project_id=self.project_id,
+                user_id=self.user_id,
+                headless=True,  # Run headless in production
+            )
             _active_browser_agents[self.project_id] = agent
+            
+            # Store agent reference in Redis for cross-worker access
+            try:
+                from app.api.websocket.redis_broadcaster import redis_broadcaster
+                await redis_broadcaster.connect()
+                session_key = f"browser_session:{self.project_id}"
+                await redis_broadcaster._redis.set(session_key, "computer_use_active", ex=3600)
+            except Exception as e:
+                logger.warning(f"Failed to store session in Redis: {e}")
             
             try:
                 # Run browser agent (handles its own WebSocket broadcasting)
@@ -128,6 +148,12 @@ class WebSocketHandler:
                 # Cleanup tracking and resources
                 _active_browser_agents.pop(self.project_id, None)
                 await agent.close()
+                
+                # Remove from Redis
+                try:
+                    await redis_broadcaster._redis.delete(session_key)
+                except Exception:
+                    pass
                 
         except Exception as e:
             logger.error(f"Browser agent failed: {e}")
@@ -142,12 +168,9 @@ class WebSocketHandler:
         """Start an interactive browser session (no AI control).
         
         User can directly control the browser via mouse/keyboard.
-        The session streams frames but doesn't run the AI ReAct loop.
+        Uses Python Playwright directly.
         """
-        import asyncio
-        import httpx
-        import websockets
-        import json
+        from app.agent.computer_use_agent import ComputerUseAgent, SCREEN_WIDTH, SCREEN_HEIGHT
         
         initial_url = data.get("initial_url", "https://google.com")
         
@@ -158,23 +181,27 @@ class WebSocketHandler:
         )
         
         try:
-            # Create browser session via browser-agent service
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    "http://browser-agent:3001/session",
-                    json={"initial_url": initial_url}
-                )
-                response.raise_for_status()
-                session_data = response.json()
-                session_id = session_data["session_id"]
+            # Create agent in interactive mode (no AI loop)
+            agent = ComputerUseAgent(
+                project_id=self.project_id,
+                user_id=self.user_id,
+                headless=True,
+            )
             
-            # Store session in Redis for interaction forwarding
-            from app.api.websocket.redis_broadcaster import redis_broadcaster
-            await redis_broadcaster.connect()
-            session_key = f"browser_session:{self.project_id}"
-            await redis_broadcaster._redis.set(session_key, session_id, ex=3600)
+            # Initialize browser
+            await agent._init_browser(initial_url)
             
-            logger.info(f"Interactive browser session created: {session_id}")
+            # Store agent for interaction handling
+            _active_browser_agents[self.project_id] = agent
+            
+            # Store session in Redis
+            try:
+                from app.api.websocket.redis_broadcaster import redis_broadcaster
+                await redis_broadcaster.connect()
+                session_key = f"browser_session:{self.project_id}"
+                await redis_broadcaster._redis.set(session_key, "interactive_active", ex=3600)
+            except Exception as e:
+                logger.warning(f"Failed to store session in Redis: {e}")
             
             # Notify frontend that session is ready
             await connection_manager.broadcast_to_project(
@@ -189,80 +216,50 @@ class WebSocketHandler:
                 }
             )
             
-            # Start streaming frames to the frontend as a BACKGROUND TASK
-            # This allows the WebSocket handler to continue receiving user interactions
+            # Start streaming frames in background
             async def stream_frames():
-                """Background task to stream frames from browser-agent to frontend."""
-                browser_ws_url = f"ws://browser-agent:3001/stream?session={session_id}"
-                
+                """Background task to stream frames from Playwright to frontend."""
+                frame_count = 0
                 try:
-                    async with websockets.connect(
-                        browser_ws_url, 
-                        ping_interval=20, 
-                        ping_timeout=20,
-                        max_size=10*1024*1024
-                    ) as ws:
-                        logger.info(f"Connected to interactive browser stream: {session_id}")
-                        
-                        while True:
-                            try:
-                                message = await asyncio.wait_for(ws.recv(), timeout=30.0)
-                                frame_data = json.loads(message)
-                                
-                                if frame_data.get("type") == "browser_frame":
-                                    # Clean the base64 data
-                                    image_data = frame_data.get("image", "")
-                                    if image_data.startswith("data:"):
-                                        image_data = image_data.split(",", 1)[1]
-                                    image_data = image_data.replace('\n', '').replace('\r', '').replace(' ', '')
-                                    
-                                    # Extract viewport metadata for coordinate mapping
-                                    metadata = frame_data.get("metadata", {})
-                                    
-                                    # Forward frame to frontend with viewport dimensions
-                                    await connection_manager.broadcast_to_project(
-                                        self.project_id,
-                                        {
-                                            "type": "browser_frame",
-                                            "agent": "browser",
-                                            "image": image_data,
-                                            "format": frame_data.get("format", "jpeg"),
-                                            "timestamp": datetime.utcnow().isoformat(),
-                                            # Include viewport dimensions for coordinate scaling
-                                            "deviceWidth": metadata.get("deviceWidth"),
-                                            "deviceHeight": metadata.get("deviceHeight"),
-                                            "pageScaleFactor": metadata.get("pageScaleFactor", 1),
-                                        }
-                                    )
-                                elif frame_data.get("type") == "browser_url_changed":
-                                    await connection_manager.broadcast_to_project(
-                                        self.project_id,
-                                        {
-                                            "type": "browser_url_changed",
-                                            "agent": "browser",
-                                            "url": frame_data.get("url", ""),
-                                            "timestamp": datetime.utcnow().isoformat(),
-                                        }
-                                    )
-                            except asyncio.TimeoutError:
-                                # Check if WebSocket is still connected
-                                continue
-                            except websockets.exceptions.ConnectionClosed:
-                                logger.info(f"Interactive browser stream closed: {session_id}")
-                                break
-                                
+                    while agent._page and not agent._stop_requested:
+                        try:
+                            # Capture screenshot
+                            screenshot_bytes = await agent._get_screenshot()
+                            screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+                            
+                            # Forward frame to frontend
+                            await connection_manager.broadcast_to_project(
+                                self.project_id,
+                                {
+                                    "type": "browser_frame",
+                                    "agent": "browser",
+                                    "image": screenshot_b64,
+                                    "format": "png",
+                                    "timestamp": datetime.utcnow().isoformat(),
+                                    "deviceWidth": SCREEN_WIDTH,
+                                    "deviceHeight": SCREEN_HEIGHT,
+                                }
+                            )
+                            
+                            frame_count += 1
+                            if frame_count % 100 == 0:
+                                logger.debug(f"Streamed {frame_count} frames for project {self.project_id}")
+                            
+                            # 30 FPS = ~33ms per frame
+                            await asyncio.sleep(0.033)
+                            
+                        except Exception as e:
+                            logger.warning(f"Frame capture error: {e}")
+                            await asyncio.sleep(0.1)
+                            
                 except Exception as stream_err:
                     logger.warning(f"Interactive browser stream error: {stream_err}")
-                
-                # Cleanup session from Redis
-                try:
-                    await redis_broadcaster._redis.delete(session_key)
-                except Exception:
-                    pass
+                finally:
+                    logger.info(f"Interactive browser stream ended for project {self.project_id}")
             
-            # Start the streaming as a background task - don't await it!
+            # Start the streaming as a background task
             asyncio.create_task(stream_frames())
-            logger.info(f"Started background streaming task for session {session_id}")
+            logger.info(f"Started interactive browser session for project {self.project_id}")
             
         except Exception as e:
             logger.error(f"Failed to start interactive browser: {e}")
@@ -275,28 +272,27 @@ class WebSocketHandler:
 
     async def _handle_end_browser_session(self, data: Dict[str, Any]) -> None:
         """End the current browser session."""
-        import httpx
-        
         logger.info(f"Ending browser session for project {self.project_id}")
         
         try:
-            from app.api.websocket.redis_broadcaster import redis_broadcaster
-            await redis_broadcaster.connect()
+            # Get active agent
+            agent = _active_browser_agents.get(self.project_id)
             
-            session_key = f"browser_session:{self.project_id}"
-            session_id = await redis_broadcaster._redis.get(session_key)
+            if agent:
+                # Stop and close
+                agent.stop()
+                await agent.close()
+                _active_browser_agents.pop(self.project_id, None)
+                logger.info(f"Closed browser agent for project {self.project_id}")
             
-            if session_id:
-                # Delete session from browser-agent service
-                try:
-                    async with httpx.AsyncClient(timeout=10.0) as client:
-                        await client.delete(f"http://browser-agent:3001/session/{session_id}")
-                        logger.info(f"Closed browser session: {session_id}")
-                except Exception as e:
-                    logger.warning(f"Failed to close browser session via API: {e}")
-                
-                # Remove from Redis
+            # Remove from Redis
+            try:
+                from app.api.websocket.redis_broadcaster import redis_broadcaster
+                await redis_broadcaster.connect()
+                session_key = f"browser_session:{self.project_id}"
                 await redis_broadcaster._redis.delete(session_key)
+            except Exception as e:
+                logger.warning(f"Failed to remove session from Redis: {e}")
             
             # Notify frontend
             await connection_manager.broadcast_to_project(
@@ -312,67 +308,66 @@ class WebSocketHandler:
         except Exception as e:
             logger.error(f"Failed to end browser session: {e}")
 
+    async def _handle_stop_browser_agent(self, data: Dict[str, Any]) -> None:
+        """Stop an ongoing browser agent task without closing session."""
+        logger.info(f"Stopping browser agent for project {self.project_id}")
+        
+        agent = _active_browser_agents.get(self.project_id)
+        if agent:
+            agent.stop()
+            await connection_manager.broadcast_to_project(
+                self.project_id,
+                {
+                    "type": "agent_status",
+                    "agent": "browser",
+                    "status": "stopped",
+                    "message": "Browser agent stopped by user",
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
+
     async def _handle_browser_navigation(self, data: Dict[str, Any]) -> None:
         """Handle browser navigation commands (back, forward, reload, navigate)."""
-        import httpx
-        
         action = data.get("action")
         url = data.get("url")
         
         logger.info(f"Browser navigation: {action}" + (f" to {url}" if url else ""))
         
+        agent = _active_browser_agents.get(self.project_id)
+        if not agent or not agent._page:
+            logger.debug(f"No active browser for project {self.project_id}")
+            return
+        
         try:
-            from app.api.websocket.redis_broadcaster import redis_broadcaster
-            await redis_broadcaster.connect()
+            if action == "back":
+                await agent._page.go_back()
+            elif action == "forward":
+                await agent._page.go_forward()
+            elif action == "reload":
+                await agent._page.reload()
+            elif action == "navigate" and url:
+                await agent._page.goto(url, wait_until="domcontentloaded")
             
-            session_key = f"browser_session:{self.project_id}"
-            session_id = await redis_broadcaster._redis.get(session_key)
+            # Broadcast URL change
+            current_url = agent._page.url
+            await connection_manager.broadcast_to_project(
+                self.project_id,
+                {
+                    "type": "browser_url_changed",
+                    "agent": "browser",
+                    "url": current_url,
+                    "timestamp": datetime.utcnow().isoformat(),
+                }
+            )
             
-            if not session_id:
-                logger.debug(f"No active browser session for project {self.project_id}")
-                return
-            
-            # Map actions to browser-agent commands
-            command_map = {
-                "back": "back",
-                "forward": "forward", 
-                "reload": "reload",
-                "navigate": "navigate",
-            }
-            
-            command = command_map.get(action)
-            if not command:
-                logger.warning(f"Unknown navigation action: {action}")
-                return
-            
-            # Send command to browser-agent
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                payload = {"command": command}
-                if command == "navigate" and url:
-                    payload["args"] = {"url": url}
-                
-                response = await client.post(
-                    f"http://browser-agent:3001/session/{session_id}/command",
-                    json=payload
-                )
-                
-                if response.status_code == 200:
-                    logger.info(f"Navigation command executed: {action}")
-                else:
-                    logger.warning(f"Navigation failed: {response.status_code} - {response.text}")
-                    
         except Exception as e:
             logger.error(f"Failed to handle browser navigation: {e}")
-
 
     async def _handle_user_interaction(self, data: Dict[str, Any]) -> None:
         """Handle user interaction event (mouse/keyboard).
         
-        Since we run with multiple workers, we can't rely on in-memory tracking.
-        Instead, we forward interactions via HTTP to the browser-agent service.
+        Routes interactions directly to the Playwright browser.
         """
-        import httpx
-        
         agent_type = data.get("agent")
         payload = data.get("payload")
         
@@ -380,43 +375,15 @@ class WebSocketHandler:
             logger.debug(f"Ignoring non-browser interaction: {agent_type}")
             return
         
-        # DEBUG LOGGING for User Interaction
-        if payload and payload.get('type') == 'input_keyboard':
-            logger.info(f"KEYBOARD_DEBUG: Backend received: {payload}")
-            # Log specifically for 'type' events
-            if payload.get('eventType') == 'type':
-                logger.info(f"KEYBOARD_DEBUG: Type event with text: '{payload.get('text')}'")
+        # Get active agent for this project
+        agent = _active_browser_agents.get(self.project_id)
         
-        # Get active session for this project from Redis
+        if not agent:
+            logger.debug(f"No active browser agent for project {self.project_id}")
+            return
+        
         try:
-            from app.api.websocket.redis_broadcaster import redis_broadcaster
-            
-            # Ensure Redis is connected
-            await redis_broadcaster.connect()
-            
-            session_key = f"browser_session:{self.project_id}"
-            session_id = await redis_broadcaster._redis.get(session_key)
-            
-            if not session_id:
-                logger.debug(f"No active browser session for project {self.project_id}")
-                return
-            
-            session_id = session_id if isinstance(session_id, str) else session_id
-            
-            # Use HTTP POST to send input event (avoids WebSocket connection lifecycle issues)
-            try:
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.post(
-                        f"http://browser-agent:3001/session/{session_id}/input",
-                        json=payload
-                    )
-                    if response.status_code == 200:
-                        logger.debug(f"Forwarded interaction to browser-agent session {session_id}: {payload.get('type')}")
-                    else:
-                        logger.warning(f"Browser-agent returned {response.status_code}: {response.text}")
-            except Exception as http_err:
-                logger.warning(f"Failed to forward interaction via HTTP: {http_err}")
-                
+            await agent.handle_user_interaction({"payload": payload})
         except Exception as e:
             logger.warning(f"Failed to handle user interaction: {e}")
 
@@ -472,8 +439,6 @@ class WebSocketHandler:
         )
 
         # Store the response or forward to the agent
-        # This would typically be handled through a callback mechanism
-        # For now, we'll broadcast it so the agent can pick it up
         await connection_manager.broadcast_to_project(
             self.project_id,
             {
@@ -510,7 +475,7 @@ class WebSocketHandler:
         else:
             logger.warning(f"No active agent found for project {self.project_id}")
         
-        # Also update the plan status in the database via API
+        # Update the plan status in the database
         if plan_id:
             try:
                 from app.core.database import get_db_context
@@ -533,7 +498,7 @@ class WebSocketHandler:
                         
                         await session.commit()
                         
-                        # Send signal to agent via Redis (instant)
+                        # Send signal to agent via Redis
                         try:
                             from app.api.websocket.redis_broadcaster import redis_broadcaster
                             await redis_broadcaster.send_agent_signal(

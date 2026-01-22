@@ -50,6 +50,12 @@ services:
     networks:
       - codi-network
     restart: unless-stopped
+    # Shared memory for Chromium (Playwright Computer Use)
+    shm_size: '512mb'
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.codi-api.rule=Host(`api.codi.local`)"
@@ -135,24 +141,8 @@ services:
       - codi-network
     restart: unless-stopped
 
-  # Browser Agent Service for AI-driven browser automation
-  browser-agent:
-    build:
-      context: ../browser-agent
-    ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=production
-    networks:
-      - codi-network
-    restart: unless-stopped
-    # Chromium requires significant memory
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-    # Shared memory for Chromium
-    shm_size: '512mb'
+  # Browser Agent Service REMOVED
+  # Gemini 2.5 Computer Use now runs Playwright directly in the api service
 
 volumes:
   postgres_data:

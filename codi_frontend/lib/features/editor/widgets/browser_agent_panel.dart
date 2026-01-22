@@ -107,8 +107,8 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
       ),
       child: Row(
         children: [
-          // Navigation Buttons (only in interactive mode)
-          Obx(() => controller.isInteractiveMode.value
+          // Navigation Buttons (only when session is active)
+          Obx(() => controller.isSessionActive.value
               ? Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -134,21 +134,6 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                 )
               : const SizedBox.shrink()),
 
-          // // Globe icon
-          // Container(
-          //   padding: EdgeInsets.all(6.r),
-          //   decoration: BoxDecoration(
-          //     color: AppColors.primary.withOpacity(0.1),
-          //     borderRadius: BorderRadius.circular(6.r),
-          //   ),
-          //   child: Icon(
-          //     RadixIcons.Globe,
-          //     size: 14.sp,
-          //     color: AppColors.primary,
-          //   ),
-          // ),
-          // SizedBox(width: 8.w),
-
           // URL text input
           Expanded(
             child: Container(
@@ -158,105 +143,38 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                 color: Get.theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Obx(() {
-                      // Keep text field in sync with controller URL if not focused
-                      // Note: A verified implementation would use a TextEditingController
-                      // and listeners, but for now we use a simple approach
-                      return TextField(
-                        controller: TextEditingController(
-                            text: controller.currentUrl.value)
-                          ..selection = TextSelection.fromPosition(TextPosition(
-                              offset: controller.currentUrl.value.length)),
-                        style: SFPro.regular(
-                          fontSize: 12.sp,
-                          color: controller.isInteractiveMode.value
-                              ? Get.textTheme.bodyMedium?.color
-                              : Colors.grey.shade400,
-                        ),
-                        enabled: controller.isInteractiveMode.value,
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.only(
-                              bottom: 14.h), // Center vertically
-                          hintText: 'Enter URL...',
-                          isDense: true,
-                        ),
-                        onSubmitted: (value) => controller.navigateTo(value),
-                      );
-                    }),
-                  ),
-                  if (controller.isInteractiveMode.value) ...[
-                    SizedBox(width: 8.w),
-                    InkWell(
-                      onTap: () {
-                        // We can't easily get the text here without a persistent controller
-                        // So we rely on the user hitting Enter for now, or we could refactor
-                        // to use a stateful widget or keep controller in GetX controller.
-                        // For now, let's just show the icon as an indicator that Enter works
-                      },
-                      child: Icon(
-                        Icons.arrow_forward_ios,
-                        size: 10.sp,
-                        color: Colors.grey,
-                      ),
+              child: Obx(() => TextField(
+                    controller: TextEditingController(
+                        text: controller.currentUrl.value)
+                      ..selection = TextSelection.fromPosition(TextPosition(
+                          offset: controller.currentUrl.value.length)),
+                    style: SFPro.regular(
+                      fontSize: 12.sp,
+                      color: controller.isSessionActive.value
+                          ? Get.textTheme.bodyMedium?.color
+                          : Colors.grey.shade400,
                     ),
-                  ],
-                ],
-              ),
+                    enabled: controller.isSessionActive.value,
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.only(bottom: 14.h),
+                      hintText: 'Enter URL...',
+                      isDense: true,
+                    ),
+                    onSubmitted: (value) => controller.navigateTo(value),
+                  )),
             ),
           ),
 
-          // Status indicator / Interactive mode badge
-          // Obx(() {
-          //   if (!controller.isSessionActive.value) {
-          //     return const SizedBox.shrink();
-          //   }
-          //
-          //   if (controller.isInteractiveMode.value) {
-          //     // Show interactive mode badge
-          //     return Container(
-          //       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-          //       decoration: BoxDecoration(
-          //         color: Colors.blue.withOpacity(0.1),
-          //         borderRadius: BorderRadius.circular(4.r),
-          //         border: Border.all(color: Colors.blue.withOpacity(0.3)),
-          //       ),
-          //       child: Text(
-          //         'Interactive',
-          //         style: SFPro.medium(
-          //           fontSize: 10.sp,
-          //           color: Colors.blue,
-          //         ),
-          //       ),
-          //     );
-          //   }
-          //
-          //   // Default: green dot for AI mode
-          //   return Container(
-          //     padding: EdgeInsets.all(6.r),
-          //     child: Icon(
-          //       Icons.circle,
-          //       size: 8.sp,
-          //       color: AppColors.success,
-          //     ),
-          //   );
-          // }),
-          //
-          // SizedBox(width: 8.w),
+          SizedBox(width: 8.w),
 
           // End Session button (when session is active)
           Obx(() => controller.isSessionActive.value
               ? InkWell(
-                  onTap: () {
-                    controller.clearSession();
-                  },
+                  onTap: () => controller.clearSession(),
                   borderRadius: BorderRadius.circular(4.r),
                   child: Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                     decoration: BoxDecoration(
                       color: Colors.red.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4.r),
@@ -264,19 +182,9 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.close,
-                          size: 12.sp,
-                          color: Colors.red,
-                        ),
+                        Icon(Icons.close, size: 12.sp, color: Colors.red),
                         SizedBox(width: 4.w),
-                        Text(
-                          'End',
-                          style: SFPro.medium(
-                            fontSize: 10.sp,
-                            color: Colors.red,
-                          ),
-                        ),
+                        Text('End', style: SFPro.medium(fontSize: 10.sp, color: Colors.red)),
                       ],
                     ),
                   ),
@@ -285,10 +193,9 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
 
           SizedBox(width: 8.w),
 
-          // Viewport Toggle
+          // Viewport Toggle (when session is active)
           Obx(() {
-            if (!controller.isSessionActive.value)
-              return const SizedBox.shrink();
+            if (!controller.isSessionActive.value) return const SizedBox.shrink();
 
             return Container(
               height: 24.h,
@@ -303,8 +210,7 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                     icon: Icons.desktop_mac,
                     isActive: !controller.isMobile.value,
                     onTap: () {
-                      if (controller.isMobile.value)
-                        controller.toggleViewport();
+                      if (controller.isMobile.value) controller.toggleViewport();
                     },
                   ),
                   Container(width: 1, color: Get.theme.dividerColor),
@@ -312,8 +218,7 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                     icon: Icons.phone_iphone,
                     isActive: controller.isMobile.value,
                     onTap: () {
-                      if (!controller.isMobile.value)
-                        controller.toggleViewport();
+                      if (!controller.isMobile.value) controller.toggleViewport();
                     },
                   ),
                 ],

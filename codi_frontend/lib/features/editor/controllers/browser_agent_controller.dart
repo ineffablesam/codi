@@ -32,8 +32,8 @@ class BrowserAgentController extends GetxController {
 
   // Actual device/viewport dimensions from screencast metadata
   // These are updated with each frame and used for coordinate scaling
-  final actualDeviceWidth = 1280.obs;
-  final actualDeviceHeight = 800.obs;
+  final actualDeviceWidth = 1440.obs;
+  final actualDeviceHeight = 900.obs;
 
   // Stats for debugging
   final frameCount = 0.obs;
@@ -378,6 +378,18 @@ class BrowserAgentController extends GetxController {
     isLoading.value = false;
     currentUrl.value = 'https://google.com';
     isMobile.value = false; // Reset to desktop on clear
+  }
+
+  /// Stop an ongoing browser agent task without ending the session
+  void stopBrowserAgent() {
+    if (!isSessionActive.value) return;
+    
+    _webSocketClient.sendMessage({
+      'type': 'stop_browser_agent',
+    });
+    
+    isLoading.value = false;
+    AppLogger.debug('Sent stop signal to browser agent');
   }
 
   /// Start an interactive-only browser session (no AI control)

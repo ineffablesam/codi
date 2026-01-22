@@ -454,26 +454,36 @@ class AgentChatController extends GetxController {
 
   /// Stop the current running task
   Future<void> stopTask() async {
-    if (!isAgentWorking.value || currentTaskId.value == null) return;
+    if (!isAgentWorking.value) return;
 
-    try {
-      final projectId = _editorController.currentProject.value?.id;
-      if (projectId == null) return;
-
-      final taskId = currentTaskId.value!;
-      AppLogger.info('Stopping task: $taskId');
-
-      // Call high-level API to stop task
-      // We'll use editorService since it handles REST calls
-      await _editorService.stopTask(projectId.toString(), taskId);
-
-      // Update local state proactively
-      isAgentWorking.value = false;
-      isTyping.value = false;
-      _editorController.setAgentWorking(false);
-    } catch (e) {
-      AppLogger.error('Failed to stop task', error: e);
+    // 1. Stop coding agent if taskId exists
+    if (currentTaskId.value != null) {
+      try {
+        final projectId = _editorController.currentProject.value?.id;
+        if (projectId != null) {
+          final taskId = currentTaskId.value!;
+          AppLogger.info('Stopping coding task: $taskId');
+          await _editorService.stopTask(projectId.toString(), taskId);
+        }
+      } catch (e) {
+        AppLogger.error('Failed to stop coding task', error: e);
+      }
     }
+
+    // 2. Stop browser agent if active
+    try {
+      final browserController = Get.find<BrowserAgentController>();
+      if (browserController.isSessionActive.value) {
+        browserController.stopBrowserAgent();
+      }
+    } catch (e) {
+      // BrowserController not found or other error
+    }
+
+    // Update local state proactively
+    isAgentWorking.value = false;
+    isTyping.value = false;
+    _editorController.setAgentWorking(false);
   }
 
   /// Clear chat history

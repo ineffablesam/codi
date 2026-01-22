@@ -44,6 +44,9 @@ FROM base as development
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+# Install Playwright and Chromium for Computer Use agent
+RUN pip install playwright && playwright install chromium --with-deps
+
 COPY . .
 
 EXPOSE 8000
@@ -55,6 +58,9 @@ FROM base as production
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+
+# Install Playwright and Chromium for Computer Use agent
+RUN pip install playwright && playwright install chromium --with-deps
 
 COPY --chown=codi:codi . .
 
