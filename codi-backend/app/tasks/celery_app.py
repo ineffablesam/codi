@@ -147,6 +147,7 @@ def run_agent_workflow_task(
     user_id: int,
     user_message: str,
     project_folder: str | None = None,
+    session_id: str | None = None,
 ) -> Dict[str, Any]:
     """Celery task to run the agent workflow.
 
@@ -157,6 +158,7 @@ def run_agent_workflow_task(
         user_id: User ID
         user_message: User's message/command
         project_folder: Local path to project repository
+        session_id: Optional chat session ID for multi-chat
 
     Returns:
         Dictionary with task results
@@ -168,17 +170,19 @@ def run_agent_workflow_task(
         task_id=task_id,
         project_id=project_id,
         user_id=user_id,
+        session_id=session_id,
     )
 
     start_time = datetime.utcnow()
 
     try:
-        # Create workflow executor with local project folder
+        # Create workflow executor with local project folder and session_id
         executor = WorkflowExecutor(
             project_id=project_id,
             user_id=user_id,
             task_id=task_id,
             project_folder=project_folder,
+            session_id=session_id,
         )
 
         # Run the workflow (this is async, so we need to run it in the event loop)

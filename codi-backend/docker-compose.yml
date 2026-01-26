@@ -95,6 +95,16 @@ services:
     networks:
       - codi-network
     restart: unless-stopped
+    
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    networks:
+      - codi-network
+    restart: unless-stopped
 
   celery-worker:
     build:
@@ -148,6 +158,7 @@ volumes:
   postgres_data:
   redis_data:
   codi_repos:  # Persistent storage for project repositories
+  qdrant_storage:  # Mem0 vector storage
 
 networks:
   codi-network:

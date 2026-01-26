@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import agents_router, auth_router, health_router, projects_router, files_router, backend_router, containers_router, deployments_router, plans_router
+from app.api import agents_router, auth_router, health_router, projects_router, files_router, backend_router, containers_router, deployments_router, plans_router, chats_router
 from app.core.config import settings
 from app.core.database import init_db
 from app.utils.logging import get_logger, setup_logging
@@ -133,6 +133,7 @@ app.include_router(backend_router, prefix="/api/v1")
 app.include_router(containers_router, prefix="/api/v1")
 app.include_router(deployments_router, prefix="/api/v1")
 app.include_router(plans_router, prefix="/api/v1")
+app.include_router(chats_router, prefix="/api/v1")
 
 
 @app.get("/")

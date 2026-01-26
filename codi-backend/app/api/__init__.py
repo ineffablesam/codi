@@ -9,6 +9,7 @@ from app.api.v1 import (
     containers_router,
     deployments_router,
     plans_router,
+    chats_router,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "containers_router",
     "deployments_router",
     "plans_router",
+    "chats_router",
 ]

@@ -17,6 +17,10 @@ from app.services.infrastructure import (
     get_traefik_service,
 )
 
+# Memory services
+from app.services.memory import Mem0Service
+from app.services.memory.mem0_service import get_mem0_service
+
 __all__ = [
     # Domain
     "EncryptionService",
@@ -30,4 +34,8 @@ __all__ = [
     "get_docker_service",
     "TraefikService",
     "get_traefik_service",
+    # Memory
+    "Mem0Service",
+    "get_mem0_service",
 ]
+

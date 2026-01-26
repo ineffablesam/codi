@@ -10,10 +10,14 @@ import '../../../core/api/websocket_client.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/logger.dart';
 import '../../planning/controllers/planning_controller.dart';
+import '../../projects/controllers/project_setup_controller.dart';
 import '../models/agent_message_model.dart';
+import '../models/chat_session_model.dart';
+import '../services/chat_service.dart';
 import '../services/editor_service.dart';
 import 'browser_agent_controller.dart';
 import 'editor_controller.dart';
+import 'multi_chat_controller.dart';
 import 'preview_controller.dart';
 
 /// Controller for agent chat panel
@@ -33,6 +37,16 @@ class AgentChatController extends GetxController {
   final isTyping = false.obs;
   final isSending = false.obs;
   final currentTaskId = RxnString();
+  final isInputBlocked = false.obs;
+
+  // Multi-chat integration
+  final currentSessionId = RxnString();
+  final ChatService _chatService = Get.put(ChatService());
+  late final MultiChatController _multiChatController;
+  late final ProjectSetupController _projectSetupController;
+
+  final isChatListDrawerOpen = false.obs;
+  final currentChatTitle = ''.obs;
 
   // Track when work started and if tools have been used (to distinguish quick conversations)
   final Rxn<DateTime> workingStartTime = Rxn<DateTime>();
@@ -58,6 +72,21 @@ class AgentChatController extends GetxController {
     focusNode.addListener(() {
       isFocused.value = focusNode.hasFocus;
     });
+
+    // Initialize controllers lazily
+    _multiChatController = Get.put(MultiChatController());
+    _projectSetupController = Get.put(ProjectSetupController());
+
+    // Listen to setup stage to block input
+    ever(_projectSetupController.isInitialSetup, (isInitial) {
+      isInputBlocked.value = isInitial || isAgentWorking.value;
+    });
+
+    // Also block/unblock based on agent working state
+    ever(isAgentWorking, (working) {
+      isInputBlocked.value =
+          working || _projectSetupController.isInitialSetup.value;
+    });
     // Periodically check if we should show the generating indicator
     _generatingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _updateGeneratingStatus();
@@ -81,6 +110,23 @@ class AgentChatController extends GetxController {
     // Show if tools are active OR if it's been more than 20 seconds
     // to distinguish long-running tasks from quick conversations
     showGeneratingIndicator.value = hasToolActivity.value || elapsed >= 20;
+  }
+
+  // Add these methods
+  void toggleChatListDrawer() {
+    isChatListDrawerOpen.value = !isChatListDrawerOpen.value;
+  }
+
+  void openChatListDrawer() {
+    isChatListDrawerOpen.value = true;
+  }
+
+  void closeChatListDrawer() {
+    isChatListDrawerOpen.value = false;
+  }
+
+  void updateCurrentChatTitle(String title) {
+    currentChatTitle.value = title;
   }
 
   /// Subscribe to WebSocket messages
@@ -441,12 +487,13 @@ class AgentChatController extends GetxController {
         throw Exception('No project loaded');
       }
 
-      // Send via WebSocket with browser mode flag
+      // Send via WebSocket with browser mode flag and session ID
       _webSocketClient.sendMessage({
         'type': 'user_message',
         'message': trimmedText,
         'project_id': projectId,
         'browser_mode': isBrowserAgentMode.value,
+        'session_id': currentSessionId.value,
       });
     } catch (e) {
       AppLogger.error('Failed to send message', error: e);
@@ -544,6 +591,36 @@ class AgentChatController extends GetxController {
 
     isAwaitingApproval.value = false;
     currentPendingPlanId.value = null;
+  }
+
+  /// Switch to a different chat session
+  Future<void> switchSession(ChatSession session) async {
+    currentSessionId.value = session.id;
+    messages.clear();
+
+    // Load messages from API
+    try {
+      final history = await _chatService.getMessages(session.id);
+
+      // Convert API messages to AgentMessage format
+      final convertedMessages = history.map((m) {
+        if (m.role == 'user') {
+          return AgentMessage.user(m.content);
+        } else {
+          // Assistant message
+          return AgentMessage(
+            text: m.content,
+            timestamp: m.createdAt,
+            type: MessageType.agentResponse,
+            toolResult: m.toolCalls != null ? m.toolCalls.toString() : null,
+          );
+        }
+      }).toList();
+
+      messages.addAll(convertedMessages);
+    } catch (e) {
+      AppLogger.error('Failed to load chat history', error: e);
+    }
   }
 
   @override

@@ -230,6 +230,78 @@ class CodingAgent:
         self._current_plan_id: Optional[int] = None
         self._plan_approved: Optional[bool] = None
         self._approval_event: Optional[asyncio.Event] = None
+        
+        # Memory service (lazy loaded)
+        self._mem0_service = None
+
+    @property
+    def mem0_service(self):
+        """Get Mem0 service (lazy load)."""
+        if self._mem0_service is None:
+            try:
+                from app.services.memory.mem0_service import get_mem0_service
+                self._mem0_service = get_mem0_service()
+            except ImportError:
+                logger.warning("Mem0Service not available")
+                self._mem0_service = None
+        return self._mem0_service
+
+    async def _load_memories(self, user_message: str) -> str:
+        """Load relevant memories for the conversation context.
+        
+        Args:
+            user_message: Current user message to find relevant context for
+            
+        Returns:
+            Formatted memory context string
+        """
+        if not self.mem0_service or not self.mem0_service.is_available:
+            return ""
+            
+        try:
+            # Generate Mem0 user ID
+            mem0_user_id = f"user_{self.context.user_id}_project_{self.context.project_id}"
+            
+            # Get persistent context
+            context = await self.mem0_service.get_session_context(
+                session_id=self.context.session_id,
+                user_id=mem0_user_id,
+                query=user_message,
+            )
+            
+            if context:
+                logger.info("Loaded persistent memories from Mem0")
+                return context
+                
+        except Exception as e:
+            logger.warning(f"Failed to load memories: {e}")
+            
+        return ""
+
+    async def _save_memory(self, content: str, memory_type: str = "task") -> None:
+        """Save a new memory to Mem0.
+        
+        Args:
+            content: Memory content
+            memory_type: Type classification
+        """
+        if not self.mem0_service or not self.mem0_service.is_available:
+            return
+            
+        try:
+            mem0_user_id = f"user_{self.context.user_id}_project_{self.context.project_id}"
+            
+            await self.mem0_service.add_memory(
+                content=content,
+                user_id=mem0_user_id,
+                session_id=self.context.session_id,
+                project_id=self.context.project_id,
+                memory_type=memory_type,
+            )
+            logger.info(f"Saved memory: {content[:50]}...")
+            
+        except Exception as e:
+            logger.warning(f"Failed to save memory: {e}")
     
     @property
     def llm(self) -> ChatGoogleGenerativeAI:
@@ -828,6 +900,13 @@ Generate a brief walkthrough of what was accomplished."""
                 logger.warning(f"Failed to load knowledge packs: {e}")
                 # Continue with base prompt
         
+        # Load relevant memories if session_id is present
+        memory_context = ""
+        if self.context.session_id:
+            memory_context = await self._load_memories(user_message)
+            if memory_context:
+                system_prompt = f"{system_prompt}\n\n{memory_context}"
+        
         # Initialize conversation with system prompt and user message
         self.messages = [
             SystemMessage(content=system_prompt),
@@ -994,6 +1073,14 @@ Generate a brief walkthrough of what was accomplished."""
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )
+
+        # Save successful interaction to memory
+        if self.context.session_id and not "reached the maximum number of iterations" in final_response:
+            # Extract key accomplishment or summary for memory
+            await self._save_memory(
+                content=f"User asked: {user_message}\nAccomplished: {final_response[:200]}...",
+                memory_type="task"
+            )
 
         
         return final_response

@@ -7,6 +7,7 @@ from app.models.backend_connection import BackendConnection, ProjectBackendConfi
 from app.models.container import Container, ContainerStatus
 from app.models.deployment import Deployment, DeploymentStatus
 from app.models.plan import ImplementationPlan, PlanTask, PlanStatus
+from app.models.chat_session import ChatSession, ChatMessage, AgentMemory
 
 __all__ = [
     "User",
@@ -22,4 +23,9 @@ __all__ = [
     "ImplementationPlan",
     "PlanTask",
     "PlanStatus",
+    # Multi-chat models
+    "ChatSession",
+    "ChatMessage",
+    "AgentMemory",
 ]
+

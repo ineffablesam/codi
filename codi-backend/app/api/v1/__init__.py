@@ -8,6 +8,7 @@ from app.api.v1.routes.backend_oauth import router as backend_router
 from app.api.v1.routes.containers import router as containers_router
 from app.api.v1.routes.deployments import router as deployments_router
 from app.api.v1.routes.plans import router as plans_router
+from app.api.v1.routes.chats import router as chats_router
 
 __all__ = [
     "auth_router",
@@ -19,4 +20,6 @@ __all__ = [
     "containers_router",
     "deployments_router",
     "plans_router",
+    "chats_router",
 ]
+

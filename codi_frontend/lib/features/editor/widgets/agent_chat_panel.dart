@@ -18,9 +18,11 @@ import 'package:super_context_menu/super_context_menu.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../projects/controllers/project_setup_controller.dart';
 import '../constants/chat_icons.dart';
 import '../controllers/agent_chat_controller.dart';
 import '../models/agent_message_model.dart';
+import 'chat_list_sidebar.dart';
 
 /// Helper class for grouping tool messages
 class _ToolGroup {
@@ -379,16 +381,183 @@ class AgentChatPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<AgentChatController>();
+    final projectSetupController = Get.find<ProjectSetupController>();
 
     return Container(
       color: Get.theme.cardTheme.color,
-      child: Column(
-        children: [
-          Expanded(child: _buildMessageList(controller)),
-          _buildInputArea(controller),
-        ],
+      child: Obx(() {
+        final isInitialSetup = projectSetupController.isInitialSetup.value;
+
+        return Stack(
+          children: [
+            // Main chat area
+            Column(
+              children: [
+                // Header with menu button
+                if (!isInitialSetup) _buildHeader(controller),
+                Expanded(child: _buildMessageList(controller)),
+                _buildInputArea(controller),
+              ],
+            ),
+
+            // Sliding drawer for chat list
+            if (!isInitialSetup) _buildChatListDrawer(controller),
+          ],
+        );
+      }),
+    );
+  }
+
+  Widget _buildHeader(AgentChatController controller) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: Get.theme.cardTheme.color,
+        border: Border(
+          bottom: BorderSide(
+            color: Get.theme.dividerColor.withOpacity(0.2),
+          ),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            // Menu button to open drawer
+            IconButton(
+              onPressed: () {
+                controller.toggleChatListDrawer();
+              },
+              icon: Icon(
+                LucideIcons.menu,
+                size: 24.r,
+                color: Get.textTheme.titleMedium?.color,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints(
+                minWidth: 40.r,
+                minHeight: 40.r,
+              ),
+            ),
+            SizedBox(width: 12.w),
+
+            // Current chat title or app name
+            Expanded(
+              child: Obx(() {
+                final currentChat = controller.currentChatTitle.value;
+                return Text(
+                  currentChat.isEmpty ? 'AI Agent' : currentChat,
+                  style: GoogleFonts.inter(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Get.textTheme.titleMedium?.color,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                );
+              }),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildChatListDrawer(AgentChatController controller) {
+    return Obx(() {
+      final isOpen = controller.isChatListDrawerOpen.value;
+
+      return AnimatedPositioned(
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        left: isOpen ? 0 : -280.w,
+        top: 0,
+        bottom: 0,
+        width: 280.w,
+        child: GestureDetector(
+          onHorizontalDragEnd: (details) {
+            if (details.primaryVelocity! < -500) {
+              controller.closeChatListDrawer();
+            }
+          },
+          child: Material(
+            elevation: 16,
+            shadowColor: Colors.black.withOpacity(0.3),
+            child: Container(
+              color: Get.theme.scaffoldBackgroundColor,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    // Drawer header
+                    Container(
+                      padding: EdgeInsets.all(16.r),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Get.theme.dividerColor.withOpacity(0.2),
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Chats',
+                            style: GoogleFonts.inter(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Get.textTheme.titleMedium?.color,
+                            ),
+                          ),
+                          Spacer(),
+                          IconButton(
+                            onPressed: () => controller.closeChatListDrawer(),
+                            icon: Icon(
+                              LucideIcons.x,
+                              size: 20.r,
+                              color: Get.textTheme.bodyMedium?.color,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(
+                              minWidth: 32.r,
+                              minHeight: 32.r,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Chat list content
+                    Expanded(
+                      child: ChatListSidebar(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  // Overlay to close drawer when tapping outside
+  Widget _buildDrawerOverlay(AgentChatController controller) {
+    return Obx(() {
+      final isOpen = controller.isChatListDrawerOpen.value;
+
+      return AnimatedOpacity(
+        duration: Duration(milliseconds: 300),
+        opacity: isOpen ? 1.0 : 0.0,
+        child: isOpen
+            ? GestureDetector(
+                onTap: () => controller.closeChatListDrawer(),
+                child: Container(
+                  color: Colors.black.withOpacity(0.5),
+                ),
+              )
+            : SizedBox.shrink(),
+      );
+    });
   }
 
   Widget _buildMessageList(AgentChatController controller) {
@@ -1073,193 +1242,248 @@ class AgentChatPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Browser mode indicator banner
-            Obx(() => controller.isBrowserAgentMode.value
-                ? Container(
-                    margin: EdgeInsets.only(bottom: 12.h),
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(
-                          color: Get.theme.dividerColor.withOpacity(0.2)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(LucideIcons.globe,
-                            size: 16.r, color: AppColors.primary),
-                        SizedBox(width: 8.w),
-                        Expanded(
-                          child: Text(
-                            'Browser Agent Mode - AI will control the browser',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.sp,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
+            // Info Banner (Blocked or Browser Mode)
+            Obx(() {
+              final isBlocked = controller.isInputBlocked.value;
+              final setupMessage =
+                  controller.isAgentWorking.value && !controller.isTyping.value
+                      ? 'Working on your task...'
+                      : 'Setting up project...';
+
+              if (isBlocked) {
+                return Container(
+                  margin: EdgeInsets.only(bottom: 12.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                    border:
+                        Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 14.r,
+                        height: 14.r,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      SizedBox(width: 8.w),
+                      Text(
+                        setupMessage,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              if (controller.isBrowserAgentMode.value) {
+                return Container(
+                  margin: EdgeInsets.only(bottom: 12.h),
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(
+                        color: Get.theme.dividerColor.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.globe,
+                          size: 16.r, color: AppColors.primary),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          'Browser Agent Mode - AI will control the browser',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.sp,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        GestureDetector(
-                          onTap: controller.toggleBrowserAgentMode,
-                          child: Icon(LucideIcons.x,
-                              size: 16.r, color: AppColors.primary),
-                        ),
-                      ],
-                    ),
-                  )
-                : const SizedBox.shrink()),
+                      ),
+                      GestureDetector(
+                        onTap: controller.toggleBrowserAgentMode,
+                        child: Icon(LucideIcons.x,
+                            size: 16.r, color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                );
+              }
 
-            // Input row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Browser mode toggle button
-                Obx(() => GestureDetector(
-                      onTap: controller.toggleBrowserAgentMode,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 44.r,
-                        height: 44.r,
-                        margin: EdgeInsets.only(right: 8.w),
-                        decoration: BoxDecoration(
-                          color: controller.isBrowserAgentMode.value
-                              ? AppColors.primary.withOpacity(0.15)
-                              : Get.theme.inputDecorationTheme.fillColor,
-                          borderRadius: BorderRadius.circular(22.r),
-                          border: Border.all(
+              return const SizedBox.shrink();
+            }),
+
+            // Input row (Only shown if not blocked)
+            Obx(() {
+              if (controller.isInputBlocked.value) {
+                return const SizedBox.shrink();
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Browser mode toggle button
+                  Obx(() => GestureDetector(
+                        onTap: controller.toggleBrowserAgentMode,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 44.r,
+                          height: 44.r,
+                          margin: EdgeInsets.only(right: 8.w),
+                          decoration: BoxDecoration(
+                            color: controller.isBrowserAgentMode.value
+                                ? AppColors.primary.withOpacity(0.15)
+                                : Get.theme.inputDecorationTheme.fillColor,
+                            borderRadius: BorderRadius.circular(22.r),
+                            border: Border.all(
+                              color: controller.isBrowserAgentMode.value
+                                  ? AppColors.primary
+                                  : Get.theme.dividerColor.withOpacity(0.2),
+                              width:
+                                  controller.isBrowserAgentMode.value ? 2 : 1,
+                            ),
+                          ),
+                          child: Icon(
+                            LucideIcons.globe,
+                            size: 20.r,
                             color: controller.isBrowserAgentMode.value
                                 ? AppColors.primary
-                                : Get.theme.dividerColor.withOpacity(0.2),
-                            width: controller.isBrowserAgentMode.value ? 2 : 1,
+                                : AppColors.textTertiary,
                           ),
                         ),
-                        child: Icon(
-                          LucideIcons.globe,
-                          size: 20.r,
-                          color: controller.isBrowserAgentMode.value
-                              ? AppColors.primary
-                              : AppColors.textTertiary,
-                        ),
-                      ),
-                    )),
+                      )),
 
-                // Text input
-                Expanded(
-                  child: Obx(
-                    () => AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      decoration: BoxDecoration(
-                        color: Get.theme.inputDecorationTheme.fillColor,
-                        borderRadius: BorderRadius.circular(24.r),
-                        border: Border.all(
-                          color: controller.isFocused.value
-                              ? AppColors.primary
-                              : Get.theme.dividerColor.withOpacity(0.2),
-                          width: controller.isFocused.value ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          SizedBox(width: 16.w),
-                          // Icon(
-                          //   StatusIcons.message,
-                          //   size: 20.r,
-                          //   color: AppColors.textTertiary,
-                          // ),
-                          // SizedBox(width: 10.w),
-                          Expanded(
-                            child: TextField(
-                              focusNode: controller.focusNode,
-                              controller: controller.textController,
-                              decoration: InputDecoration(
-                                hintText: controller.isBrowserAgentMode.value
-                                    ? 'Tell the browser what to do...'
-                                    : AppStrings.typeMessage,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(24.r),
-                                  borderSide:
-                                      BorderSide.none, // remove inner line
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(24.r),
-                                  borderSide: BorderSide.none,
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(24.r),
-                                  borderSide: BorderSide.none,
-                                ),
-                                contentPadding: EdgeInsets.symmetric(
-                                    vertical: 12.h, horizontal: 0),
-                              ),
-                              maxLines: 4,
-                              minLines: 1,
-                            ),
+                  // Text input
+                  Expanded(
+                    child: Obx(
+                      () => AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        decoration: BoxDecoration(
+                          color: Get.theme.inputDecorationTheme.fillColor,
+                          borderRadius: BorderRadius.circular(24.r),
+                          border: Border.all(
+                            color: controller.isFocused.value
+                                ? AppColors.primary
+                                : Get.theme.dividerColor.withOpacity(0.2),
+                            width: controller.isFocused.value ? 1.5 : 1,
                           ),
-                          SizedBox(width: 8.w),
-                        ],
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: TextField(
+                                focusNode: controller.focusNode,
+                                controller: controller.textController,
+                                decoration: InputDecoration(
+                                  hintText: controller.isBrowserAgentMode.value
+                                      ? 'Tell the browser what to do...'
+                                      : AppStrings.typeMessage,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(24.r),
+                                    borderSide:
+                                        BorderSide.none, // remove inner line
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(24.r),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(24.r),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      vertical: 12.h, horizontal: 0),
+                                ),
+                                maxLines: 4,
+                                minLines: 1,
+                                onSubmitted: (value) {
+                                  if (value.isNotEmpty) {
+                                    controller.sendMessage(
+                                      value,
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                SizedBox(width: 12.w),
+                  SizedBox(width: 12.w),
 
-                // Send/Stop button
-                Obx(() => AnimatedContainer(
-                      duration: Duration(milliseconds: 200),
-                      width: 48.r,
-                      height: 48.r,
-                      decoration: BoxDecoration(
-                        gradient: controller.isAgentWorking.value
-                            ? LinearGradient(colors: [
-                                AppColors.error,
-                                AppColors.error.withOpacity(0.8)
-                              ])
-                            : LinearGradient(
-                                colors: [
-                                  AppColors.primary,
-                                  const Color(0xFF6366F1)
-                                ],
-                              ),
-                        shape: BoxShape.circle,
-                        boxShadow: controller.isAgentWorking.value
-                            ? []
-                            : [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 4),
+                  // Send/Stop button
+                  Obx(() => AnimatedContainer(
+                        duration: Duration(milliseconds: 200),
+                        width: 48.r,
+                        height: 48.r,
+                        decoration: BoxDecoration(
+                          gradient: controller.isAgentWorking.value
+                              ? LinearGradient(colors: [
+                                  AppColors.error,
+                                  AppColors.error.withOpacity(0.8)
+                                ])
+                              : LinearGradient(
+                                  colors: [
+                                    AppColors.primary,
+                                    const Color(0xFF6366F1)
+                                  ],
                                 ),
-                              ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(24.r),
-                          onTap: controller.isAgentWorking.value
-                              ? () => controller.stopTask()
-                              : () => controller
-                                  .sendMessage(controller.textController.text),
-                          child: Center(
-                            child: Icon(
-                              controller.isAgentWorking.value
-                                  ? LucideIcons.square
-                                  : LucideIcons.send,
-                              color: Colors.white,
-                              size: 20.r,
+                          shape: BoxShape.circle,
+                          boxShadow: controller.isAgentWorking.value
+                              ? []
+                              : [
+                                  BoxShadow(
+                                    color: AppColors.primary.withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(24.r),
+                            onTap: controller.isAgentWorking.value
+                                ? () => controller.stopTask()
+                                : () => controller.sendMessage(
+                                      controller.textController.text,
+                                    ),
+                            child: Center(
+                              child: Icon(
+                                controller.isAgentWorking.value
+                                    ? LucideIcons.square
+                                    : LucideIcons.send,
+                                color: Colors.white,
+                                size: 20.r,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    )
-                        .animate(
-                            target: controller.isAgentWorking.value ? 1 : 0)
-                        .scale(
-                            begin: Offset(1, 1),
-                            end: Offset(0.9, 0.9),
-                            duration: 200.ms)),
-              ],
-            ),
+                      )
+                          .animate(
+                              target: controller.isAgentWorking.value ? 1 : 0)
+                          .scale(
+                              begin: Offset(1, 1),
+                              end: Offset(0.9, 0.9),
+                              duration: 200.ms)),
+                ],
+              );
+            }),
           ],
         ),
       ),

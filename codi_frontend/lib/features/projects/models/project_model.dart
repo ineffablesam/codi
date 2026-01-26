@@ -23,6 +23,8 @@ class ProjectModel {
   final DateTime? lastBuildAt;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? setupStage;
+
 
   // Platform configuration
   final String? platformType;
@@ -54,7 +56,9 @@ class ProjectModel {
     this.lastBuildAt,
     required this.createdAt,
     required this.updatedAt,
+    this.setupStage,
     this.platformType,
+
     this.framework,
     this.backendType,
     this.deploymentPlatform,
@@ -85,7 +89,9 @@ class ProjectModel {
           : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
+      setupStage: json['setup_stage'] as String?,
       platformType: json['platform_type'] as String?,
+
       framework: json['framework'] as String?,
       backendType: json['backend_type'] as String?,
       deploymentPlatform: json['deployment_platform'] as String?,
@@ -113,7 +119,9 @@ class ProjectModel {
       'last_build_at': lastBuildAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'setup_stage': setupStage,
       'platform_type': platformType,
+
       'framework': framework,
       'backend_type': backendType,
       'deployment_platform': deploymentPlatform,

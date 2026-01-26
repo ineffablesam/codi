@@ -157,6 +157,7 @@ async def submit_agent_task_internal(
     project_id: int,
     user_id: int,
     message: str,
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Internal function to submit agent task (used by WebSocket handler).
 
@@ -164,6 +165,7 @@ async def submit_agent_task_internal(
         project_id: Project ID
         user_id: User ID
         message: User message
+        session_id: Optional chat session ID for multi-chat
 
     Returns:
         Task submission result
@@ -211,6 +213,7 @@ async def submit_agent_task_internal(
             user_id=user_id,
             user_message=message,
             project_folder=project_folder,
+            session_id=session_id,  # Pass session_id for multi-chat
         )
 
         # Update task with Celery ID
@@ -222,7 +225,7 @@ async def submit_agent_task_internal(
             )
             await session.commit()
 
-        return {"task_id": task_id, "status": "queued"}
+        return {"task_id": task_id, "status": "queued", "session_id": session_id}
 
     except Exception as e:
         return {"task_id": task_id, "status": "error", "message": str(e)}

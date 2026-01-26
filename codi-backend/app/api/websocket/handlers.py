@@ -87,6 +87,7 @@ class WebSocketHandler:
         """
         message = data.get("message", "").strip()
         browser_mode = data.get("browser_mode", False)
+        session_id = data.get("session_id")  # Optional - for multi-chat
 
         if not message:
             await connection_manager.send_personal_message(
@@ -103,16 +104,21 @@ class WebSocketHandler:
             f"Received user message via WebSocket",
             project_id=self.project_id,
             user_id=self.user_id,
+            session_id=session_id,
             message_length=len(message),
             browser_mode=browser_mode,
         )
+
+        # Persist user message if session_id provided
+        if session_id:
+            await self._persist_message(session_id, "user", message)
 
         if browser_mode:
             # Route to browser agent for AI-driven browser automation
             await self._handle_browser_agent_message(message, data)
         else:
             # Route to coding agent (existing behavior)
-            await self._handle_coding_agent_message(message)
+            await self._handle_coding_agent_message(message, session_id)
 
     async def _handle_browser_agent_message(self, message: str, data: Dict[str, Any]) -> None:
         """Handle message routed to browser agent using Gemini 2.5 Computer Use.
@@ -416,21 +422,23 @@ class WebSocketHandler:
         except Exception as e:
             logger.warning(f"Failed to handle user interaction: {e}")
 
-    async def _handle_coding_agent_message(self, message: str) -> None:
+    async def _handle_coding_agent_message(self, message: str, session_id: Optional[str] = None) -> None:
         """Handle message routed to coding agent.
         
         Args:
             message: User's request message
+            session_id: Optional chat session ID for multi-chat
         """
         # Import here to avoid circular imports
         from app.api.v1.routes.agents import submit_agent_task_internal
 
         try:
-            # Submit the task
+            # Submit the task with session_id
             task_response = await submit_agent_task_internal(
                 project_id=self.project_id,
                 user_id=self.user_id,
                 message=message,
+                session_id=session_id,
             )
 
             # Confirm task submission
@@ -439,6 +447,7 @@ class WebSocketHandler:
                 {
                     "type": "task_submitted",
                     "task_id": task_response.get("task_id"),
+                    "session_id": session_id,
                     "message": "Task submitted successfully",
                     "timestamp": datetime.utcnow().isoformat(),
                 },
@@ -452,6 +461,58 @@ class WebSocketHandler:
                 str(e),
                 "Failed to submit task",
             )
+
+    async def _persist_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        tool_calls: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Persist a message to the database.
+        
+        Args:
+            session_id: Chat session ID
+            role: Message role (user, assistant, system)
+            content: Message content
+            tool_calls: Optional tool call data
+        """
+        try:
+            from uuid import uuid4
+            from app.core.database import get_db_context
+            from app.models.chat_session import ChatMessage, ChatSession
+            from sqlalchemy import select
+            
+            async with get_db_context() as session:
+                # Verify session exists
+                result = await session.execute(
+                    select(ChatSession).where(ChatSession.id == session_id)
+                )
+                chat_session = result.scalar_one_or_none()
+                
+                if not chat_session:
+                    logger.warning(f"Chat session {session_id} not found, skipping persist")
+                    return
+                
+                # Create message
+                message = ChatMessage(
+                    id=str(uuid4()),
+                    session_id=session_id,
+                    role=role,
+                    content=content,
+                    tool_calls=tool_calls,
+                )
+                session.add(message)
+                
+                # Update session stats
+                chat_session.message_count += 1
+                chat_session.last_message_at = datetime.utcnow()
+                
+                await session.commit()
+                logger.debug(f"Persisted {role} message to session {session_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to persist message: {e}")
 
     async def _handle_user_input_response(self, data: Dict[str, Any]) -> None:
         """Handle user response to an input request.

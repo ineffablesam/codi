@@ -36,6 +36,7 @@ class AgentContext:
     current_branch: str = "main"
     framework: Optional[str] = None
     task_id: Optional[str] = None
+    session_id: Optional[str] = None
     
     # Services (lazy loaded)
     _docker_service: Any = field(default=None, repr=False)

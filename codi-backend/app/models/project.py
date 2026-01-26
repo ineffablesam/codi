@@ -84,6 +84,12 @@ class Project(Base):
         index=True,
     )
 
+    # Initial project setup stage (for multi-chat blocking)
+    # pending -> deploying_starter -> building_idea -> deploying_final -> completed
+    setup_stage: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="completed"
+    )
+
     # Deployment info
     deployment_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     deployment_provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -173,6 +179,7 @@ class Project(Base):
             "last_build_status": self.last_build_status,
             "last_build_at": self.last_build_at.isoformat() if self.last_build_at else None,
             "status": self.status if isinstance(self.status, str) else self.status.value,
+            "setup_stage": self.setup_stage,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

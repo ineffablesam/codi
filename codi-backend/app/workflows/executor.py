@@ -97,6 +97,7 @@ class WorkflowExecutor:
         user_id: int,
         task_id: str,
         project_folder: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> None:
         """Initialize the workflow executor.
 
@@ -105,11 +106,13 @@ class WorkflowExecutor:
             user_id: User ID
             task_id: Unique task identifier
             project_folder: Local path to project repository
+            session_id: Optional chat session ID for multi-chat
         """
         self.project_id = project_id
         self.user_id = user_id
         self.task_id = task_id
         self.project_folder = project_folder
+        self.session_id = session_id
         self._project_slug: Optional[str] = None
         self._current_branch: str = "main"
         self._framework: Optional[str] = None
@@ -355,6 +358,7 @@ Please specify:
                 current_branch=self._current_branch,
                 framework=self._framework,
                 task_id=self.task_id,
+                session_id=self.session_id,  # Pass session_id to context
             )
             
             # Check if this is initial project setup (skip planning for starter templates)
@@ -475,6 +479,7 @@ async def run_workflow(
         user_id=user_id,
         task_id=task_id,
         project_folder=project_folder,
+        # Note: session_id param missing in convenience function for now
     )
 
     return await executor.execute(user_message)

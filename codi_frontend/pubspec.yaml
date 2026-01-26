@@ -91,6 +91,7 @@ dependencies:
   flutter_sliding_box: ^1.1.5
   ai_glow: ^0.0.2
   super_context_menu: ^0.9.1
+  timeago: ^3.7.1
 
 dev_dependencies:
   flutter_test:
