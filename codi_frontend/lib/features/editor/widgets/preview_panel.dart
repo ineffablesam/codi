@@ -12,7 +12,6 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/constants/image_placeholders.dart';
 import '../controllers/preview_controller.dart';
 
 /// Embedded WebView preview panel using InAppWebView
@@ -137,7 +136,7 @@ class PreviewPanel extends StatelessWidget {
   Widget _buildPhaseUI(PreviewController controller) {
     return Obx(() {
       final phase = controller.buildPhase.value;
-      
+
       switch (phase) {
         case BuildPhase.initialDeploy:
           return _buildInitialDeployUI(controller);
@@ -505,37 +504,98 @@ class PreviewPanel extends StatelessWidget {
 
   Widget _buildNoPreviewState() {
     return Container(
-      color: AppColors.surface,
+      color: Get.theme.scaffoldBackgroundColor,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.network(
-              ImagePlaceholders.noPreview,
-              width: 160.w,
-              height: 120.h,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.preview,
-                size: 64.r,
-                color: AppColors.textTertiary,
+            // Animated building indicator
+            Container(
+              width: 120.r,
+              height: 120.r,
+              decoration: BoxDecoration(
+                color: Get.theme.primaryColor.withOpacity(0.08),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Get.theme.focusColor.withOpacity(0.1),
+                  width: 1.5,
+                ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Outer pulsing circle
+                  _PulsingCircle(),
+                  // Building icon
+                  Icon(
+                    Icons.engineering_outlined,
+                    size: 48.r,
+                    color: Get.theme.primaryColor,
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: 16.h),
+            SizedBox(height: 32.h),
+
+            // Main message
             Text(
-              AppStrings.noPreview,
+              'Building Your Preview',
               style: GoogleFonts.inter(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                fontSize: 20.sp,
+                fontWeight: FontWeight.w700,
+                color: Get.textTheme.titleLarge?.color,
+                letterSpacing: -0.5,
               ),
             ),
-            SizedBox(height: 8.h),
-            Text(
-              AppStrings.noPreviewSubtitle,
-              style: GoogleFonts.inter(
-                fontSize: 14.sp,
-                color: AppColors.textSecondary,
+            SizedBox(height: 12.h),
+
+            // Subtitle
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 48.w),
+              child: Text(
+                'Your deployment is currently being built.\nCheck the chat panel for live updates.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  height: 1.5,
+                  color: Get.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+            SizedBox(height: 24.h),
+
+            // Action button
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 64.w),
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // Open chat panel
+                  // TODO: Implement chat panel opening logic
+                },
+                icon: Icon(Icons.chat_outlined, size: 18.r),
+                label: Text(
+                  'Open Chat Panel',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Get.theme.primaryColor,
+                  side: BorderSide(
+                    color: Get.theme.focusColor.withOpacity(0.2),
+                    width: 1.5,
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 20.w,
+                    vertical: 12.h,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(40.r),
+                  ),
+                ),
               ),
             ),
           ],
@@ -574,6 +634,59 @@ class PreviewPanel extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PulsingCircle extends StatefulWidget {
+  const _PulsingCircle();
+
+  @override
+  State<_PulsingCircle> createState() => _PulsingCircleState();
+}
+
+class _PulsingCircleState extends State<_PulsingCircle>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: Duration(seconds: 2),
+      vsync: this,
+    )..repeat();
+
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          width: 100.r + (_animation.value * 20.r),
+          height: 100.r + (_animation.value * 20.r),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: Get.theme.primaryColor
+                  .withOpacity(0.3 * (1 - _animation.value)),
+              width: 2,
+            ),
+          ),
+        );
+      },
     );
   }
 }

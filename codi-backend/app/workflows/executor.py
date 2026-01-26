@@ -113,6 +113,7 @@ class WorkflowExecutor:
         self._project_slug: Optional[str] = None
         self._current_branch: str = "main"
         self._framework: Optional[str] = None
+        self._deployment_exists: bool = False
 
     async def _load_project_info(self) -> None:
         """Load project information from database."""
@@ -127,6 +128,8 @@ class WorkflowExecutor:
                 self.project_folder = project.local_path
                 self._current_branch = project.git_branch or "main"
                 self._framework = project.framework
+                # Check if project has ever been deployed (used to determine if we should skip planning)
+                self._deployment_exists = bool(project.deployment_url)
                 
                 # Build tech stack for knowledge packs
                 self._tech_stack = {}
@@ -251,9 +254,8 @@ Please specify:
     async def _is_initial_project_setup(self, user_message: str) -> bool:
         """Check if this is an initial project setup that should skip planning.
         
-        Initial project setup includes:
-        - First message after project creation (starter template deployment)
-        - Messages that are clearly about initial setup/building from template
+        Rule: Skip planning for the first 2 tasks (initial deploy + first implementation).
+        After that, always enforce planning for safety and user approval.
         
         Args:
             user_message: The user's request message
@@ -261,45 +263,37 @@ Please specify:
         Returns:
             True if planning should be skipped, False otherwise
         """
-        import os
-        
-        # Check if project folder has minimal files (just created from template)
-        if self.project_folder and os.path.exists(self.project_folder):
-            # Count non-hidden files/folders in root
-            try:
-                root_items = [f for f in os.listdir(self.project_folder) if not f.startswith('.')]
+        # Count completed tasks for this project
+        try:
+            from sqlalchemy import select, func
+            
+            async with get_db_context() as session:
+                result = await session.execute(
+                    select(func.count(AgentTask.id))
+                    .where(AgentTask.project_id == self.project_id)
+                    .where(AgentTask.id != self.task_id)
+                    .where(AgentTask.status.in_(["completed", "processing"]))
+                )
+                completed_task_count = result.scalar() or 0
                 
-                # Check for "fresh project" indicators:
-                # - Only has template files like package.json, next.config, etc.
-                # - No src modifications yet (very few total files)
+            logger.info(
+                f"Project has {completed_task_count} completed/processing tasks",
+                project_id=self.project_id,
+            )
+            
+            # Skip planning only for first task (initial deploy + build from idea)
+            # Task 2+ requires planning approval
+            if completed_task_count < 1:
+                logger.info("Initial setup phase (no prior tasks), skipping planning")
+                return True
+            else:
+                logger.info("Post-setup phase (>= 1 task completed), enforcing planning")
+                return False
                 
-                # Count total files in src/app if it exists
-                src_path = os.path.join(self.project_folder, "src", "app")
-                if os.path.exists(src_path):
-                    src_files = os.listdir(src_path)
-                    # Fresh Next.js has ~3-5 files in src/app
-                    if len(src_files) <= 6:
-                        logger.info(f"Detected fresh project (src/app has {len(src_files)} files)")
-                        return True
-                
-                # Alternative: Check for no agent task history yet
-                async with get_db_context() as session:
-                    from sqlalchemy import select, func
-                    result = await session.execute(
-                        select(func.count(AgentTask.id))
-                        .where(AgentTask.project_id == self.project_id)
-                        .where(AgentTask.status == "completed")
-                    )
-                    completed_tasks = result.scalar() or 0
-                    
-                    if completed_tasks == 0:
-                        logger.info(f"First task for project {self.project_id}, skipping planning")
-                        return True
-                        
-            except Exception as e:
-                logger.warning(f"Error checking project setup state: {e}")
-        
-        return False
+        except Exception as e:
+            logger.error(f"Failed to count tasks, defaulting to require planning: {e}")
+            # On error, be safe and require planning
+            return False
 
     async def execute(self, user_message: str) -> Dict[str, Any]:
         """Execute the workflow for a user message.

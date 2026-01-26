@@ -102,7 +102,8 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
       decoration: BoxDecoration(
         color: Get.theme.cardColor,
         border: Border(
-          bottom: BorderSide(color: Get.theme.dividerColor, width: 1),
+          bottom: BorderSide(
+              color: Get.theme.focusColor.withOpacity(0.1), width: 1),
         ),
       ),
       child: Row(
@@ -137,17 +138,18 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
           // URL text input
           Expanded(
             child: Container(
-              height: 28.h,
+              height: 32.h,
               padding: EdgeInsets.symmetric(horizontal: 12.w),
               decoration: BoxDecoration(
                 color: Get.theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(8.r),
               ),
+              alignment: Alignment.centerLeft,
               child: Obx(() => TextField(
-                    controller: TextEditingController(
-                        text: controller.currentUrl.value)
-                      ..selection = TextSelection.fromPosition(TextPosition(
-                          offset: controller.currentUrl.value.length)),
+                    controller:
+                        TextEditingController(text: controller.currentUrl.value)
+                          ..selection = TextSelection.fromPosition(TextPosition(
+                              offset: controller.currentUrl.value.length)),
                     style: SFPro.regular(
                       fontSize: 12.sp,
                       color: controller.isSessionActive.value
@@ -156,11 +158,13 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                     ),
                     enabled: controller.isSessionActive.value,
                     decoration: InputDecoration(
+                      fillColor: Get.theme.scaffoldBackgroundColor,
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.only(bottom: 14.h),
+                      contentPadding: EdgeInsets.zero,
                       hintText: 'Enter URL...',
                       isDense: true,
                     ),
+                    textAlignVertical: TextAlignVertical.center,
                     onSubmitted: (value) => controller.navigateTo(value),
                   )),
             ),
@@ -174,7 +178,8 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                   onTap: () => controller.clearSession(),
                   borderRadius: BorderRadius.circular(4.r),
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                     decoration: BoxDecoration(
                       color: Colors.red.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4.r),
@@ -184,7 +189,9 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                       children: [
                         Icon(Icons.close, size: 12.sp, color: Colors.red),
                         SizedBox(width: 4.w),
-                        Text('End', style: SFPro.medium(fontSize: 10.sp, color: Colors.red)),
+                        Text('End',
+                            style: SFPro.medium(
+                                fontSize: 10.sp, color: Colors.red)),
                       ],
                     ),
                   ),
@@ -195,7 +202,8 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
 
           // Viewport Toggle (when session is active)
           Obx(() {
-            if (!controller.isSessionActive.value) return const SizedBox.shrink();
+            if (!controller.isSessionActive.value)
+              return const SizedBox.shrink();
 
             return Container(
               height: 24.h,
@@ -210,7 +218,8 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                     icon: Icons.desktop_mac,
                     isActive: !controller.isMobile.value,
                     onTap: () {
-                      if (controller.isMobile.value) controller.toggleViewport();
+                      if (controller.isMobile.value)
+                        controller.toggleViewport();
                     },
                   ),
                   Container(width: 1, color: Get.theme.dividerColor),
@@ -218,7 +227,8 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
                     icon: Icons.phone_iphone,
                     isActive: controller.isMobile.value,
                     onTap: () {
-                      if (!controller.isMobile.value) controller.toggleViewport();
+                      if (!controller.isMobile.value)
+                        controller.toggleViewport();
                     },
                   ),
                 ],
@@ -365,96 +375,7 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
 
   /// Placeholder when no browser session is active
   Widget _buildPlaceholder() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Browser icon
-          Container(
-            padding: EdgeInsets.all(24.r),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              RadixIcons.Globe,
-              size: 48.sp,
-              color: AppColors.primary.withOpacity(0.6),
-            ),
-          ),
-          SizedBox(height: 24.h),
-
-          // Title
-          Text(
-            'Browser Agent',
-            style: SFPro.bold(
-              fontSize: 20.sp,
-              color: Get.textTheme.titleLarge?.color,
-            ),
-          ),
-          SizedBox(height: 8.h),
-
-          // Description
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 48.w),
-            child: Text(
-              'Browse the web with AI assistance or take direct control',
-              style: SFPro.regular(
-                fontSize: 14.sp,
-                color: Colors.grey.shade500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          SizedBox(height: 32.h),
-
-          // Action buttons
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 32.w),
-            child: Row(
-              children: [
-                // Interactive Mode button
-                Expanded(
-                  child: _buildModeButton(
-                    icon: Icons.mouse_outlined,
-                    title: 'Interactive',
-                    subtitle: 'Control browser directly',
-                    color: Colors.blue,
-                    onTap: () {
-                      controller.startInteractiveSession();
-                    },
-                  ),
-                ),
-                SizedBox(width: 16.w),
-                // Agent Mode button
-                Expanded(
-                  child: _buildModeButton(
-                    icon: Icons.auto_fix_high,
-                    title: 'AI Agent',
-                    subtitle: 'Let AI browse for you',
-                    color: AppColors.primary,
-                    onTap: () {
-                      // Get the AgentChatController and toggle browser mode
-                      try {
-                        final chatController = Get.find<AgentChatController>();
-                        if (!chatController.isBrowserAgentMode.value) {
-                          chatController.toggleBrowserAgentMode();
-                        }
-                        // Show chat panel
-                        final editorController = Get.find<EditorController>();
-                        editorController.isChatVisible.value = true;
-                      } catch (e) {
-                        // Controllers not found, fallback
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return const _AnimatedPlaceholder();
   }
 
   /// Build a mode selection button
@@ -473,7 +394,7 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
         decoration: BoxDecoration(
           color: Get.theme.cardColor,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: Get.theme.dividerColor),
+          border: Border.all(color: Get.theme.focusColor.withOpacity(0.1)),
         ),
         child: Column(
           children: [
@@ -685,6 +606,240 @@ class BrowserAgentPanel extends GetView<BrowserAgentController> {
             size: 14.sp,
             color: Get.textTheme.bodyMedium?.color?.withOpacity(0.7),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedPlaceholder extends StatefulWidget {
+  const _AnimatedPlaceholder();
+
+  @override
+  State<_AnimatedPlaceholder> createState() => _AnimatedPlaceholderState();
+}
+
+class _AnimatedPlaceholderState extends State<_AnimatedPlaceholder>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _iconScale;
+  late Animation<double> _textOpacity;
+  late Animation<Offset> _textSlide;
+  late Animation<double> _buttonsOpacity;
+  late Animation<Offset> _buttonsSlide;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _iconScale = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.6, curve: Curves.elasticOut),
+    );
+
+    _textOpacity = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.3, 0.8, curve: Curves.easeOut),
+    );
+
+    _textSlide = Tween<Offset>(
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.3, 0.8, curve: Curves.easeOutCubic),
+    ));
+
+    _buttonsOpacity = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+    );
+
+    _buttonsSlide = Tween<Offset>(
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.5, 1.0, curve: Curves.easeOutCubic),
+    ));
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // We need to access the controller methods, but we are inside a pure widget.
+    // We can find the controller using Get.find since BrowserAgentPanel is a GetView.
+    final controller = Get.find<BrowserAgentController>();
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Browser icon
+          ScaleTransition(
+            scale: _iconScale,
+            child: Container(
+              padding: EdgeInsets.all(24.r),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                RadixIcons.Globe,
+                size: 48.sp,
+                color: AppColors.primary.withOpacity(0.6),
+              ),
+            ),
+          ),
+          SizedBox(height: 24.h),
+
+          // Title & Description
+          FadeTransition(
+            opacity: _textOpacity,
+            child: SlideTransition(
+              position: _textSlide,
+              child: Column(
+                children: [
+                  Text(
+                    'Browser Agent',
+                    style: SFPro.bold(
+                      fontSize: 20.sp,
+                      color: Get.textTheme.titleLarge?.color,
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 48.w),
+                    child: Text(
+                      'Browse the web with AI assistance or take direct control',
+                      style: SFPro.regular(
+                        fontSize: 14.sp,
+                        color: Colors.grey.shade500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 32.h),
+
+          // Action buttons
+          FadeTransition(
+            opacity: _buttonsOpacity,
+            child: SlideTransition(
+              position: _buttonsSlide,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32.w),
+                child: Row(
+                  children: [
+                    // Interactive Mode button
+                    Expanded(
+                      child: _buildModeButton(
+                        icon: Icons.mouse_outlined,
+                        title: 'Interactive',
+                        subtitle: 'Control browser directly',
+                        color: Colors.blue,
+                        onTap: () {
+                          controller.startInteractiveSession();
+                        },
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    // Agent Mode button
+                    Expanded(
+                      child: _buildModeButton(
+                        icon: Icons.auto_fix_high,
+                        title: 'AI Agent',
+                        subtitle: 'Let AI browse for you instead.',
+                        color: AppColors.primary,
+                        onTap: () {
+                          try {
+                            final chatController =
+                                Get.find<AgentChatController>();
+                            if (!chatController.isBrowserAgentMode.value) {
+                              chatController.toggleBrowserAgentMode();
+                            }
+                            final editorController =
+                                Get.find<EditorController>();
+                            editorController.isChatVisible.value = true;
+                          } catch (e) {
+                            // Controllers not found
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeButton({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12.r),
+      child: Container(
+        padding: EdgeInsets.all(16.r),
+        decoration: BoxDecoration(
+          color: Get.theme.cardColor,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: Get.theme.focusColor.withOpacity(0.1)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: EdgeInsets.all(12.r),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 24.sp,
+                color: color,
+              ),
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              title,
+              style: SFPro.semibold(
+                fontSize: 14.sp,
+                color: Get.textTheme.bodyLarge?.color,
+              ),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              subtitle,
+              style: SFPro.regular(
+                fontSize: 11.sp,
+                color: Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

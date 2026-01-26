@@ -50,7 +50,7 @@ services:
     networks:
       - codi-network
     restart: unless-stopped
-    # Shared memory for Chromium (Playwright Computer Use)
+    # Shared memory for Camoufox (prevents browser crashes)
     shm_size: '512mb'
     deploy:
       resources:

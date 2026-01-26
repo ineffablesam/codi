@@ -38,7 +38,7 @@ class ProjectCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Get.theme.cardTheme.color,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: Get.theme.dividerColor),
+          border: Border.all(color: Get.theme.focusColor.withOpacity(0.1)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.03),
@@ -62,8 +62,12 @@ class ProjectCard extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        isArchived ? Colors.grey : AppColors.primary.withOpacity(0.8),
-                        isArchived ? Colors.grey.shade400 : AppColors.secondary.withOpacity(0.8),
+                        isArchived
+                            ? Colors.grey
+                            : AppColors.primary.withOpacity(0.8),
+                        isArchived
+                            ? Colors.grey.shade400
+                            : AppColors.secondary.withOpacity(0.8),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12.r),
@@ -80,7 +84,7 @@ class ProjectCard extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: 12.w),
-                
+
                 // Name and status
                 Expanded(
                   child: Column(
@@ -120,7 +124,7 @@ class ProjectCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 // Actions Menu
                 PopupMenuButton<String>(
                   icon: Icon(
@@ -143,9 +147,12 @@ class ProjectCard extends StatelessWidget {
                         value: 'archive',
                         child: Row(
                           children: [
-                            Icon(Icons.archive_outlined, size: 20.r, color: AppColors.textSecondary),
+                            Icon(Icons.archive_outlined,
+                                size: 20.r, color: AppColors.textSecondary),
                             SizedBox(width: 8.w),
-                            Text('Archive', style: TextStyle(color: Get.textTheme.bodyMedium?.color)),
+                            Text('Archive',
+                                style: TextStyle(
+                                    color: Get.textTheme.bodyMedium?.color)),
                           ],
                         ),
                       ),
@@ -154,9 +161,12 @@ class ProjectCard extends StatelessWidget {
                         value: 'restore',
                         child: Row(
                           children: [
-                            Icon(Icons.restore, size: 20.r, color: AppColors.success),
+                            Icon(Icons.restore,
+                                size: 20.r, color: AppColors.success),
                             SizedBox(width: 8.w),
-                            Text('Restore', style: TextStyle(color: Get.textTheme.bodyMedium?.color)),
+                            Text('Restore',
+                                style: TextStyle(
+                                    color: Get.textTheme.bodyMedium?.color)),
                           ],
                         ),
                       ),
@@ -164,10 +174,11 @@ class ProjectCard extends StatelessWidget {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline, size: 20.r, color: AppColors.error),
+                          Icon(Icons.delete_outline,
+                              size: 20.r, color: AppColors.error),
                           SizedBox(width: 8.w),
                           Text(
-                            isArchived ? 'Delete Permanently' : 'Delete', 
+                            isArchived ? 'Delete Permanently' : 'Delete',
                             style: TextStyle(color: AppColors.error),
                           ),
                         ],
@@ -177,7 +188,7 @@ class ProjectCard extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             // Description
             if (project.description != null && project.description!.isNotEmpty)
               Padding(
@@ -192,7 +203,7 @@ class ProjectCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            
+
             // Footer
             Padding(
               padding: EdgeInsets.only(top: 12.h),
@@ -215,7 +226,7 @@ class ProjectCard extends StatelessWidget {
                     ),
                     SizedBox(width: 16.w),
                   ],
-                  
+
                   // Last updated
                   Icon(
                     Icons.access_time,
@@ -230,13 +241,14 @@ class ProjectCard extends StatelessWidget {
                       color: AppColors.textTertiary,
                     ),
                   ),
-                  
+
                   const Spacer(),
-                  
+
                   // Deploy badge
                   if (project.hasDeployment && !isArchived)
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                       decoration: BoxDecoration(
                         color: AppColors.success.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(4.r),

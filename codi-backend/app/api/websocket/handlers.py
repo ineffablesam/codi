@@ -17,6 +17,8 @@ logger = get_logger(__name__)
 
 # Track active browser agents by project_id for interaction routing
 _active_browser_agents: Dict[int, Any] = {}
+# Track active streaming tasks by project_id to ensure they are cancelled
+_active_streaming_tasks: Dict[int, asyncio.Task] = {}
 
 
 class WebSocketHandler:
@@ -185,7 +187,7 @@ class WebSocketHandler:
             agent = ComputerUseAgent(
                 project_id=self.project_id,
                 user_id=self.user_id,
-                headless=True,
+                headless=True
             )
             
             # Initialize browser
@@ -223,8 +225,9 @@ class WebSocketHandler:
                 try:
                     while agent._page and not agent._stop_requested:
                         try:
-                            # Capture screenshot
-                            screenshot_bytes = await agent._get_screenshot()
+                            # Capture screenshot in JPEG for speed (reduced quality for FPS)
+                            start_time = datetime.utcnow()
+                            screenshot_bytes = await agent._get_screenshot(format="jpeg", quality=50)
                             screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
                             
                             # Forward frame to frontend
@@ -234,7 +237,7 @@ class WebSocketHandler:
                                     "type": "browser_frame",
                                     "agent": "browser",
                                     "image": screenshot_b64,
-                                    "format": "png",
+                                    "format": "jpeg",
                                     "timestamp": datetime.utcnow().isoformat(),
                                     "deviceWidth": SCREEN_WIDTH,
                                     "deviceHeight": SCREEN_HEIGHT,
@@ -245,8 +248,10 @@ class WebSocketHandler:
                             if frame_count % 100 == 0:
                                 logger.debug(f"Streamed {frame_count} frames for project {self.project_id}")
                             
-                            # 30 FPS = ~33ms per frame
-                            await asyncio.sleep(0.033)
+                            # Calculate sleep time to maintain ~30 FPS (33ms target)
+                            elapsed = (datetime.utcnow() - start_time).total_seconds()
+                            sleep_time = max(0.001, 0.033 - elapsed)
+                            await asyncio.sleep(sleep_time)
                             
                         except Exception as e:
                             logger.warning(f"Frame capture error: {e}")
@@ -258,7 +263,8 @@ class WebSocketHandler:
                     logger.info(f"Interactive browser stream ended for project {self.project_id}")
             
             # Start the streaming as a background task
-            asyncio.create_task(stream_frames())
+            stream_task = asyncio.create_task(stream_frames())
+            _active_streaming_tasks[self.project_id] = stream_task
             logger.info(f"Started interactive browser session for project {self.project_id}")
             
         except Exception as e:
@@ -283,6 +289,17 @@ class WebSocketHandler:
                 agent.stop()
                 await agent.close()
                 _active_browser_agents.pop(self.project_id, None)
+                
+                # Cancel streaming task
+                stream_task = _active_streaming_tasks.pop(self.project_id, None)
+                if stream_task:
+                    stream_task.cancel()
+                    try:
+                        await stream_task
+                    except asyncio.CancelledError:
+                        pass
+                    logger.info(f"Cancelled streaming task for project {self.project_id}")
+                    
                 logger.info(f"Closed browser agent for project {self.project_id}")
             
             # Remove from Redis
@@ -315,6 +332,18 @@ class WebSocketHandler:
         agent = _active_browser_agents.get(self.project_id)
         if agent:
             agent.stop()
+            
+            # Cancel streaming task
+            stream_task = _active_streaming_tasks.get(self.project_id)
+            if stream_task:
+                stream_task.cancel()
+                try:
+                    await stream_task
+                except asyncio.CancelledError:
+                    pass
+                _active_streaming_tasks.pop(self.project_id, None)
+                logger.info(f"Cancelled streaming task for project {self.project_id}")
+
             await connection_manager.broadcast_to_project(
                 self.project_id,
                 {

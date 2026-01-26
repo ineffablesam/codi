@@ -1,6 +1,3 @@
-/// Editor screen with preview and chat panels
-library;
-
 import 'package:flex_switch/flex_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -467,9 +464,10 @@ class EditorScreen extends StatelessWidget {
         onTap: onPressed,
         borderRadius: BorderRadius.circular(8.r),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+          padding: EdgeInsets.all(12.r),
           decoration: BoxDecoration(
-            border: Border.all(color: Get.theme.dividerColor),
+            // border: Border.all(color: Get.theme.dividerColor),
+            color: Get.theme.focusColor,
             borderRadius: BorderRadius.circular(8.r),
           ),
           child: child,
@@ -480,8 +478,10 @@ class EditorScreen extends StatelessWidget {
 
   Widget _buildPopupMenu(EditorController controller) {
     return Container(
+      padding: EdgeInsets.all(0.r),
       decoration: BoxDecoration(
-        border: Border.all(color: Get.theme.dividerColor),
+        // border: Border.all(color: Get.theme.dividerColor),
+        color: Get.theme.focusColor,
         borderRadius: BorderRadius.circular(8.r),
       ),
       child: PopupMenuButton(

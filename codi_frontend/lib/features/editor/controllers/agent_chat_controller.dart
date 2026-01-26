@@ -108,9 +108,10 @@ class AgentChatController extends GetxController {
     final messageType = data['type'] as String?;
 
     // Skip ping/pong and browser frames (frames are handled by BrowserAgentController)
-    if (messageType == 'ping' || 
-        messageType == 'pong' || 
-        messageType == 'browser_frame') {
+    if (messageType == 'ping' ||
+        messageType == 'pong' ||
+        messageType == 'browser_frame' ||
+        messageType == "browser_url_changed") {
       return;
     }
 
@@ -157,10 +158,19 @@ class AgentChatController extends GetxController {
           workingStartTime.value ??= DateTime.now();
           _editorController.setAgentWorking(true);
         } else if (message.status == 'completed' ||
-            message.status == 'failed') {
+            message.status == 'failed' ||
+            message.status == 'stopped') {
           // But show "failed" so user knows if something went wrong
           if (message.status == 'failed') {
             addMessage(message);
+          } else {
+            // For completed/stopped, we don't add a new message,
+            // but we MUST remove the previous "thinking/started" indication
+            messages.removeWhere((m) =>
+                m.type == MessageType.agentStatus &&
+                (m.status == 'thinking' ||
+                    m.status == 'started' ||
+                    m.status == 'planning'));
           }
           isAgentWorking.value = false;
           isTyping.value = false;
@@ -342,7 +352,7 @@ class AgentChatController extends GetxController {
           currentTaskId.value = null;
           _editorController.setAgentWorking(false);
         }
-        
+
         // Forward URL updates to browser controller
         if (message.browserUrl != null) {
           try {
@@ -456,34 +466,44 @@ class AgentChatController extends GetxController {
   Future<void> stopTask() async {
     if (!isAgentWorking.value) return;
 
-    // 1. Stop coding agent if taskId exists
+    // 1. IMPROVEMENT: Reset UI state IMMEDIATELY (Instant Stop)
+    isAgentWorking.value = false;
+    isTyping.value = false;
+    _editorController.setAgentWorking(false);
+
+    // Explicitly remove any "Thinking..." messages right away
+    messages.removeWhere((m) =>
+        m.type == MessageType.agentStatus &&
+        (m.status == 'thinking' ||
+            m.status == 'started' ||
+            m.status == 'planning'));
+
+    // 2. Stop coding agent if taskId exists
     if (currentTaskId.value != null) {
       try {
         final projectId = _editorController.currentProject.value?.id;
         if (projectId != null) {
           final taskId = currentTaskId.value!;
           AppLogger.info('Stopping coding task: $taskId');
-          await _editorService.stopTask(projectId.toString(), taskId);
+          // Fire and forget - don't await to keep UI responsive
+          _editorService.stopTask(projectId.toString(), taskId);
         }
       } catch (e) {
         AppLogger.error('Failed to stop coding task', error: e);
       }
     }
 
-    // 2. Stop browser agent if active
+    // 3. Stop browser agent if active
     try {
       final browserController = Get.find<BrowserAgentController>();
       if (browserController.isSessionActive.value) {
-        browserController.stopBrowserAgent();
+        // Use clearSession() to fully reset UI (hide frame, show placeholder)
+        // and close backend session instanty for "Instant Stop" feel
+        browserController.clearSession();
       }
     } catch (e) {
       // BrowserController not found or other error
     }
-
-    // Update local state proactively
-    isAgentWorking.value = false;
-    isTyping.value = false;
-    _editorController.setAgentWorking(false);
   }
 
   /// Clear chat history

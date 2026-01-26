@@ -27,17 +27,42 @@ SCREEN_HEIGHT = 900
 COMPUTER_USE_MODEL = "gemini-2.5-computer-use-preview-10-2025"
 
 
-SYSTEM_PROMPT = """You are operating an Android phone. Today's date is October 15, 2023, so ignore any other date provided.
-* To provide an answer to the user, *do not use any tools* and output your answer on a separate line. IMPORTANT: Do not add any formatting or additional punctuation/text, just output the answer by itself after two empty lines.
-* Make sure you scroll down to see everything before deciding something isn't available.
-* You can open an app from anywhere. The icon doesn't have to currently be on screen.
-* Unless explicitly told otherwise, make sure to save any changes you make.
-* If text is cut off or incomplete, scroll or click into the element to get the full text before providing an answer.
-* IMPORTANT: Complete the given task EXACTLY as stated. DO NOT make any assumptions that completing a similar task is correct.  If you can't find what you're looking for, SCROLL to find it.
-* If you want to edit some text, ONLY USE THE `type` tool. Do not use the onscreen keyboard.
-* Quick settings shouldn't be used to change settings. Use the Settings app instead.
-* The given task may already be completed. If so, there is no need to do anything.
+SYSTEM_PROMPT = """You are operating a desktop web browser controlled via Playwright.
+
+General rules:
+- Assume a modern Chromium-based desktop browser.
+- The current date is October 15, 2023. Ignore any other dates.
+- You can only interact with web pages (no OS-level or mobile actions).
+- Always wait for elements to be visible and interactable before acting.
+- If content is not visible, scroll the page until it appears.
+- If text is truncated, open, expand, or navigate to view the full content.
+- Do NOT assume something does not exist without scrolling or navigating.
+
+Task execution:
+- Follow the user’s instructions EXACTLY as stated.
+- Do NOT complete similar or inferred tasks.
+- If the task is already completed, do nothing.
+- Do NOT open new tabs or windows unless explicitly instructed.
+- Do NOT use browser shortcuts unless explicitly required.
+- If the user provides a direct URL or a domain name (e.g., "example.com", "https://site.org"), navigate DIRECTLY to it. Do NOT search for it on Google.
+
+Input and editing rules:
+- If text input is required, use typing actions only.
+- Do NOT use autofill or clipboard pasting unless explicitly allowed.
+- Save changes unless explicitly told not to.
+
+Output rules:
+- Provide a **concise summary** first, describing what you found (max 2-3 sentences).
+- Then, on a separate section, provide the **final answer ONLY** with TWO empty lines above it.
+- Do NOT include reasoning or extra context in the final answer section.
+
+Error handling:
+- If something is missing, scroll or navigate to find it.
+- If an element fails to load, retry logically before giving up.
 """
+
+
+
 
 
 
@@ -103,6 +128,9 @@ class ComputerUseAgent:
         
         # Stop flag for graceful termination
         self._stop_requested = False
+        
+        # Background streaming task
+        self._stream_task: Optional[asyncio.Task] = None
     
     @property
     def client(self) -> genai.Client:
@@ -120,6 +148,68 @@ class ComputerUseAgent:
             from app.api.websocket.connection_manager import connection_manager
             self._connection_manager = connection_manager
         return self._connection_manager
+    
+    async def _start_streaming(self) -> None:
+        """Start background streaming task."""
+        if self._stream_task and not self._stream_task.done():
+            return
+            
+        self._stream_task = asyncio.create_task(self._stream_loop())
+        logger.info("Started background browser stream")
+
+    async def _stop_streaming(self) -> None:
+        """Stop background streaming task."""
+        if self._stream_task:
+            self._stream_task.cancel()
+            try:
+                await self._stream_task
+            except asyncio.CancelledError:
+                pass
+            self._stream_task = None
+            logger.info("Stopped background browser stream")
+
+    async def _stream_loop(self) -> None:
+        """Continuous background streaming loop for smooth frontend."""
+        logger.info("Entering background stream loop")
+        frame_count = 0
+        
+        try:
+            while not self._stop_requested and self._page:
+                try:
+                    start_time = datetime.utcnow()
+                    
+                    # Capture JPEG for Frontend (Fast)
+                    screenshot_bytes = await self._get_screenshot(format="jpeg", quality=60)
+                    screenshot_b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+                    
+                    # Broadcast frame
+                    await self._broadcast("browser_frame", {
+                        "image": screenshot_b64, 
+                        "format": "jpeg",
+                        "deviceWidth": SCREEN_WIDTH,
+                        "deviceHeight": SCREEN_HEIGHT
+                    })
+                    
+                    # Periodically sync URL (every ~10 frames or so, or just rely on navigation events)
+                    # Doing it every frame is fine if it's cheap, but page.url is cheap.
+                    if frame_count % 30 == 0:
+                         await self._broadcast("browser_url_changed", {"url": self._page.url})
+                    
+                    frame_count += 1
+                    
+                    # Maintain ~30 FPS
+                    elapsed = (datetime.utcnow() - start_time).total_seconds()
+                    sleep_time = max(0.001, 0.033 - elapsed)
+                    await asyncio.sleep(sleep_time)
+                    
+                except Exception as e:
+                    # Don't crash the agent, just log and retry
+                    logger.debug(f"Stream capture error: {e}")
+                    await asyncio.sleep(0.1)
+        except asyncio.CancelledError:
+             raise
+        except Exception as e:
+            logger.error(f"Stream loop died: {e}")
     
     async def _broadcast(self, message_type: str, data: Dict) -> None:
         """Broadcast message via WebSocket."""
@@ -165,13 +255,20 @@ class ComputerUseAgent:
         await self._page.goto(initial_url, wait_until="domcontentloaded")
         logger.info(f"Browser initialized at {initial_url}")
     
-    async def _get_screenshot(self) -> bytes:
-        """Capture current page screenshot as PNG bytes."""
+    async def _get_screenshot(self, format: str = "png", quality: int = None) -> bytes:
+        """Capture current page screenshot as bytes.
+        
+        Args:
+            format: 'png' or 'jpeg'
+            quality: Quality (0-100) for jpeg, ignored for png
+        """
+        if format == "jpeg":
+            return await self._page.screenshot(type="jpeg", quality=quality or 80)
         return await self._page.screenshot(type="png")
     
-    async def _get_screenshot_base64(self) -> str:
+    async def _get_screenshot_base64(self, format: str = "png", quality: int = None) -> str:
         """Get screenshot as base64 string."""
-        screenshot_bytes = await self._get_screenshot()
+        screenshot_bytes = await self._get_screenshot(format=format, quality=quality)
         return base64.b64encode(screenshot_bytes).decode('utf-8')
     
     async def _execute_action(self, function_call) -> Dict[str, Any]:
@@ -401,7 +498,7 @@ class ComputerUseAgent:
         Returns:
             List of FunctionResponse objects
         """
-        screenshot_bytes = await self._get_screenshot()
+        screenshot_bytes = await self._get_screenshot(format="png")
         current_url = self._page.url
         
         function_responses = []
@@ -451,16 +548,18 @@ class ComputerUseAgent:
         
         # Get initial screenshot
         try:
-            initial_screenshot = await self._get_screenshot()
-            screenshot_b64 = base64.b64encode(initial_screenshot).decode('utf-8')
+            # Capture PNG for Model (Required)
+            initial_screenshot_png = await self._get_screenshot(format="png")
             
-            # Broadcast initial frame
-            await self._broadcast("browser_frame", {"image": screenshot_b64, "format": "png"})
+            # Streaming will handle the frontend update from now on
         except Exception as e:
             error_msg = f"Failed to capture initial screenshot: {e}"
             logger.error(error_msg)
             await self._broadcast("agent_status", {"status": "error", "message": error_msg})
             return error_msg
+        
+        # Start background streaming for smooth frontend
+        await self._start_streaming()
         
         # Configure Computer Use tool
         config = types.GenerateContentConfig(
@@ -482,76 +581,112 @@ class ComputerUseAgent:
                 role="user",
                 parts=[
                     Part(text=user_message),
-                    Part.from_bytes(data=initial_screenshot, mime_type="image/png")
+                    Part.from_bytes(data=initial_screenshot_png, mime_type="image/png")
                 ]
             )
         ]
         
         final_response = ""
+        agent_completed = False
         
         # Agent loop
-        for iteration in range(1, self.max_iterations + 1):
-            if self._stop_requested:
-                logger.info("Stop requested, terminating agent loop")
-                break
-            
-            logger.info(f"Agent iteration {iteration}")
-            
-            try:
-                # Call model
-                response = self.client.models.generate_content(
-                    model=COMPUTER_USE_MODEL,
-                    contents=self._contents,
-                    config=config,
-                )
-                
-                candidate = response.candidates[0]
-                self._contents.append(candidate.content)
-                
-                # Check for function calls
-                has_function_calls = any(
-                    part.function_call for part in candidate.content.parts
-                )
-                
-                if not has_function_calls:
-                    # No function calls - agent is done
-                    text_parts = [part.text for part in candidate.content.parts if part.text]
-                    final_response = " ".join(text_parts)
-                    logger.info(f"Agent completed after {iteration} iterations")
+        try:
+            for iteration in range(1, self.max_iterations + 1):
+                if self._stop_requested:
+                    logger.info("Stop requested, terminating agent loop")
                     break
                 
-                # Execute function calls
-                results = await self._execute_function_calls(candidate)
+                logger.info(f"Agent iteration {iteration}")
                 
-                # Get new screenshot and build function responses
-                function_responses = await self._get_function_responses(results)
-                
-                # Broadcast updated frame
-                screenshot_b64 = await self._get_screenshot_base64()
-                await self._broadcast("browser_frame", {"image": screenshot_b64, "format": "png"})
-                await self._broadcast("browser_url_changed", {"url": self._page.url})
-                
-                # Add function responses to conversation
-                self._contents.append(
-                    Content(
-                        role="user",
-                        parts=[Part(function_response=fr) for fr in function_responses]
+                try:
+                    # Call model in thread to avoid blocking the stream
+                    loop = asyncio.get_running_loop()
+                    response = await loop.run_in_executor(
+                        None,
+                        lambda: self.client.models.generate_content(
+                            model=COMPUTER_USE_MODEL,
+                            contents=self._contents,
+                            config=config,
+                        )
+                    )
+                    
+                    candidate = response.candidates[0]
+                    self._contents.append(candidate.content)
+                    
+                    # Check for function calls
+                    has_function_calls = any(
+                        part.function_call for part in candidate.content.parts
+                    )
+                    
+                    if not has_function_calls:
+                        # No function calls - agent is done
+                        text_parts = [part.text for part in candidate.content.parts if part.text]
+                        final_response = " ".join(text_parts)
+                        agent_completed = True
+                        logger.info(f"Agent completed after {iteration} iterations")
+                        break
+                    
+                    # Execute function calls
+                    results = await self._execute_function_calls(candidate)
+                    
+                    # Get new screenshot and build function responses
+                    # This explicitly uses PNG internally for the model responses
+                    function_responses = await self._get_function_responses(results)
+                    
+                    # Add function responses to conversation
+                    self._contents.append(
+                        Content(
+                            role="user",
+                            parts=[Part(function_response=fr) for fr in function_responses]
+                        )
+                    )
+                    
+                except Exception as e:
+                    error_msg = f"Error in iteration {iteration}: {e}"
+                    logger.error(error_msg)
+                    # Don't broadcast logic error as agent status, just log it
+                    # await self._broadcast("agent_status", {"status": "error", "message": str(e)})
+                    
+                    # Try to recover
+                    self._contents.append(
+                        Content(role="user", parts=[Part(text=f"Error occurred: {e}. Please try a different approach.")])
+                    )
+        finally:
+            # Stop streaming when agent is done
+            await self._stop_streaming()
+
+        
+        if iteration >= self.max_iterations and not agent_completed:
+            logger.warning(f"Agent reached max iterations ({self.max_iterations})")
+            
+            # Request summary from model
+            summary_prompt = "You have reached the maximum number of defined steps (max_iterations). Please provide a clear and concise summary of what you have found, accomplished, or verified so far based on our interaction. If you have partial results, please list them."
+            
+            self._contents.append(
+                Content(role="user", parts=[Part(text=summary_prompt)])
+            )
+            
+            try:
+                # Call model for final summary
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: self.client.models.generate_content(
+                        model=COMPUTER_USE_MODEL,
+                        contents=self._contents,
+                        config=config,
                     )
                 )
                 
+                if response.candidates and response.candidates[0].content.parts:
+                    text_parts = [part.text for part in response.candidates[0].content.parts if part.text]
+                    final_response = " ".join(text_parts)
+                else:
+                    final_response = "I've reached the maximum number of steps, but couldn't generate a summary."
+                    
             except Exception as e:
-                error_msg = f"Error in iteration {iteration}: {e}"
-                logger.error(error_msg)
-                await self._broadcast("agent_status", {"status": "error", "message": str(e)})
-                
-                # Try to recover
-                self._contents.append(
-                    Content(role="user", parts=[Part(text=f"Error occurred: {e}. Please try a different approach.")])
-                )
-        
-        if iteration >= self.max_iterations:
-            logger.warning(f"Agent reached max iterations ({self.max_iterations})")
-            final_response = "I've reached the maximum number of steps. Here's what I was able to accomplish."
+                logger.error(f"Failed to generate summary on max steps: {e}")
+                final_response = "I've reached the maximum number of steps. Here's what I was able to accomplish (summary generation failed)."
         
         # Send final response
         await self._broadcast("agent_response", {"message": final_response})

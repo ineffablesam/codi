@@ -140,7 +140,6 @@ Generate the plan in this exact markdown format:
 ## Estimated Impact
 - **Files affected**: [number]
 - **Risk level**: [Low/Medium/High]
-- **Estimated time**: [time estimate]
 
 ## Testing Plan
 - [How the changes will be verified]

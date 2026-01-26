@@ -1,4 +1,4 @@
-/// Settings screen
+/// Settings screen with enhanced UX
 library;
 
 import 'package:flutter/material.dart';
@@ -28,40 +28,34 @@ class SettingsScreen extends StatelessWidget {
           AppStrings.settings,
           style: GoogleFonts.inter(fontWeight: FontWeight.w600),
         ),
+        elevation: 0,
       ),
       body: ListView(
-        padding: EdgeInsets.all(16.r),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
         children: [
+          SizedBox(height: 8.h),
+
           // User profile card
           _buildProfileCard(authController),
-          SizedBox(height: 24.h),
+          SizedBox(height: 32.h),
 
-          // Appearance section
+          // Preferences section
           _buildSectionHeader(AppStrings.appearance),
-          SizedBox(height: 8.h),
+          SizedBox(height: 12.h),
           _buildSettingsCard([
             _buildToggleTile(
-              icon: Icons.dark_mode,
-              title: AppStrings.darkMode,
-              value: SharedPrefs.getDarkMode(),
-              onChanged: (value) async {
-                await SharedPrefs.setDarkMode(value);
-                Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light);
-              },
-            ),
-            _buildDivider(),
-            _buildToggleTile(
-              icon: Icons.notifications,
+              icon: Icons.notifications_outlined,
               title: AppStrings.notifications,
+              subtitle: 'Get updates and alerts',
               value: SharedPrefs.getNotifications(),
               onChanged: (value) => SharedPrefs.setNotifications(value),
             ),
           ]),
-          SizedBox(height: 24.h),
+          SizedBox(height: 32.h),
 
           // About section
           _buildSectionHeader(AppStrings.about),
-          SizedBox(height: 8.h),
+          SizedBox(height: 12.h),
           _buildSettingsCard([
             _buildInfoTile(
               icon: Icons.info_outline,
@@ -70,7 +64,7 @@ class SettingsScreen extends StatelessWidget {
             ),
             _buildDivider(),
             _buildLinkTile(
-              icon: Icons.description_outlined,
+              icon: Icons.privacy_tip_outlined,
               title: AppStrings.privacyPolicy,
               onTap: () => _openUrl('https://codi.app/privacy'),
             ),
@@ -80,19 +74,18 @@ class SettingsScreen extends StatelessWidget {
               title: AppStrings.termsOfService,
               onTap: () => _openUrl('https://codi.app/terms'),
             ),
+            _buildDivider(),
+            _buildLinkTile(
+              icon: Icons.bug_report_outlined,
+              title: 'Report an Issue',
+              onTap: () => _openUrl('https://codi.app/support'),
+            ),
           ]),
-          SizedBox(height: 24.h),
+          SizedBox(height: 32.h),
 
           // Logout button
-          ElevatedButton(
-            onPressed: authController.confirmLogout,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(AppStrings.logout),
-          ),
-          SizedBox(height: 32.h),
+          _buildLogoutButton(authController),
+          SizedBox(height: 48.h),
         ],
       ),
     );
@@ -102,20 +95,39 @@ class SettingsScreen extends StatelessWidget {
     return Obx(() {
       final user = authController.currentUser.value;
       return Container(
-        padding: EdgeInsets.all(16.r),
+        padding: EdgeInsets.all(20.r),
         decoration: BoxDecoration(
           color: Get.theme.cardTheme.color,
-          borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: Get.theme.dividerColor),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: Get.theme.focusColor.withOpacity(0.08),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Get.theme.shadowColor.withOpacity(0.03),
+              blurRadius: 10,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 32.r,
-              backgroundImage: NetworkImage(
-                ImagePlaceholders.userAvatarWithFallback(
-                  user?.githubAvatarUrl,
-                  user?.githubUsername,
+            Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Get.theme.focusColor.withOpacity(0.1),
+                  width: 2,
+                ),
+              ),
+              child: CircleAvatar(
+                radius: 34.r,
+                backgroundImage: NetworkImage(
+                  ImagePlaceholders.userAvatarWithFallback(
+                    user?.githubAvatarUrl,
+                    user?.githubUsername,
+                  ),
                 ),
               ),
             ),
@@ -124,29 +136,44 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    user?.displayName ?? 'User',
-                    style: GoogleFonts.inter(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Get.textTheme.titleLarge?.color,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          user?.displayName ?? 'User',
+                          style: GoogleFonts.inter(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Get.textTheme.titleLarge?.color,
+                            letterSpacing: -0.3,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      SizedBox(width: 6.w),
+                      Icon(
+                        Icons.verified,
+                        color: Get.theme.primaryColor,
+                        size: 20.r,
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 4.h),
+                  SizedBox(height: 6.h),
                   Text(
                     '@${user?.githubUsername ?? 'unknown'}',
                     style: GoogleFonts.inter(
                       fontSize: 14.sp,
-                      color: Get.textTheme.bodyMedium?.color,
+                      color: Get.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ],
               ),
             ),
             Icon(
-              Icons.verified,
-              color: Get.theme.primaryColor,
-              size: 24.r,
+              Icons.chevron_right,
+              color: Get.textTheme.bodySmall?.color?.withOpacity(0.4),
+              size: 20.r,
             ),
           ],
         ),
@@ -155,12 +182,16 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.inter(
-        fontSize: 13.sp,
-        fontWeight: FontWeight.w600,
-        color: Get.textTheme.bodySmall?.color,
+    return Padding(
+      padding: EdgeInsets.only(left: 4.w, bottom: 0.h),
+      child: Text(
+        title.toUpperCase(),
+        style: GoogleFonts.inter(
+          fontSize: 12.sp,
+          fontWeight: FontWeight.w700,
+          color: Get.textTheme.bodySmall?.color?.withOpacity(0.6),
+          letterSpacing: 0.8,
+        ),
       ),
     );
   }
@@ -169,8 +200,18 @@ class SettingsScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Get.theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: Get.theme.dividerColor),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: Get.theme.focusColor.withOpacity(0.08),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Get.theme.shadowColor.withOpacity(0.03),
+            blurRadius: 10,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(children: children),
     );
@@ -179,16 +220,44 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildToggleTile({
     required IconData icon,
     required String title,
+    required String subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
     return StatefulBuilder(
       builder: (context, setState) {
         return ListTile(
-          leading: Icon(icon, color: Get.textTheme.bodyMedium?.color),
+          contentPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+          leading: Container(
+            padding: EdgeInsets.all(10.r),
+            decoration: BoxDecoration(
+              color: Get.theme.primaryColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10.r),
+            ),
+            child: Icon(
+              icon,
+              color: Get.theme.primaryColor,
+              size: 20.r,
+            ),
+          ),
           title: Text(
             title,
-            style: GoogleFonts.inter(fontSize: 15.sp),
+            style: GoogleFonts.inter(
+              fontSize: 15.sp,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.2,
+            ),
+          ),
+          subtitle: Padding(
+            padding: EdgeInsets.only(top: 4.h),
+            child: Text(
+              subtitle,
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                color: Get.textTheme.bodySmall?.color?.withOpacity(0.6),
+                letterSpacing: -0.1,
+              ),
+            ),
           ),
           trailing: Switch(
             value: value,
@@ -209,16 +278,45 @@ class SettingsScreen extends StatelessWidget {
     required String subtitle,
   }) {
     return ListTile(
-      leading: Icon(icon, color: Get.textTheme.bodyMedium?.color),
+      contentPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+      leading: Container(
+        padding: EdgeInsets.all(10.r),
+        decoration: BoxDecoration(
+          color: Get.theme.focusColor.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(10.r),
+        ),
+        child: Icon(
+          icon,
+          color: Get.textTheme.bodyMedium?.color?.withOpacity(0.8),
+          size: 20.r,
+        ),
+      ),
       title: Text(
         title,
-        style: GoogleFonts.inter(fontSize: 15.sp),
-      ),
-      trailing: Text(
-        subtitle,
         style: GoogleFonts.inter(
-          fontSize: 14.sp,
-          color: Get.textTheme.bodyMedium?.color,
+          fontSize: 15.sp,
+          fontWeight: FontWeight.w500,
+          letterSpacing: -0.2,
+        ),
+      ),
+      trailing: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: Get.theme.focusColor.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(
+            color: Get.theme.focusColor.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          subtitle,
+          style: GoogleFonts.inter(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w600,
+            color: Get.textTheme.bodyMedium?.color,
+            letterSpacing: -0.1,
+          ),
         ),
       ),
     );
@@ -229,22 +327,87 @@ class SettingsScreen extends StatelessWidget {
     required String title,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Get.textTheme.bodyMedium?.color),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(fontSize: 15.sp),
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: Get.textTheme.bodySmall?.color,
-      ),
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(0),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+        leading: Container(
+          padding: EdgeInsets.all(10.r),
+          decoration: BoxDecoration(
+            color: Get.theme.focusColor.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(10.r),
+          ),
+          child: Icon(
+            icon,
+            color: Get.textTheme.bodyMedium?.color?.withOpacity(0.8),
+            size: 20.r,
+          ),
+        ),
+        title: Text(
+          title,
+          style: GoogleFonts.inter(
+            fontSize: 15.sp,
+            fontWeight: FontWeight.w500,
+            letterSpacing: -0.2,
+          ),
+        ),
+        trailing: Icon(
+          Icons.chevron_right,
+          color: Get.textTheme.bodySmall?.color?.withOpacity(0.4),
+          size: 20.r,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton(AuthController authController) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: AppColors.error.withOpacity(0.2),
+          width: 1.5,
+        ),
+      ),
+      child: ElevatedButton(
+        onPressed: authController.confirmLogout,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.error,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: EdgeInsets.symmetric(vertical: 16.h),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout, size: 20.r),
+            SizedBox(width: 8.w),
+            Text(
+              AppStrings.logout,
+              style: GoogleFonts.inter(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildDivider() {
-    return Divider(height: 1, indent: 56.w, color: Get.theme.dividerColor);
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 68.w,
+      endIndent: 20.w,
+      color: Get.theme.focusColor.withOpacity(0.06),
+    );
   }
 
   void _openUrl(String url) async {

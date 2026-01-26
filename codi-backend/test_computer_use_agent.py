@@ -36,13 +36,13 @@ async def main():
     agent = ComputerUseAgent(
         project_id=999,  # Test project ID
         user_id=1,
-        max_iterations=5,  # Limit for quick test
-        headless=False,  # Show browser for verification
+        max_iterations=1,  # Force hit limit immediately
+        headless=False,
     )
     
     try:
-        # Simple test: Navigate and extract page title
-        user_prompt = "Go to google.com and tell me what you see on the page."
+        # Complex prompt that definitely takes more than 1 step
+        user_prompt = "Go to python.org, click on Downloads, then search for 'release notes', and finally tell me the latest version."
         
         print(f"\nPrompt: {user_prompt}")
         print("-" * 40)

@@ -83,7 +83,7 @@ refresh_services() {
     echo -e "${YELLOW}Refreshing Codi services...${NC}"
     if [ -d "$BACKEND_DIR" ]; then
         cd "$BACKEND_DIR" || exit
-        docker compose restart api celery-worker celery-beat browser-agent
+        docker compose restart api celery-worker celery-beat
         cd - > /dev/null || exit
         echo -e "${GREEN}Services refreshed (API, Celery, Browser Agent).${NC}"
     else

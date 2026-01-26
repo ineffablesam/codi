@@ -21,7 +21,8 @@ class BrowserAgentController extends GetxController {
 
   // Browser session state
   final isSessionActive = false.obs;
-  final currentUrl = 'https://google.com'.obs;
+  final currentUrl = 'Start Interactive or AI Agent session'.obs;
+
   final isLoading = false.obs;
 
   // Interactive mode - user controls browser directly (no AI)
@@ -94,6 +95,10 @@ class BrowserAgentController extends GetxController {
 
   /// Handle incoming browser frame
   void _handleBrowserFrame(Map<String, dynamic> data) {
+    // strict check: don't process frames if session is not active
+    // this prevents lingering frames from re-showing the view after "Stop" is clicked
+    if (!isSessionActive.value) return;
+
     try {
       final imageB64 = data['image'] as String?;
       if (imageB64 != null) {
@@ -115,7 +120,8 @@ class BrowserAgentController extends GetxController {
           actualDeviceHeight.value = deviceHeight;
         }
 
-        isSessionActive.value = true;
+        // REMOVED: isSessionActive.value = true; 
+        // We rely on explicit 'started' events to manage lifecycle now.
         isLoading.value = false;
 
         // Calculate FPS
@@ -383,11 +389,11 @@ class BrowserAgentController extends GetxController {
   /// Stop an ongoing browser agent task without ending the session
   void stopBrowserAgent() {
     if (!isSessionActive.value) return;
-    
+
     _webSocketClient.sendMessage({
       'type': 'stop_browser_agent',
     });
-    
+
     isLoading.value = false;
     AppLogger.debug('Sent stop signal to browser agent');
   }

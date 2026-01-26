@@ -548,10 +548,29 @@ async def initial_deploy(context: AgentContext) -> str:
     from app.utils.logging import get_logger
     logger = get_logger(__name__)
     
-    # Guard against duplicate initial deploys
+    # Guard against duplicate initial deploys (InMemory + DB Check)
     if _initial_deploy_completed.get(context.project_id):
-        logger.info(f"Initial deploy already completed for project {context.project_id}, skipping")
+        logger.info(f"Initial deploy already completed for project {context.project_id} (cached), skipping")
         return "Initial deployment already completed for this project. Use docker_preview for subsequent builds."
+
+    # Check database for existing deployment
+    try:
+        from app.core.database import get_db_context
+        from app.models.project import Project
+        from sqlalchemy import select
+
+        async with get_db_context() as session:
+            result = await session.execute(select(Project).where(Project.id == context.project_id))
+            project = result.scalar_one_or_none()
+            
+            if project and (project.last_deployment_at or project.deployment_url):
+                _initial_deploy_completed[context.project_id] = True
+                logger.info(f"Initial deploy already completed for project {context.project_id} (db check), skipping")
+                return "Initial deployment already completed for this project. Use docker_preview for subsequent builds."
+    except Exception as e:
+        logger.warning(f"Failed to check DB for initial deploy status: {e}")
+        # Continue with deployment if DB check fails to be safe? 
+        # Or return error? For better UX, let's try to deploy if we can't be sure.
     
     # NOTE: We do NOT run npm install on the host!
     # Docker's `npm ci` handles dependencies inside the container.

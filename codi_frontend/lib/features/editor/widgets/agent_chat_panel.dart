@@ -7,12 +7,14 @@ import 'package:codi_frontend/features/editor/widgets/chat/success_message.dart'
 import 'package:codi_frontend/features/editor/widgets/chat/thinking_message.dart';
 import 'package:codi_frontend/features/editor/widgets/chat/tool_execution_card.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:super_context_menu/super_context_menu.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
@@ -407,9 +409,8 @@ class AgentChatPanel extends StatelessWidget {
         itemBuilder: (context, index) {
           if (index == groupedMessages.length) {
             // Show "Crawling" for browser mode, "Generating" otherwise
-            final indicatorText = controller.isBrowserAgentMode.value 
-                ? 'Crawling' 
-                : 'Generating';
+            final indicatorText =
+                controller.isBrowserAgentMode.value ? 'Crawling' : 'Generating';
             return GeneratingIndicator(text: indicatorText);
           }
 
@@ -563,50 +564,65 @@ class AgentChatPanel extends StatelessWidget {
   }
 
   Widget _buildUserMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 16.h),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Flexible(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-              decoration: BoxDecoration(
-                color: AppColors.messageUser,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16.r),
-                  topRight: Radius.circular(4.r),
-                  bottomLeft: Radius.circular(16.r),
-                  bottomRight: Radius.circular(16.r),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
+    return ContextMenuWidget(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: 16.h),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Flexible(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: AppColors.messageUser,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16.r),
+                    topRight: Radius.circular(4.r),
+                    bottomLeft: Radius.circular(16.r),
+                    bottomRight: Radius.circular(16.r),
                   ),
-                ],
-              ),
-              child: Text(
-                message.text,
-                style: GoogleFonts.inter(
-                  fontSize: 14.sp,
-                  color: Colors.white,
-                  height: 1.4,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  message.text,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    color: Colors.white,
+                    height: 1.4,
+                  ),
                 ),
               ),
             ),
-          ),
-          SizedBox(width: 8.w),
-          CircleAvatar(
-            radius: 16.r,
-            backgroundColor: Colors.grey[200],
-            child: Icon(StatusIcons.user, size: 16.r, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0);
+            SizedBox(width: 8.w),
+            CircleAvatar(
+              radius: 16.r,
+              backgroundColor: Colors.grey[200],
+              child:
+                  Icon(StatusIcons.user, size: 16.r, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0),
+      menuProvider: (_) {
+        return Menu(
+          children: [
+            MenuAction(
+              title: "Copy",
+              callback: () async {
+                await Clipboard.setData(ClipboardData(text: message.text));
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildAgentStatusMessage(AgentMessage message) {
@@ -637,88 +653,102 @@ class AgentChatPanel extends StatelessWidget {
   }
 
   Widget _buildAgentResponseMessage(AgentMessage message) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 16.h),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 16.r,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
-            child:
-                Icon(AgentAvatarIcons.ai, size: 20.r, color: AppColors.primary),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.all(16.r),
-              decoration: BoxDecoration(
-                color: Colors.grey[900],
-                border: Border.all(color: Colors.grey[800]!),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(4.r),
-                  topRight: Radius.circular(16.r),
-                  bottomLeft: Radius.circular(16.r),
-                  bottomRight: Radius.circular(16.r),
+    return ContextMenuWidget(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: 16.h),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 16.r,
+              backgroundColor: AppColors.primary.withOpacity(0.1),
+              child: Icon(AgentAvatarIcons.ai,
+                  size: 20.r, color: AppColors.primary),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Container(
+                padding: EdgeInsets.all(16.r),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  border: Border.all(color: Colors.grey[800]!),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(4.r),
+                    topRight: Radius.circular(16.r),
+                    bottomLeft: Radius.circular(16.r),
+                    bottomRight: Radius.circular(16.r),
+                  ),
                 ),
-              ),
-              child: MarkdownBody(
-                data: message.text,
-                styleSheet: MarkdownStyleSheet(
-                  p: GoogleFonts.inter(
-                    fontSize: 14.sp,
-                    color: Colors.grey[300],
-                    height: 1.5,
-                  ),
-                  h1: GoogleFonts.inter(
-                    fontSize: 20.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  h2: GoogleFonts.inter(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  h3: GoogleFonts.inter(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                  code: GoogleFonts.jetBrainsMono(
-                    fontSize: 12.sp,
-                    backgroundColor: Colors.grey[850],
-                    color: Colors.blue[300],
-                  ),
-                  codeblockDecoration: BoxDecoration(
-                    color: Colors.grey[850],
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  blockquoteDecoration: BoxDecoration(
-                    color: Colors.grey[850],
-                    border: Border(
-                      left: BorderSide(color: Colors.grey[600]!, width: 4),
+                child: MarkdownBody(
+                  data: message.text,
+                  styleSheet: MarkdownStyleSheet(
+                    p: GoogleFonts.inter(
+                      fontSize: 14.sp,
+                      color: Colors.grey[300],
+                      height: 1.5,
                     ),
-                  ),
-                  listBullet: GoogleFonts.inter(
-                    fontSize: 14.sp,
-                    color: Colors.grey[400],
-                  ),
-                  strong: GoogleFonts.inter(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  em: GoogleFonts.inter(
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey[300],
+                    h1: GoogleFonts.inter(
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    h2: GoogleFonts.inter(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    h3: GoogleFonts.inter(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    code: GoogleFonts.jetBrainsMono(
+                      fontSize: 12.sp,
+                      backgroundColor: Colors.grey[850],
+                      color: Colors.blue[300],
+                    ),
+                    codeblockDecoration: BoxDecoration(
+                      color: Colors.grey[850],
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    blockquoteDecoration: BoxDecoration(
+                      color: Colors.grey[850],
+                      border: Border(
+                        left: BorderSide(color: Colors.grey[600]!, width: 4),
+                      ),
+                    ),
+                    listBullet: GoogleFonts.inter(
+                      fontSize: 14.sp,
+                      color: Colors.grey[400],
+                    ),
+                    strong: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    em: GoogleFonts.inter(
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey[300],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0);
+          ],
+        ),
+      ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0),
+      menuProvider: (_) {
+        return Menu(
+          children: [
+            MenuAction(
+              title: "Copy",
+              callback: () async {
+                await Clipboard.setData(ClipboardData(text: message.text));
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildToolExecutionMessage(AgentMessage message) {
@@ -1317,13 +1347,14 @@ class AgentChatPanel extends StatelessWidget {
       onPressed: () {
         controller.textController.text = label;
       },
-      backgroundColor: Get.theme.cardTheme.color,
+      backgroundColor: Get.theme.focusColor.withOpacity(0.05),
       shadowColor: Colors.black.withOpacity(0.05),
       elevation: 2,
       padding: EdgeInsets.all(8.r),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24.r),
-          side: BorderSide(color: Get.theme.dividerColor, width: 1.0)),
+          side: BorderSide(
+              color: Get.theme.focusColor.withOpacity(0.1), width: 1.0)),
     );
   }
 }
