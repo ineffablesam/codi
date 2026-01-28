@@ -167,11 +167,28 @@ class AgentChatController extends GetxController {
     // Update controller states based on message type
     switch (message.type) {
       case MessageType.taskSubmitted:
-        // Task was submitted to queue - store the task ID for stopping
+        // Combined case for task submission
         if (message.taskId != null) {
           currentTaskId.value = message.taskId;
         }
         isAgentWorking.value = true;
+        isTyping.value = true;
+        
+        // Ensure thinking indicator is showing
+        final hasThinking = messages.any((m) =>
+            m.type == MessageType.agentStatus && m.status == 'thinking');
+        if (!hasThinking) {
+          final thinkingMessage = AgentMessage(
+            text: '',
+            timestamp: DateTime.now(),
+            type: MessageType.agentStatus,
+            status: 'thinking',
+          );
+          addMessage(thinkingMessage);
+        }
+        
+        workingStartTime.value ??= DateTime.now();
+        _editorController.setAgentWorking(true);
         break;
 
       case MessageType.agentResponse:
@@ -364,20 +381,7 @@ class AgentChatController extends GetxController {
         }
         break;
 
-      case MessageType.taskSubmitted:
-        // Show thinking indicator instead of "task submitted" text
-        // Add a synthetic thinking status message that will be replaced when response arrives
-        final thinkingMessage = AgentMessage(
-          text: '',
-          timestamp: DateTime.now(),
-          type: MessageType.agentStatus,
-          status: 'thinking',
-        );
-        addMessage(thinkingMessage);
-        isAgentWorking.value = true;
-        isTyping.value = true;
-        _editorController.setAgentWorking(true);
-        break;
+
 
       case MessageType.browserAction:
         // Show browser navigation/action in chat
@@ -479,7 +483,18 @@ class AgentChatController extends GetxController {
     final userMessage = AgentMessage.user(trimmedText);
     addMessage(userMessage);
 
+    // Add INSTANT thinking indicator for immediate feedback
+    final thinkingMessage = AgentMessage(
+      text: '',
+      timestamp: DateTime.now(),
+      type: MessageType.agentStatus,
+      status: 'thinking',
+    );
+    addMessage(thinkingMessage);
+
     isSending.value = true;
+    isAgentWorking.value = true;
+    isTyping.value = true;
 
     try {
       final projectId = _editorController.currentProject.value?.id;
