@@ -233,7 +233,7 @@ class ProjectWizardScreen extends StatelessWidget {
         ...ProjectWizardController.backends.map((backend) {
           final isServerpod = backend.id == 'serverpod';
           return Padding(
-            padding: EdgeInsets.only(bottom: 10.h),
+            padding: EdgeInsets.only(bottom: 0.3.sh),
             child: Obx(() => BackendProviderCard(
                   id: backend.id,
                   iconWidget: Icon(backend.icon,
@@ -245,7 +245,8 @@ class ProjectWizardScreen extends StatelessWidget {
                   isSelected: wizard.selectedBackend.value == backend.id,
                   isConnected: connectionStatus[backend.id] ?? false,
                   isConnecting: isConnecting[backend.id] ?? false,
-                  showManualConfig: isServerpod,
+                  showManualConfig: false,
+                  isAutoManaged: isServerpod,
                   onSelect: () => wizard.selectedBackend.value = backend.id,
                   onConnect: isServerpod
                       ? null
@@ -276,25 +277,7 @@ class ProjectWizardScreen extends StatelessWidget {
                             connectionStatus[backend.id] = false;
                           }
                         },
-                  onManualConfig: isServerpod
-                      ? () => Get.dialog(
-                            ServerpodConfigDialog(
-                              onSave: (serverUrl, apiKey) {
-                                wizard.serverpodServerUrl.value = serverUrl;
-                                wizard.serverpodApiKey.value = apiKey ?? '';
-                                Get.snackbar(
-                                  'Configured!',
-                                  'Serverpod settings saved',
-                                  snackPosition: SnackPosition.BOTTOM,
-                                  backgroundColor:
-                                      AppColors.success.withOpacity(0.9),
-                                  colorText: Colors.white,
-                                  margin: EdgeInsets.all(16.r),
-                                );
-                              },
-                            ),
-                          )
-                      : null,
+                  onManualConfig: null,
                 )),
           );
         }),

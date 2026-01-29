@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:radix_icons/radix_icons.dart';
 
+import '../../../config/routes.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/sf_font.dart';
 import '../../../shared/controller/ui_controller.dart';
@@ -521,6 +522,16 @@ class EditorScreen extends StatelessWidget {
             ),
           ),
           const PopupMenuItem(
+            value: 'env',
+            child: Row(
+              children: [
+                Icon(Iconsax.setting_2),
+                SizedBox(width: 8),
+                Text('Env manager'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
             value: 'deploy',
             child: Row(
               children: [
@@ -559,6 +570,15 @@ class EditorScreen extends StatelessWidget {
                 );
               } else {
                 Get.snackbar('No Container', 'Deploy first to view logs');
+              }
+              break;
+            case 'env':
+              final projectId = controller.currentProject.value?.id;
+              if (projectId != null) {
+                Get.toNamed(AppRoutes.environment
+                    .replaceFirst(':id', projectId.toString()));
+              } else {
+                Get.snackbar('Error', 'Project ID not found');
               }
               break;
             case 'deploy':

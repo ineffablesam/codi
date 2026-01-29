@@ -21,6 +21,7 @@ class BackendProviderCard extends StatelessWidget {
   final bool isConnected;
   final bool isConnecting;
   final bool showManualConfig;
+  final bool isAutoManaged;
   final VoidCallback onSelect;
   final VoidCallback? onConnect;
   final VoidCallback? onDisconnect;
@@ -38,6 +39,7 @@ class BackendProviderCard extends StatelessWidget {
     required this.isConnected,
     this.isConnecting = false,
     this.showManualConfig = false,
+    this.isAutoManaged = false,
     required this.onSelect,
     this.onConnect,
     this.onDisconnect,
@@ -191,6 +193,33 @@ class BackendProviderCard extends StatelessWidget {
   }
 
   Widget _buildActionButton(Color primaryColor) {
+    if (isAutoManaged) {
+      return Container(
+        height: 36.h,
+        decoration: BoxDecoration(
+          color: primaryColor.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(
+            color: primaryColor.withOpacity(0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.sparkles, size: 14.r, color: primaryColor),
+            SizedBox(width: 8.w),
+            Text(
+              'Managed by Codi',
+              style: SFPro.medium(
+                fontSize: 12.sp,
+                color: primaryColor,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     if (showManualConfig) {
       return OutlinedButton.icon(
         onPressed: onManualConfig,
@@ -254,102 +283,3 @@ class BackendProviderCard extends StatelessWidget {
   }
 }
 
-/// Manual Serverpod configuration dialog
-class ServerpodConfigDialog extends StatefulWidget {
-  final void Function(String serverUrl, String? apiKey) onSave;
-
-  const ServerpodConfigDialog({super.key, required this.onSave});
-
-  @override
-  State<ServerpodConfigDialog> createState() => _ServerpodConfigDialogState();
-}
-
-class _ServerpodConfigDialogState extends State<ServerpodConfigDialog> {
-  final _serverUrlController = TextEditingController();
-  final _apiKeyController = TextEditingController();
-
-  @override
-  void dispose() {
-    _serverUrlController.dispose();
-    _apiKeyController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.surfaceDark,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.r),
-      ),
-      title: Text(
-        'Configure Serverpod',
-        style: SFPro.bold(
-          fontSize: 18.sp,
-          color: AppColors.textInverse,
-        ),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Enter your Serverpod server details.',
-            style: SFPro.regular(
-              fontSize: 13.sp,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          SizedBox(height: 16.h),
-          TextField(
-            controller: _serverUrlController,
-            style: SFPro.regular(fontSize: 14.sp),
-            decoration: InputDecoration(
-              labelText: 'Server URL',
-              hintText: 'https://api.myapp.com',
-              prefixIcon: Icon(LucideIcons.server, size: 18.r),
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-            ),
-          ),
-          SizedBox(height: 12.h),
-          TextField(
-            controller: _apiKeyController,
-            style: SFPro.regular(fontSize: 14.sp),
-            decoration: InputDecoration(
-              labelText: 'API Key (Optional)',
-              hintText: 'sk-...',
-              prefixIcon: Icon(LucideIcons.key, size: 18.r),
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-            ),
-            obscureText: true,
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Get.back(),
-          child: Text('Cancel', style: SFPro.medium(fontSize: 14.sp)),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_serverUrlController.text.isNotEmpty) {
-              widget.onSave(
-                _serverUrlController.text,
-                _apiKeyController.text.isEmpty ? null : _apiKeyController.text,
-              );
-              Get.back();
-            }
-          },
-          style: ElevatedButton.styleFrom(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-          ),
-          child: Text('Save', style: SFPro.medium(fontSize: 14.sp)),
-        ),
-      ],
-    );
-  }
-}

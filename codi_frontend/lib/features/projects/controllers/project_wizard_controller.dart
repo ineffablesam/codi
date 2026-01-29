@@ -31,10 +31,6 @@ class ProjectWizardController extends GetxController {
   final isPrivate = false.obs;
   final appIdea = ''.obs;
 
-  // Serverpod manual config
-  final serverpodServerUrl = ''.obs;
-  final serverpodApiKey = ''.obs;
-
   // Animation state
   final isAnimating = false.obs;
 
@@ -52,7 +48,8 @@ class ProjectWizardController extends GetxController {
 
     // Listen to changes and update observable values
     nameController.addListener(() => projectName.value = nameController.text);
-    descriptionController.addListener(() => projectDescription.value = descriptionController.text);
+    descriptionController.addListener(
+        () => projectDescription.value = descriptionController.text);
     appIdeaController.addListener(() => appIdea.value = appIdeaController.text);
   }
 
@@ -121,7 +118,7 @@ class ProjectWizardController extends GetxController {
     BackendOption(
       id: 'serverpod',
       name: 'Serverpod',
-      description: 'Dart backend for Flutter',
+      description: 'Auto-managed by Codi',
       icon: LucideIcons.server,
       gradient: [Color(0xFF0175C2), Color(0xFF02569B)],
       features: ['Type-safe API', 'ORM', 'Caching', 'Auth'],

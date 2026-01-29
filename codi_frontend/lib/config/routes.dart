@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../bindings/deployments_binding.dart';
 import '../bindings/editor_binding.dart';
+import '../bindings/environment_binding.dart';
 import '../bindings/planning_binding.dart';
 import '../bindings/projects_binding.dart';
 import '../bindings/layout_binding.dart';
@@ -12,6 +13,7 @@ import '../features/auth/views/login_screen.dart';
 import '../features/auth/views/splash_screen.dart';
 import '../features/deployments/views/deployments_screen.dart';
 import '../features/editor/views/editor_screen.dart';
+import '../features/environment/screens/environment_manager_screen.dart';
 import '../features/planning/views/plan_review_screen.dart';
 import '../features/planning/views/walkthrough_screen.dart';
 import '../features/projects/views/project_wizard_screen.dart';
@@ -33,6 +35,7 @@ class AppRoutes {
   static const String createProject = '/projects/create';
   static const String projectDetail = '/projects/:id';
   static const String editor = '/editor/:id';
+  static const String environment = '/environment/:id';
   static const String deployments = '/deployments';
   static const String settings = '/settings';
   static const String planReview = '/plan-review';
@@ -114,6 +117,14 @@ class AppRoutes {
           name: planReview,
           page: () => const PlanReviewScreen(),
           binding: PlanningBinding(),
+          transition: Transition.rightToLeft,
+        ),
+
+        // Environment Manager
+        GetPage(
+          name: environment,
+          page: () => const EnvironmentManagerScreen(),
+          binding: EnvironmentBinding(),
           transition: Transition.rightToLeft,
         ),
 
