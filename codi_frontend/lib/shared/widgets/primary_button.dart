@@ -3,9 +3,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/sf_font.dart';
 
 /// Primary button with loading state
 class PrimaryButton extends StatelessWidget {
@@ -55,7 +55,7 @@ class PrimaryButton extends StatelessWidget {
                 ],
                 Text(
                   label,
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.w600,
                   ),
@@ -64,6 +64,8 @@ class PrimaryButton extends StatelessWidget {
             ),
     );
 
-    return isFullWidth ? SizedBox(width: double.infinity, child: button) : button;
+    return isFullWidth
+        ? SizedBox(width: double.infinity, child: button)
+        : button;
   }
 }

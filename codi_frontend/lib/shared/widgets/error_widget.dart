@@ -3,10 +3,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/utils/sf_font.dart';
 
 /// Error state widget with retry button
 class ErrorWidget extends StatelessWidget {
@@ -35,7 +35,7 @@ class ErrorWidget extends StatelessWidget {
             SizedBox(height: 16.h),
             Text(
               AppStrings.somethingWentWrong,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -45,7 +45,7 @@ class ErrorWidget extends StatelessWidget {
               SizedBox(height: 8.h),
               Text(
                 message!,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 14.sp,
                   color: AppColors.textSecondary,
                 ),

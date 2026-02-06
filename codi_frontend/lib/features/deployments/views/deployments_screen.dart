@@ -4,11 +4,11 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/image_placeholders.dart';
+import '../../../core/utils/sf_font.dart';
 import '../controllers/deployments_controller.dart';
 import '../widgets/deployment_card.dart';
 
@@ -30,7 +30,7 @@ class DeploymentsScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           AppStrings.deployments,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          style: SFPro.font(fontWeight: FontWeight.w600),
         ),
       ),
       body: RefreshIndicator(
@@ -50,7 +50,8 @@ class DeploymentsScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               return Padding(
                 padding: EdgeInsets.only(bottom: 12.h),
-                child: DeploymentCard(deployment: controller.deployments[index]),
+                child:
+                    DeploymentCard(deployment: controller.deployments[index]),
               );
             },
           );
@@ -79,7 +80,7 @@ class DeploymentsScreen extends StatelessWidget {
             SizedBox(height: 24.h),
             Text(
               AppStrings.noDeployments,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -88,7 +89,7 @@ class DeploymentsScreen extends StatelessWidget {
             SizedBox(height: 8.h),
             Text(
               AppStrings.noDeploymentsSubtitle,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 14.sp,
                 color: AppColors.textSecondary,
               ),

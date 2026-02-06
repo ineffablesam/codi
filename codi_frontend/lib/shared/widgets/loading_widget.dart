@@ -3,9 +3,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/sf_font.dart';
 
 /// Centered loading indicator with optional message
 class LoadingWidget extends StatelessWidget {
@@ -36,7 +36,7 @@ class LoadingWidget extends StatelessWidget {
             SizedBox(height: 16.h),
             Text(
               message!,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 14.sp,
                 color: AppColors.textSecondary,
               ),

@@ -2,12 +2,13 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
+
+import '../../../../core/utils/sf_font.dart';
 
 /// Animated indicator with smooth blurry fading dots
 class GeneratingIndicator extends StatefulWidget {
   final String text;
-  
+
   const GeneratingIndicator({super.key, this.text = 'Generating'});
 
   @override
@@ -67,7 +68,7 @@ class _GeneratingIndicatorState extends State<GeneratingIndicator>
         children: [
           Text(
             widget.text,
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 12.sp,
               color: Colors.grey[400],
               fontWeight: FontWeight.w500,
@@ -91,7 +92,7 @@ class _GeneratingIndicatorState extends State<GeneratingIndicator>
                       opacity: value.clamp(0.0, 1.0),
                       child: Text(
                         '.',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 16.sp,
                           color: Colors.grey[400],
                           fontWeight: FontWeight.bold,

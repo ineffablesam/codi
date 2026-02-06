@@ -100,6 +100,14 @@ class ProjectWizardController extends GetxController {
   /// Backend options
   static const List<BackendOption> backends = [
     BackendOption(
+      id: 'serverpod',
+      name: 'Serverpod',
+      description: 'Auto-managed by Codi',
+      icon: LucideIcons.server,
+      gradient: [Color(0xFF0175C2), Color(0xFF02569B)],
+      features: ['Type-safe API', 'ORM', 'Caching', 'Auth'],
+    ),
+    BackendOption(
       id: 'supabase',
       name: 'Supabase',
       description: 'Open source Firebase alternative',
@@ -114,14 +122,6 @@ class ProjectWizardController extends GetxController {
       icon: LucideIcons.flame,
       gradient: [Color(0xFFFFCA28), Color(0xFFF57C00)],
       features: ['Auth', 'Firestore', 'Storage', 'Analytics'],
-    ),
-    BackendOption(
-      id: 'serverpod',
-      name: 'Serverpod',
-      description: 'Auto-managed by Codi',
-      icon: LucideIcons.server,
-      gradient: [Color(0xFF0175C2), Color(0xFF02569B)],
-      features: ['Type-safe API', 'ORM', 'Caching', 'Auth'],
     ),
   ];
 

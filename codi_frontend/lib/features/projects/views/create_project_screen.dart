@@ -4,10 +4,10 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/utils/sf_font.dart';
 import '../../../core/utils/validators.dart';
 import '../controllers/projects_controller.dart';
 
@@ -41,7 +41,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
       appBar: AppBar(
         title: Text(
           AppStrings.createProject,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          style: SFPro.font(fontWeight: FontWeight.w600),
         ),
       ),
       body: SafeArea(
@@ -53,7 +53,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
               // Project name
               Text(
                 AppStrings.projectName,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -74,7 +74,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
               // Description
               Text(
                 AppStrings.projectDescription,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 14.sp,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -113,7 +113,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
                         children: [
                           Text(
                             AppStrings.privateProject,
-                            style: GoogleFonts.inter(
+                            style: SFPro.font(
                               fontSize: 14.sp,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
@@ -122,7 +122,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
                           SizedBox(height: 2.h),
                           Text(
                             'Only you can see this repository',
-                            style: GoogleFonts.inter(
+                            style: SFPro.font(
                               fontSize: 12.sp,
                               color: AppColors.textSecondary,
                             ),
@@ -160,7 +160,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
                     Expanded(
                       child: Text(
                         'A new GitHub repository will be created with a Flutter starter template. You can start building immediately!',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 13.sp,
                           color: AppColors.textPrimary,
                         ),
@@ -173,9 +173,8 @@ class _CreateProjectScreenState extends State<CreateProjectScreen> {
 
               // Create button
               Obx(() => ElevatedButton(
-                    onPressed: controller.isCreating.value
-                        ? null
-                        : _createProject,
+                    onPressed:
+                        controller.isCreating.value ? null : _createProject,
                     child: controller.isCreating.value
                         ? SizedBox(
                             width: 24.r,

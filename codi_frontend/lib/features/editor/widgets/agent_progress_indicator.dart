@@ -4,9 +4,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/sf_font.dart';
 import '../controllers/editor_controller.dart';
 
 /// Circular progress indicator for build/deploy status
@@ -64,7 +64,7 @@ class AgentProgressIndicator extends StatelessWidget {
             if (progress > 0)
               Text(
                 '${(progress * 100).toInt()}%',
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: (size / 4).sp,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primary,

@@ -4,10 +4,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/utils/sf_font.dart';
 import '../../../core/utils/validators.dart';
 import '../controllers/projects_controller.dart';
 
@@ -36,7 +35,7 @@ class _CreateProjectDialogState extends State<CreateProjectDialog> {
     return AlertDialog(
       title: Text(
         AppStrings.newProject,
-        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+        style: SFPro.font(fontWeight: FontWeight.w600),
       ),
       content: Form(
         key: _formKey,

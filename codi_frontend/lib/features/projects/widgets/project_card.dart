@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/sf_font.dart';
 import '../models/project_model.dart';
 
 /// Project card widget for list display
@@ -75,7 +76,7 @@ class ProjectCard extends StatelessWidget {
                   child: Center(
                     child: Text(
                       project.name.substring(0, 1).toUpperCase(),
-                      style: GoogleFonts.inter(
+                      style: SFPro.font(
                         fontSize: 18.sp,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
@@ -92,7 +93,7 @@ class ProjectCard extends StatelessWidget {
                     children: [
                       Text(
                         project.name,
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 16.sp,
                           fontWeight: FontWeight.w600,
                           color: Get.textTheme.titleMedium?.color,
@@ -114,7 +115,7 @@ class ProjectCard extends StatelessWidget {
                           SizedBox(width: 6.w),
                           Text(
                             _getStatusText(),
-                            style: GoogleFonts.inter(
+                            style: SFPro.font(
                               fontSize: 12.sp,
                               color: Get.textTheme.bodyMedium?.color,
                             ),
@@ -195,7 +196,7 @@ class ProjectCard extends StatelessWidget {
                 padding: EdgeInsets.only(top: 12.h),
                 child: Text(
                   project.description!,
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 13.sp,
                     color: AppColors.textSecondary,
                   ),
@@ -236,7 +237,7 @@ class ProjectCard extends StatelessWidget {
                   SizedBox(width: 4.w),
                   Text(
                     _formatDate(project.updatedAt),
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 11.sp,
                       color: AppColors.textTertiary,
                     ),
@@ -263,7 +264,7 @@ class ProjectCard extends StatelessWidget {
                           SizedBox(width: 4.w),
                           Text(
                             'Live',
-                            style: GoogleFonts.inter(
+                            style: SFPro.font(
                               fontSize: 10.sp,
                               fontWeight: FontWeight.w600,
                               color: AppColors.success,

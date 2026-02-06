@@ -8,8 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../config/routes.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/sf_font.dart';
 import '../controllers/projects_controller.dart';
 
 /// Project detail screen
@@ -30,7 +30,7 @@ class ProjectDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: Obx(() => Text(
               controller.selectedProject.value?.name ?? 'Project',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              style: SFPro.font(fontWeight: FontWeight.w600),
             )),
         actions: [
           IconButton(
@@ -54,7 +54,7 @@ class ProjectDetailScreen extends StatelessWidget {
           return Center(
             child: Text(
               'Project not found',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 16.sp,
                 color: AppColors.textSecondary,
               ),
@@ -114,7 +114,7 @@ class ProjectDetailScreen extends StatelessWidget {
           SizedBox(width: 12.w),
           Text(
             project.status.toString().toUpperCase(),
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 14.sp,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -124,7 +124,7 @@ class ProjectDetailScreen extends StatelessWidget {
           if (project.lastBuildAt != null)
             Text(
               'Last build: ${DateFormat.yMd().format(project.lastBuildAt!)}',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 12.sp,
                 color: AppColors.textSecondary,
               ),
@@ -147,7 +147,7 @@ class ProjectDetailScreen extends StatelessWidget {
         children: [
           Text(
             'Project Info',
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 16.sp,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -157,7 +157,7 @@ class ProjectDetailScreen extends StatelessWidget {
           if (project.description != null && project.description!.isNotEmpty)
             Text(
               project.description!,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 14.sp,
                 color: AppColors.textSecondary,
               ),
@@ -165,11 +165,12 @@ class ProjectDetailScreen extends StatelessWidget {
           SizedBox(height: 12.h),
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 16.r, color: AppColors.textSecondary),
+              Icon(Icons.calendar_today,
+                  size: 16.r, color: AppColors.textSecondary),
               SizedBox(width: 8.w),
               Text(
                 'Created ${DateFormat.yMMMd().format(project.createdAt)}',
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 12.sp,
                   color: AppColors.textSecondary,
                 ),
@@ -198,7 +199,7 @@ class ProjectDetailScreen extends StatelessWidget {
               SizedBox(width: 8.w),
               Text(
                 'GitHub Repository',
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -222,11 +223,12 @@ class ProjectDetailScreen extends StatelessWidget {
             SizedBox(height: 8.h),
             Row(
               children: [
-                Icon(Icons.account_tree, size: 14.r, color: AppColors.textSecondary),
+                Icon(Icons.account_tree,
+                    size: 14.r, color: AppColors.textSecondary),
                 SizedBox(width: 4.w),
                 Text(
                   project.githubCurrentBranch!,
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 12.sp,
                     color: AppColors.textSecondary,
                   ),
@@ -256,7 +258,7 @@ class ProjectDetailScreen extends StatelessWidget {
               SizedBox(width: 8.w),
               Text(
                 'Live Deployment',
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
@@ -297,7 +299,8 @@ class ProjectDetailScreen extends StatelessWidget {
     );
   }
 
-  void _showOptionsSheet(BuildContext context, ProjectsController controller, project) {
+  void _showOptionsSheet(
+      BuildContext context, ProjectsController controller, project) {
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(

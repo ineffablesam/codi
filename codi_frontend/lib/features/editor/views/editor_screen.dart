@@ -619,7 +619,7 @@ class EditorScreen extends StatelessWidget {
             SizedBox(height: 16.h),
             Text(
               controller.errorMessage.value ?? 'Something went wrong',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 16.sp,
                 color: AppColors.textPrimary,
               ),

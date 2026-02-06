@@ -4,13 +4,13 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/image_placeholders.dart';
 import '../../../core/storage/shared_prefs.dart';
+import '../../../core/utils/sf_font.dart';
 import '../../auth/controllers/auth_controller.dart';
 
 /// Settings screen
@@ -26,7 +26,7 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           AppStrings.settings,
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          style: SFPro.font(fontWeight: FontWeight.w600),
         ),
         elevation: 0,
       ),
@@ -141,7 +141,7 @@ class SettingsScreen extends StatelessWidget {
                       Flexible(
                         child: Text(
                           user?.displayName ?? 'User',
-                          style: GoogleFonts.inter(
+                          style: SFPro.font(
                             fontSize: 18.sp,
                             fontWeight: FontWeight.w600,
                             color: Get.textTheme.titleLarge?.color,
@@ -161,7 +161,7 @@ class SettingsScreen extends StatelessWidget {
                   SizedBox(height: 6.h),
                   Text(
                     '@${user?.githubUsername ?? 'unknown'}',
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 14.sp,
                       color: Get.textTheme.bodyMedium?.color?.withOpacity(0.7),
                       letterSpacing: -0.2,
@@ -186,7 +186,7 @@ class SettingsScreen extends StatelessWidget {
       padding: EdgeInsets.only(left: 4.w, bottom: 0.h),
       child: Text(
         title.toUpperCase(),
-        style: GoogleFonts.inter(
+        style: SFPro.font(
           fontSize: 12.sp,
           fontWeight: FontWeight.w700,
           color: Get.textTheme.bodySmall?.color?.withOpacity(0.6),
@@ -242,7 +242,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           title: Text(
             title,
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 15.sp,
               fontWeight: FontWeight.w600,
               letterSpacing: -0.2,
@@ -252,7 +252,7 @@ class SettingsScreen extends StatelessWidget {
             padding: EdgeInsets.only(top: 4.h),
             child: Text(
               subtitle,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 13.sp,
                 color: Get.textTheme.bodySmall?.color?.withOpacity(0.6),
                 letterSpacing: -0.1,
@@ -293,7 +293,7 @@ class SettingsScreen extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: GoogleFonts.inter(
+        style: SFPro.font(
           fontSize: 15.sp,
           fontWeight: FontWeight.w500,
           letterSpacing: -0.2,
@@ -311,7 +311,7 @@ class SettingsScreen extends StatelessWidget {
         ),
         child: Text(
           subtitle,
-          style: GoogleFonts.inter(
+          style: SFPro.font(
             fontSize: 13.sp,
             fontWeight: FontWeight.w600,
             color: Get.textTheme.bodyMedium?.color,
@@ -346,7 +346,7 @@ class SettingsScreen extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: GoogleFonts.inter(
+          style: SFPro.font(
             fontSize: 15.sp,
             fontWeight: FontWeight.w500,
             letterSpacing: -0.2,
@@ -388,7 +388,7 @@ class SettingsScreen extends StatelessWidget {
             SizedBox(width: 8.w),
             Text(
               AppStrings.logout,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 15.sp,
                 fontWeight: FontWeight.w600,
                 letterSpacing: -0.2,

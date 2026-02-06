@@ -3,10 +3,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/image_placeholders.dart';
+import '../../core/utils/sf_font.dart';
 
 /// Empty state widget with image, title, subtitle, and optional action
 class EmptyStateWidget extends StatelessWidget {
@@ -54,7 +54,7 @@ class EmptyStateWidget extends StatelessWidget {
             SizedBox(height: 24.h),
             Text(
               title,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 18.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -65,7 +65,7 @@ class EmptyStateWidget extends StatelessWidget {
               SizedBox(height: 8.h),
               Text(
                 subtitle!,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 14.sp,
                   color: AppColors.textSecondary,
                 ),

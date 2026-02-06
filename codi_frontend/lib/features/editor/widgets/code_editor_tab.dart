@@ -11,6 +11,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:resizable_splitter/resizable_splitter.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/sf_font.dart';
 import '../controllers/code_editor_controller.dart';
 import '../controllers/commit_panel_controller.dart';
 import '../controllers/file_tree_controller.dart';
@@ -56,7 +57,7 @@ class BuildFileTree extends StatelessWidget {
           SizedBox(width: 8.w),
           Text(
             'Files',
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 14.sp,
               fontWeight: FontWeight.w600,
               color: Get.textTheme.bodyLarge?.color,
@@ -211,7 +212,7 @@ class _FileTreeNode extends StatelessWidget {
                   Expanded(
                     child: Text(
                       node.name,
-                      style: GoogleFonts.inter(
+                      style: SFPro.font(
                         fontSize: 12.sp,
                         fontWeight:
                             isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -364,7 +365,7 @@ class _CodeEditorPanel extends StatelessWidget {
               SizedBox(height: 16.h),
               Text(
                 'Select a file to edit',
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 16.sp,
                   color: AppColors.textSecondary,
                 ),
@@ -448,7 +449,7 @@ class _CodeEditorPanel extends StatelessWidget {
                   ),
                   child: Text(
                     'Modified',
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 10.sp,
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
@@ -474,7 +475,7 @@ class _CodeEditorPanel extends StatelessWidget {
                     : Icon(LucideIcons.save, size: 16.r),
                 label: Text(
                   controller.isSaving.value ? 'Saving...' : 'Save',
-                  style: GoogleFonts.inter(fontSize: 12.sp),
+                  style: SFPro.font(fontSize: 12.sp),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -520,7 +521,7 @@ class _CommitPanel extends StatelessWidget {
                     SizedBox(width: 8.w),
                     Text(
                       'Commit Changes',
-                      style: GoogleFonts.inter(
+                      style: SFPro.font(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w600,
                         color: Get.textTheme.titleSmall?.color,
@@ -537,7 +538,7 @@ class _CommitPanel extends StatelessWidget {
                             ),
                             child: Text(
                               '${controller.modifiedFiles.length}',
-                              style: GoogleFonts.inter(
+                              style: SFPro.font(
                                 fontSize: 10.sp,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
@@ -576,7 +577,7 @@ class _CommitPanel extends StatelessWidget {
             children: [
               Text(
                 'Branch:',
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w600,
                   color: Get.textTheme.titleSmall?.color,
@@ -597,7 +598,7 @@ class _CommitPanel extends StatelessWidget {
           // Commit message
           Text(
             'Commit Message',
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 13.sp,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -608,7 +609,7 @@ class _CommitPanel extends StatelessWidget {
             controller: controller.messageController,
             decoration: InputDecoration(
               hintText: 'e.g., feat: add login validation',
-              hintStyle: GoogleFonts.inter(
+              hintStyle: SFPro.font(
                   fontSize: 12.sp, color: Get.textTheme.bodyMedium?.color),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8.r),
@@ -616,7 +617,7 @@ class _CommitPanel extends StatelessWidget {
               contentPadding:
                   EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
             ),
-            style: GoogleFonts.inter(fontSize: 13.sp),
+            style: SFPro.font(fontSize: 13.sp),
             maxLines: 2,
             onChanged: (value) => controller.commitMessage.value = value,
           ),
@@ -633,7 +634,7 @@ class _CommitPanel extends StatelessWidget {
                   ),
                   child: Text(
                     'Cancel',
-                    style: GoogleFonts.inter(fontSize: 13.sp),
+                    style: SFPro.font(fontSize: 13.sp),
                   ),
                 ),
               ),
@@ -659,7 +660,7 @@ class _CommitPanel extends StatelessWidget {
                         controller.isCommitting.value
                             ? 'Committing...'
                             : 'Commit & Push',
-                        style: GoogleFonts.inter(fontSize: 13.sp),
+                        style: SFPro.font(fontSize: 13.sp),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.success,

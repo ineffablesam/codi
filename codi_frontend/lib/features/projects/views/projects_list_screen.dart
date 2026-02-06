@@ -7,7 +7,6 @@ import 'package:codi_frontend/core/utils/sf_font.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../config/routes.dart';
 import '../../../core/constants/app_colors.dart';
@@ -209,17 +208,17 @@ class ProjectsListScreen extends StatelessWidget {
             SizedBox(height: 24.h),
             Text(
               isArchived ? 'No archived projects' : AppStrings.noProjects,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            SizedBox(height: 8.h),
+            SizedBox(height: 2.h),
             Text(
               isArchived
                   ? 'Projects you archive will appear here'
                   : AppStrings.noProjectsSubtitle,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 14.sp,
                 color: AppColors.textSecondary,
               ),

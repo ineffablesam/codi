@@ -233,7 +233,7 @@ class ProjectWizardScreen extends StatelessWidget {
         ...ProjectWizardController.backends.map((backend) {
           final isServerpod = backend.id == 'serverpod';
           return Padding(
-            padding: EdgeInsets.only(bottom: 0.3.sh),
+            padding: EdgeInsets.only(bottom: 14.h),
             child: Obx(() => BackendProviderCard(
                   id: backend.id,
                   iconWidget: Icon(backend.icon,

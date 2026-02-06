@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../../core/utils/sf_font.dart';
 import '../../models/agent_message_model.dart';
 
 /// Compact dark-themed deployment success message
@@ -51,7 +52,7 @@ class SuccessMessage extends StatelessWidget {
                 children: [
                   Text(
                     'Deployed successfully',
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 12.sp,
                       fontWeight: FontWeight.w500,
                       color: Colors.green[400],

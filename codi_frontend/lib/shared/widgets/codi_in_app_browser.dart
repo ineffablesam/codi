@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/sf_font.dart';
 
 /// In-app browser screen with Codi branding
 class CodiInAppBrowser extends StatefulWidget {
@@ -249,7 +249,7 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
               Flexible(
                 child: Text(
                   _getDomain(_currentUrl),
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 12.sp,
                     color: AppColors.textSecondary,
                   ),
@@ -261,7 +261,7 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
           if (_pageTitle.isNotEmpty)
             Text(
               _pageTitle,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -271,7 +271,7 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
           else
             Text(
               widget.title,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -352,7 +352,7 @@ class _CodiInAppBrowserState extends State<CodiInAppBrowser> {
                       SizedBox(width: 4.w),
                       Text(
                         'Codi',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 12.sp,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,

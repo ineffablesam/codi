@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/sf_font.dart';
 
 /// Celebratory screen showing walkthrough of completed implementation
 class WalkthroughScreen extends StatefulWidget {
@@ -124,7 +125,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
           const SizedBox(height: 16),
           Text(
             '🎉 Implementation Complete!',
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 24,
               fontWeight: FontWeight.w700,
               color: Colors.white,
@@ -134,7 +135,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
           const SizedBox(height: 8),
           Text(
             "Here's everything that was built",
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 15,
               color: Colors.white.withOpacity(0.9),
             ),
@@ -152,27 +153,27 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
         data: markdown,
         selectable: true,
         styleSheet: MarkdownStyleSheet(
-          h1: GoogleFonts.inter(
+          h1: SFPro.font(
             fontSize: 22,
             fontWeight: FontWeight.w700,
             color: Colors.black87,
           ),
-          h2: GoogleFonts.inter(
+          h2: SFPro.font(
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
-          h3: GoogleFonts.inter(
+          h3: SFPro.font(
             fontSize: 15,
             fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
-          p: GoogleFonts.inter(
+          p: SFPro.font(
             fontSize: 14,
             color: Colors.black87,
             height: 1.7,
           ),
-          listBullet: GoogleFonts.inter(
+          listBullet: SFPro.font(
             fontSize: 14,
             color: AppColors.success,
           ),
@@ -185,7 +186,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey[300]!),
           ),
-          blockquote: GoogleFonts.inter(
+          blockquote: SFPro.font(
             fontSize: 14,
             color: Colors.grey[700],
           ),
@@ -228,7 +229,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
           ),
           child: Text(
             'Back to Project',
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),

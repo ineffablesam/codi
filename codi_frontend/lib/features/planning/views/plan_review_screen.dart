@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/sf_font.dart';
 import '../controllers/planning_controller.dart';
 
 /// Screen for reviewing implementation plans before approval
@@ -64,7 +65,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
         children: [
           Text(
             'Implementation Plan',
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -74,7 +75,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
             if (controller.currentPlan.value != null) {
               return Text(
                 controller.currentPlan.value!.title,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 12,
                   color: Colors.white70,
                 ),
@@ -142,7 +143,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
                       const SizedBox(width: 4),
                       Text(
                         plan.estimatedTime ?? 'Not estimated',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.primaryLight,
@@ -168,7 +169,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
                       const SizedBox(width: 4),
                       Text(
                         '${plan.totalTasks} tasks',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: AppColors.success,
@@ -182,7 +183,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
             const SizedBox(height: 12),
             Text(
               'Review this plan carefully before approving.',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 13,
                 color: Colors.grey[400],
               ),
@@ -190,7 +191,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
             const SizedBox(height: 4),
             Text(
               'Once approved, agents will begin implementing the tasks automatically.',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 12,
                 color: Colors.grey[600],
               ),
@@ -215,27 +216,27 @@ class PlanReviewScreen extends GetView<PlanningController> {
             'code': CodeElementBuilder(),
           },
           styleSheet: MarkdownStyleSheet(
-            h1: GoogleFonts.inter(
+            h1: SFPro.font(
               fontSize: 24,
               fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
-            h2: GoogleFonts.inter(
+            h2: SFPro.font(
               fontSize: 20,
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
-            h3: GoogleFonts.inter(
+            h3: SFPro.font(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
-            p: GoogleFonts.inter(
+            p: SFPro.font(
               fontSize: 14,
               color: Colors.white,
               height: 1.6,
             ),
-            listBullet: GoogleFonts.inter(
+            listBullet: SFPro.font(
               fontSize: 14,
               color: Colors.white,
             ),
@@ -248,10 +249,10 @@ class PlanReviewScreen extends GetView<PlanningController> {
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(8),
             ),
-            blockquote: GoogleFonts.inter(
+            blockquote: SFPro.font(
               fontSize: 14,
               color: Colors.grey[400],
-              fontStyle: FontStyle.italic,
+              style: FontStyle.italic,
             ),
             blockquoteDecoration: BoxDecoration(
               color: const Color(0xFFFEF3C7).withOpacity(0.1),
@@ -307,7 +308,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
                   ),
                   child: Text(
                     'Decline',
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -335,7 +336,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
                       const SizedBox(width: 8),
                       Text(
                         'Approve & Start',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
@@ -360,7 +361,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
           const SizedBox(height: 16),
           Text(
             'Loading plan...',
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 14,
               color: Colors.grey[600],
             ),
@@ -379,7 +380,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
           const SizedBox(height: 16),
           Text(
             'No plan to display',
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Colors.grey[700],
@@ -395,7 +396,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
       AlertDialog(
         title: Text(
           'Approve Plan?',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          style: SFPro.font(fontWeight: FontWeight.w600),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -403,12 +404,12 @@ class PlanReviewScreen extends GetView<PlanningController> {
           children: [
             Text(
               'This will start the automated implementation process.',
-              style: GoogleFonts.inter(fontSize: 14),
+              style: SFPro.font(fontSize: 14),
             ),
             const SizedBox(height: 12),
             Text(
               'You can monitor progress in real-time through the agent chat panel.',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 13,
                 color: Colors.grey[600],
               ),
@@ -442,7 +443,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
       AlertDialog(
         title: Text(
           'Decline Plan',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          style: SFPro.font(fontWeight: FontWeight.w600),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -450,7 +451,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
           children: [
             Text(
               'Why are you declining this plan? (Optional)',
-              style: GoogleFonts.inter(fontSize: 14),
+              style: SFPro.font(fontSize: 14),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -458,7 +459,7 @@ class PlanReviewScreen extends GetView<PlanningController> {
               maxLines: 3,
               decoration: InputDecoration(
                 hintText: 'e.g., "Please add authentication first"',
-                hintStyle: GoogleFonts.inter(fontSize: 13),
+                hintStyle: SFPro.font(fontSize: 13),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -495,11 +496,11 @@ class PlanReviewScreen extends GetView<PlanningController> {
       AlertDialog(
         title: Text(
           'Close Plan Review?',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          style: SFPro.font(fontWeight: FontWeight.w600),
         ),
         content: Text(
           'You can review this plan later from the project dashboard.',
-          style: GoogleFonts.inter(fontSize: 14),
+          style: SFPro.font(fontSize: 14),
         ),
         actions: [
           TextButton(

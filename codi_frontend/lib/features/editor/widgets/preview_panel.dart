@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/utils/sf_font.dart';
 import '../controllers/preview_controller.dart';
 
 /// Embedded WebView preview panel using InAppWebView
@@ -172,7 +173,7 @@ class PreviewPanel extends StatelessWidget {
             // Title
             Text(
               'Initial Deployment',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -184,7 +185,7 @@ class PreviewPanel extends StatelessWidget {
                   controller.buildStage.value.isNotEmpty
                       ? controller.buildStage.value
                       : 'Setting up your development environment...',
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 14.sp,
                     color: AppColors.textSecondary,
                   ),
@@ -229,7 +230,7 @@ class PreviewPanel extends StatelessWidget {
               // Title
               Text(
                 'AI Building Your App',
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 22.sp,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
@@ -241,7 +242,7 @@ class PreviewPanel extends StatelessWidget {
                     controller.buildStage.value.isNotEmpty
                         ? controller.buildStage.value
                         : 'Analyzing your requirements...',
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 14.sp,
                       color: AppColors.textSecondary,
                     ),
@@ -267,7 +268,7 @@ class PreviewPanel extends StatelessWidget {
                       SizedBox(height: 8.h),
                       Text(
                         '${(progress * 100).toInt()}%',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 12.sp,
                           color: AppColors.textTertiary,
                         ),
@@ -300,7 +301,7 @@ class PreviewPanel extends StatelessWidget {
                                   Expanded(
                                     child: Text(
                                       msg,
-                                      style: GoogleFonts.inter(
+                                      style: SFPro.font(
                                         fontSize: 12.sp,
                                         color: AppColors.textSecondary,
                                       ),
@@ -370,7 +371,7 @@ class PreviewPanel extends StatelessWidget {
                     SizedBox(height: 16.h),
                     Text(
                       'Updating Preview',
-                      style: GoogleFonts.inter(
+                      style: SFPro.font(
                         fontSize: 18.sp,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -381,7 +382,7 @@ class PreviewPanel extends StatelessWidget {
                           controller.buildStage.value.isNotEmpty
                               ? controller.buildStage.value
                               : 'Making changes...',
-                          style: GoogleFonts.inter(
+                          style: SFPro.font(
                             fontSize: 13.sp,
                             color: AppColors.textSecondary,
                           ),
@@ -488,7 +489,7 @@ class PreviewPanel extends StatelessWidget {
                 SizedBox(width: 4.w),
                 Text(
                   'Live',
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 10.sp,
                     fontWeight: FontWeight.w600,
                     color: AppColors.success,
@@ -540,7 +541,7 @@ class PreviewPanel extends StatelessWidget {
             // Main message
             Text(
               'Building Your Preview',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 20.sp,
                 fontWeight: FontWeight.w700,
                 color: Get.textTheme.titleLarge?.color,
@@ -555,7 +556,7 @@ class PreviewPanel extends StatelessWidget {
               child: Text(
                 'Your deployment is currently being built.\nCheck the chat panel for live updates.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 14.sp,
                   height: 1.5,
                   color: Get.textTheme.bodyMedium?.color?.withOpacity(0.7),
@@ -576,7 +577,7 @@ class PreviewPanel extends StatelessWidget {
                 icon: Icon(Icons.chat_outlined, size: 18.r),
                 label: Text(
                   'Open Chat Panel',
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -0.2,
@@ -619,7 +620,7 @@ class PreviewPanel extends StatelessWidget {
             SizedBox(height: 16.h),
             Text(
               'Failed to load preview',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,

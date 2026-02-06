@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../core/constants/app_colors.dart';
+import '../core/utils/sf_font.dart';
 
 /// Application theme definitions
 class AppTheme {
@@ -26,93 +27,93 @@ class AppTheme {
         surface: AppColors.surface,
         error: AppColors.error,
       ),
-      
+
       // Text theme using Google Fonts
       textTheme: GoogleFonts.interTextTheme().copyWith(
-        displayLarge: GoogleFonts.inter(
+        displayLarge: SFPro.font(
           fontSize: 32.sp,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
-        displayMedium: GoogleFonts.inter(
+        displayMedium: SFPro.font(
           fontSize: 28.sp,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
-        displaySmall: GoogleFonts.inter(
+        displaySmall: SFPro.font(
           fontSize: 24.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        headlineLarge: GoogleFonts.inter(
+        headlineLarge: SFPro.font(
           fontSize: 22.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        headlineMedium: GoogleFonts.inter(
+        headlineMedium: SFPro.font(
           fontSize: 20.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        headlineSmall: GoogleFonts.inter(
+        headlineSmall: SFPro.font(
           fontSize: 18.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        titleLarge: GoogleFonts.inter(
+        titleLarge: SFPro.font(
           fontSize: 16.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
-        titleMedium: GoogleFonts.inter(
+        titleMedium: SFPro.font(
           fontSize: 15.sp,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
         ),
-        titleSmall: GoogleFonts.inter(
+        titleSmall: SFPro.font(
           fontSize: 14.sp,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
         ),
-        bodyLarge: GoogleFonts.inter(
+        bodyLarge: SFPro.font(
           fontSize: 16.sp,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimary,
         ),
-        bodyMedium: GoogleFonts.inter(
+        bodyMedium: SFPro.font(
           fontSize: 14.sp,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimary,
         ),
-        bodySmall: GoogleFonts.inter(
+        bodySmall: SFPro.font(
           fontSize: 12.sp,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
-        labelLarge: GoogleFonts.inter(
+        labelLarge: SFPro.font(
           fontSize: 14.sp,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
         ),
-        labelMedium: GoogleFonts.inter(
+        labelMedium: SFPro.font(
           fontSize: 12.sp,
           fontWeight: FontWeight.w500,
           color: AppColors.textSecondary,
         ),
-        labelSmall: GoogleFonts.inter(
+        labelSmall: SFPro.font(
           fontSize: 10.sp,
           fontWeight: FontWeight.w500,
           color: AppColors.textSecondary,
         ),
       ),
-      
+
       // AppBar theme
       appBarTheme: AppBarTheme(
         elevation: 0,
         centerTitle: false,
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: SFPro.font(
           fontSize: 18.sp,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
@@ -122,7 +123,7 @@ class AppTheme {
           size: 24.r,
         ),
       ),
-      
+
       // Card theme
       cardTheme: CardThemeData(
         elevation: 0,
@@ -132,7 +133,7 @@ class AppTheme {
         ),
         color: AppColors.surface,
       ),
-      
+
       // Input decoration theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -154,12 +155,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12.r),
           borderSide: BorderSide(color: AppColors.error),
         ),
-        hintStyle: GoogleFonts.inter(
+        hintStyle: SFPro.font(
           fontSize: 14.sp,
           color: AppColors.textSecondary,
         ),
       ),
-      
+
       // Elevated button theme
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -170,13 +171,13 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.r),
           ),
-          textStyle: GoogleFonts.inter(
+          textStyle: SFPro.font(
             fontSize: 16.sp,
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
-      
+
       // Outlined button theme
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
@@ -186,24 +187,24 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.r),
           ),
-          textStyle: GoogleFonts.inter(
+          textStyle: SFPro.font(
             fontSize: 16.sp,
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
-      
+
       // Text button theme
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: GoogleFonts.inter(
+          textStyle: SFPro.font(
             fontSize: 14.sp,
             fontWeight: FontWeight.w600,
           ),
         ),
       ),
-      
+
       // BottomNavigationBar theme
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,
@@ -211,23 +212,23 @@ class AppTheme {
         unselectedItemColor: AppColors.textSecondary,
         type: BottomNavigationBarType.fixed,
         elevation: 8,
-        selectedLabelStyle: GoogleFonts.inter(
+        selectedLabelStyle: SFPro.font(
           fontSize: 12.sp,
           fontWeight: FontWeight.w600,
         ),
-        unselectedLabelStyle: GoogleFonts.inter(
+        unselectedLabelStyle: SFPro.font(
           fontSize: 12.sp,
           fontWeight: FontWeight.w500,
         ),
       ),
-      
+
       // Divider theme
       dividerTheme: DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
         space: 1,
       ),
-      
+
       // Progress indicator theme
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: AppColors.primary,
@@ -251,10 +252,10 @@ class AppTheme {
         surface: AppColors.surfaceDark,
         error: AppColors.error,
       ),
-      
+
       // Text theme using Google Fonts
-      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-      
+      // textTheme: SFPro.fontTextTheme(ThemeData.dark().textTheme),
+
       // Card theme
       cardTheme: CardThemeData(
         elevation: 0,
@@ -286,7 +287,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12.r),
           borderSide: BorderSide(color: AppColors.error),
         ),
-        hintStyle: GoogleFonts.inter(
+        hintStyle: SFPro.font(
           fontSize: 14.sp,
           color: AppColors.textSecondary,
         ),
@@ -302,7 +303,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.r),
           ),
-          textStyle: GoogleFonts.inter(
+          textStyle: SFPro.font(
             fontSize: 16.sp,
             fontWeight: FontWeight.w600,
           ),
@@ -318,7 +319,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.r),
           ),
-          textStyle: GoogleFonts.inter(
+          textStyle: SFPro.font(
             fontSize: 16.sp,
             fontWeight: FontWeight.w600,
           ),
@@ -331,7 +332,7 @@ class AppTheme {
         centerTitle: false,
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: Colors.white,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: SFPro.font(
           fontSize: 18.sp,
           fontWeight: FontWeight.w600,
           color: Colors.white,
@@ -341,7 +342,7 @@ class AppTheme {
           size: 24.r,
         ),
       ),
-      
+
       // Divider theme
       dividerTheme: DividerThemeData(
         color: AppColors.surfaceDarkVariant,

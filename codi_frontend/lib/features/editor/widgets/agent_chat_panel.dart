@@ -18,6 +18,7 @@ import 'package:super_context_menu/super_context_menu.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/utils/sf_font.dart';
 import '../../projects/controllers/project_setup_controller.dart';
 import '../constants/chat_icons.dart';
 import '../controllers/agent_chat_controller.dart';
@@ -447,7 +448,7 @@ class AgentChatPanel extends StatelessWidget {
                 final currentChat = controller.currentChatTitle.value;
                 return Text(
                   currentChat.isEmpty ? 'AI Agent' : currentChat,
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.w600,
                     color: Get.textTheme.titleMedium?.color,
@@ -502,7 +503,7 @@ class AgentChatPanel extends StatelessWidget {
                         children: [
                           Text(
                             'Chats',
-                            style: GoogleFonts.inter(
+                            style: SFPro.font(
                               fontSize: 18.sp,
                               fontWeight: FontWeight.w600,
                               color: Get.textTheme.titleMedium?.color,
@@ -761,7 +762,7 @@ class AgentChatPanel extends StatelessWidget {
                 ),
                 child: Text(
                   message.text,
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 14.sp,
                     color: Colors.white,
                     height: 1.4,
@@ -811,7 +812,7 @@ class AgentChatPanel extends StatelessWidget {
               ),
               child: Text(
                 message.text,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                     fontSize: 13.sp, color: Get.textTheme.bodyMedium?.color),
               ),
             ),
@@ -851,22 +852,22 @@ class AgentChatPanel extends StatelessWidget {
                 child: MarkdownBody(
                   data: message.text,
                   styleSheet: MarkdownStyleSheet(
-                    p: GoogleFonts.inter(
+                    p: SFPro.font(
                       fontSize: 14.sp,
                       color: Colors.grey[300],
                       height: 1.5,
                     ),
-                    h1: GoogleFonts.inter(
+                    h1: SFPro.font(
                       fontSize: 20.sp,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
-                    h2: GoogleFonts.inter(
+                    h2: SFPro.font(
                       fontSize: 18.sp,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
-                    h3: GoogleFonts.inter(
+                    h3: SFPro.font(
                       fontSize: 16.sp,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -886,16 +887,16 @@ class AgentChatPanel extends StatelessWidget {
                         left: BorderSide(color: Colors.grey[600]!, width: 4),
                       ),
                     ),
-                    listBullet: GoogleFonts.inter(
+                    listBullet: SFPro.font(
                       fontSize: 14.sp,
                       color: Colors.grey[400],
                     ),
-                    strong: GoogleFonts.inter(
+                    strong: SFPro.font(
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
-                    em: GoogleFonts.inter(
-                      fontStyle: FontStyle.italic,
+                    em: SFPro.font(
+                      style: FontStyle.italic,
                       color: Colors.grey[300],
                     ),
                   ),
@@ -948,7 +949,7 @@ class AgentChatPanel extends StatelessWidget {
       padding: EdgeInsets.only(bottom: 12.h, left: 36.w),
       child: Text(
         message.text,
-        style: GoogleFonts.inter(
+        style: SFPro.font(
           fontSize: 13.sp,
           color: AppColors.textSecondary,
         ),
@@ -1054,7 +1055,7 @@ class AgentChatPanel extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   title,
-                                  style: GoogleFonts.inter(
+                                  style: SFPro.font(
                                     fontSize: 14.sp,
                                     fontWeight: FontWeight.w600,
                                     color: Get.textTheme.titleMedium?.color,
@@ -1077,7 +1078,7 @@ class AgentChatPanel extends StatelessWidget {
                                   ),
                                   child: Text(
                                     'Pending',
-                                    style: GoogleFonts.inter(
+                                    style: SFPro.font(
                                       fontSize: 10.sp,
                                       fontWeight: FontWeight.w600,
                                       color: Colors.white,
@@ -1095,7 +1096,7 @@ class AgentChatPanel extends StatelessWidget {
                               SizedBox(width: 4.w),
                               Text(
                                 '$taskCount tasks',
-                                style: GoogleFonts.inter(
+                                style: SFPro.font(
                                   fontSize: 11.sp,
                                   color: AppColors.textSecondary,
                                 ),
@@ -1106,7 +1107,7 @@ class AgentChatPanel extends StatelessWidget {
                               SizedBox(width: 4.w),
                               Text(
                                 'Tap to review',
-                                style: GoogleFonts.inter(
+                                style: SFPro.font(
                                   fontSize: 11.sp,
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w500,
@@ -1142,7 +1143,7 @@ class AgentChatPanel extends StatelessWidget {
                                         ),
                                       ),
                                       child: Text('Decline',
-                                          style: GoogleFonts.inter(
+                                          style: SFPro.font(
                                               fontSize: 12.sp,
                                               fontWeight: FontWeight.w600)),
                                     ),
@@ -1154,7 +1155,7 @@ class AgentChatPanel extends StatelessWidget {
                                       onPressed: () => controller.approvePlan(),
                                       icon: Icon(LucideIcons.check, size: 14.r),
                                       label: Text('Approve',
-                                          style: GoogleFonts.inter(
+                                          style: SFPro.font(
                                               fontSize: 12.sp,
                                               fontWeight: FontWeight.w600)),
                                       style: ElevatedButton.styleFrom(
@@ -1213,7 +1214,7 @@ class AgentChatPanel extends StatelessWidget {
               isApproved
                   ? 'Plan approved - starting implementation...'
                   : 'Plan rejected',
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 12.sp,
                 fontWeight: FontWeight.w500,
                 color: isApproved ? AppColors.success : AppColors.error,
@@ -1268,7 +1269,7 @@ class AgentChatPanel extends StatelessWidget {
                     Expanded(
                       child: Text(
                         'Browser Agent Mode - AI will control the browser',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 10.sp,
                           color: AppColors.primary,
                           fontWeight: FontWeight.w500,
@@ -1476,7 +1477,7 @@ class AgentChatPanel extends StatelessWidget {
               SizedBox(height: 24.h),
               Text(
                 AppStrings.startConversation,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 18.sp,
                   fontWeight: FontWeight.w600,
                   color: Get.textTheme.titleLarge?.color,
@@ -1485,7 +1486,7 @@ class AgentChatPanel extends StatelessWidget {
               SizedBox(height: 8.h),
               Text(
                 AppStrings.startConversationSubtitle,
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 14.sp,
                   color: Get.textTheme.bodyMedium?.color,
                   height: 1.5,
@@ -1518,7 +1519,7 @@ class AgentChatPanel extends StatelessWidget {
       avatar: Icon(icon, size: 16.r, color: AppColors.primary),
       label: Text(
         label,
-        style: GoogleFonts.inter(
+        style: SFPro.font(
             fontSize: 13.sp,
             fontWeight: FontWeight.w500,
             color: Get.textTheme.bodyMedium?.color),

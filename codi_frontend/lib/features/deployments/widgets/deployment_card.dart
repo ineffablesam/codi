@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/sf_font.dart';
 import '../models/deployment_model.dart';
 
 /// Deployment card widget
@@ -35,7 +36,7 @@ class DeploymentCard extends StatelessWidget {
               const Spacer(),
               Text(
                 DateFormat.yMMMd().add_Hm().format(deployment.createdAt),
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 12.sp,
                   color: AppColors.textSecondary,
                 ),
@@ -48,7 +49,7 @@ class DeploymentCard extends StatelessWidget {
           if (deployment.commitMessage != null)
             Text(
               deployment.commitMessage!,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w500,
                 color: AppColors.textPrimary,
@@ -62,7 +63,8 @@ class DeploymentCard extends StatelessWidget {
           Row(
             children: [
               if (deployment.branch != null) ...[
-                Icon(Icons.account_tree, size: 14.r, color: AppColors.textTertiary),
+                Icon(Icons.account_tree,
+                    size: 14.r, color: AppColors.textTertiary),
                 SizedBox(width: 4.w),
                 Text(
                   deployment.branch!,
@@ -97,7 +99,7 @@ class DeploymentCard extends StatelessWidget {
                   SizedBox(width: 4.w),
                   Text(
                     deployment.buildTime!,
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 11.sp,
                       color: AppColors.textSecondary,
                     ),
@@ -105,11 +107,12 @@ class DeploymentCard extends StatelessWidget {
                   SizedBox(width: 16.w),
                 ],
                 if (deployment.size != null) ...[
-                  Icon(Icons.data_usage, size: 14.r, color: AppColors.textTertiary),
+                  Icon(Icons.data_usage,
+                      size: 14.r, color: AppColors.textTertiary),
                   SizedBox(width: 4.w),
                   Text(
                     deployment.size!,
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 11.sp,
                       color: AppColors.textSecondary,
                     ),
@@ -144,7 +147,8 @@ class DeploymentCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Icon(Icons.open_in_new, size: 14.r, color: AppColors.success),
+                    Icon(Icons.open_in_new,
+                        size: 14.r, color: AppColors.success),
                   ],
                 ),
               ),
@@ -186,7 +190,7 @@ class DeploymentCard extends StatelessWidget {
           SizedBox(width: 4.w),
           Text(
             text,
-            style: GoogleFonts.inter(
+            style: SFPro.font(
               fontSize: 11.sp,
               fontWeight: FontWeight.w600,
               color: color,

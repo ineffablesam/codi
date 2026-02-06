@@ -5,9 +5,9 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/utils/sf_font.dart';
 import '../../constants/chat_icons.dart';
 import '../../models/agent_message_model.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class FileOperationMessage extends StatelessWidget {
   final AgentMessage message;
@@ -55,7 +55,7 @@ class FileOperationMessage extends StatelessWidget {
                   if (message.stats != null)
                     Text(
                       message.stats!,
-                      style: GoogleFonts.inter(
+                      style: SFPro.font(
                         fontSize: 9.sp,
                         color: AppColors.textSecondary,
                       ),
@@ -71,7 +71,7 @@ class FileOperationMessage extends StatelessWidget {
               ),
               child: Text(
                 operation.toUpperCase(),
-                style: GoogleFonts.inter(
+                style: SFPro.font(
                   fontSize: 8.sp,
                   fontWeight: FontWeight.w700,
                   color: color,
@@ -121,7 +121,7 @@ class GitOperationMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final operation = message.operation ?? 'commit';
-    
+
     return Padding(
       padding: EdgeInsets.only(bottom: 8.h, left: 40.w),
       child: Container(
@@ -154,7 +154,7 @@ class GitOperationMessage extends StatelessWidget {
                     children: [
                       Text(
                         _getGitOperationText(operation),
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 10.sp,
                           fontWeight: FontWeight.w700,
                           color: AppColors.success,
@@ -163,7 +163,8 @@ class GitOperationMessage extends StatelessWidget {
                       if (message.branchName != null) ...[
                         SizedBox(width: 6.w),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 6.w, vertical: 2.h),
                           decoration: BoxDecoration(
                             color: AppColors.success.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4.r),
@@ -182,7 +183,7 @@ class GitOperationMessage extends StatelessWidget {
                   SizedBox(height: 4.h),
                   Text(
                     message.text,
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 11.sp,
                       color: AppColors.textPrimary,
                     ),
@@ -197,27 +198,30 @@ class GitOperationMessage extends StatelessWidget {
   }
 
   IconData _getGitOperationIcon(String operation) {
-     switch (operation) {
-        case 'create_branch':
-          return StatusIcons.gitBranch;
-        case 'commit':
-          return StatusIcons.gitCommit;
-        case 'push':
-          return StatusIcons.gitPush;
-        case 'merge':
-          return StatusIcons.gitMerge;
-        case 'pull':
-          return StatusIcons.gitPull;
-        default:
-          return StatusIcons.gitBranch;
-      }
+    switch (operation) {
+      case 'create_branch':
+        return StatusIcons.gitBranch;
+      case 'commit':
+        return StatusIcons.gitCommit;
+      case 'push':
+        return StatusIcons.gitPush;
+      case 'merge':
+        return StatusIcons.gitMerge;
+      case 'pull':
+        return StatusIcons.gitPull;
+      default:
+        return StatusIcons.gitBranch;
+    }
   }
-  
+
   String _getGitOperationText(String operation) {
-      // transform snake_case to Title Case
-      return operation.split('_').map((word) => 
-        word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1)}' : ''
-      ).join(' ');
+    // transform snake_case to Title Case
+    return operation
+        .split('_')
+        .map((word) => word.isNotEmpty
+            ? '${word[0].toUpperCase()}${word.substring(1)}'
+            : '')
+        .join(' ');
   }
 }
 
@@ -259,7 +263,7 @@ class ErrorMessage extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Something went wrong',
-                    style: GoogleFonts.inter(
+                    style: SFPro.font(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w700,
                       color: AppColors.error,
@@ -271,7 +275,7 @@ class ErrorMessage extends StatelessWidget {
             SizedBox(height: 10.h),
             Text(
               message.text,
-              style: GoogleFonts.inter(
+              style: SFPro.font(
                 fontSize: 12.sp,
                 color: AppColors.textPrimary,
               ),
@@ -316,7 +320,8 @@ class ErrorMessage extends StatelessWidget {
                 backgroundColor: AppColors.error,
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.r)),
               ),
             ),
           ],
@@ -328,14 +333,14 @@ class ErrorMessage extends StatelessWidget {
 
 class BuildProgressMessage extends StatelessWidget {
   final AgentMessage message;
-  
+
   const BuildProgressMessage({super.key, required this.message});
-  
+
   @override
   Widget build(BuildContext context) {
-      final progress = message.progress ?? 0.0;
-      
-      return Padding(
+    final progress = message.progress ?? 0.0;
+
+    return Padding(
       padding: EdgeInsets.only(bottom: 10.h, left: 40.w),
       child: Container(
         padding: EdgeInsets.all(12.r),
@@ -361,7 +366,7 @@ class BuildProgressMessage extends StatelessWidget {
                     children: [
                       Text(
                         message.stage ?? 'Building',
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 11.sp,
                           fontWeight: FontWeight.w600,
                           color: AppColors.info,
@@ -369,7 +374,7 @@ class BuildProgressMessage extends StatelessWidget {
                       ),
                       Text(
                         message.text,
-                        style: GoogleFonts.inter(
+                        style: SFPro.font(
                           fontSize: 10.sp,
                           color: AppColors.textSecondary,
                         ),
@@ -379,7 +384,7 @@ class BuildProgressMessage extends StatelessWidget {
                 ),
                 Text(
                   '${(progress * 100).toInt()}%',
-                  style: GoogleFonts.inter(
+                  style: SFPro.font(
                     fontSize: 12.sp,
                     fontWeight: FontWeight.w700,
                     color: AppColors.info,
@@ -403,7 +408,10 @@ class BuildProgressMessage extends StatelessWidget {
                     height: 8.h,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppColors.info, AppColors.info.withOpacity(0.7)],
+                        colors: [
+                          AppColors.info,
+                          AppColors.info.withOpacity(0.7)
+                        ],
                       ),
                       borderRadius: BorderRadius.circular(4.r),
                     ),
