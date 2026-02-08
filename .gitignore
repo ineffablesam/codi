@@ -28,7 +28,7 @@ doc/api/
 .flutter-plugins
 .flutter-plugins-dependencies
 
-codi-backend/
+# codi-backend/
 codi-serverpod/
 /DEMO
 /serverpod
