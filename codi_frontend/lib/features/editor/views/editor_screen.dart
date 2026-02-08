@@ -2,9 +2,10 @@ import 'package:flex_switch/flex_switch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:radix_icons/radix_icons.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import '../../../config/routes.dart';
 import '../../../core/constants/app_colors.dart';
@@ -19,6 +20,7 @@ import '../widgets/branch_switcher_sheet.dart';
 import '../widgets/browser_agent_panel.dart';
 import '../widgets/code_editor_tab.dart';
 import '../widgets/container_logs_sheet.dart';
+import '../widgets/opik_dashboard.dart';
 import '../widgets/preview_panel.dart';
 
 /// Main editor screen with preview and agent chat
@@ -417,6 +419,55 @@ class EditorScreen extends StatelessWidget {
 
                 SizedBox(width: 8.w),
 
+                // Opik Dashboard button
+                _buildIconButton(
+                  icon: LucideIcons.chartBar,
+                  onPressed: () {
+                    final currentProjectId =
+                        controller.currentProject.value?.id;
+                    WoltModalSheet.show(
+                      context: Get.context!,
+                      pageListBuilder: (modalContext) {
+                        return [
+                          WoltModalSheetPage(
+                            backgroundColor: Get.theme.scaffoldBackgroundColor,
+                            hasTopBarLayer: false,
+                            useSafeArea: false,
+                            // topBarTitle: Row(
+                            //   children: [
+                            //     Icon(
+                            //       LucideIcons.activity,
+                            //       size: 22.sp,
+                            //       color: AppColors.primary,
+                            //     ),
+                            //     SizedBox(width: 10.w),
+                            //     Text(
+                            //       'Opik Dashboard',
+                            //       style: Get.textTheme.headlineSmall?.copyWith(
+                            //         fontWeight: FontWeight.bold,
+                            //       ),
+                            //     ),
+                            //   ],
+                            // ),
+                            // trailingNavBarWidget: IconButton(
+                            //   icon: const Icon(LucideIcons.x),
+                            //   onPressed: () => Navigator.of(modalContext).pop(),
+                            // ),
+                            child: SizedBox(
+                              height: Get.height * 0.85,
+                              child: OpikDashboard(
+                                projectId: currentProjectId,
+                              ),
+                            ),
+                          ),
+                        ];
+                      },
+                    );
+                  },
+                ),
+
+                SizedBox(width: 8.w),
+
                 // More menu
                 _buildPopupMenu(controller),
               ],
@@ -551,6 +602,16 @@ class EditorScreen extends StatelessWidget {
               ],
             ),
           ),
+          const PopupMenuItem(
+            value: 'opik',
+            child: Row(
+              children: [
+                Icon(LucideIcons.activity),
+                SizedBox(width: 8),
+                Text('Opik Dashboard'),
+              ],
+            ),
+          ),
         ],
         onSelected: (value) async {
           final previewCtrl = Get.find<PreviewController>();
@@ -586,6 +647,46 @@ class EditorScreen extends StatelessWidget {
               break;
             case 'redeploy':
               await previewCtrl.redeploy();
+              break;
+            case 'opik':
+              final currentProjectId = controller.currentProject.value?.id;
+              WoltModalSheet.show(
+                context: Get.context!,
+                pageListBuilder: (modalContext) {
+                  return [
+                    WoltModalSheetPage(
+                      backgroundColor: Get.theme.scaffoldBackgroundColor,
+                      hasTopBarLayer: true,
+                      topBarTitle: Row(
+                        children: [
+                          Icon(
+                            LucideIcons.activity,
+                            size: 22.sp,
+                            color: AppColors.primary,
+                          ),
+                          SizedBox(width: 10.w),
+                          Text(
+                            'Opik Dashboard',
+                            style: Get.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      trailingNavBarWidget: IconButton(
+                        icon: const Icon(LucideIcons.x),
+                        onPressed: () => Navigator.of(modalContext).pop(),
+                      ),
+                      child: SizedBox(
+                        height: Get.height * 0.85,
+                        child: OpikDashboard(
+                          projectId: currentProjectId,
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+              );
               break;
           }
         },

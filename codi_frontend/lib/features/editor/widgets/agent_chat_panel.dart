@@ -15,6 +15,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:super_context_menu/super_context_menu.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
@@ -22,8 +23,10 @@ import '../../../core/utils/sf_font.dart';
 import '../../projects/controllers/project_setup_controller.dart';
 import '../constants/chat_icons.dart';
 import '../controllers/agent_chat_controller.dart';
+import '../controllers/editor_controller.dart';
 import '../models/agent_message_model.dart';
 import 'chat_list_sidebar.dart';
+import 'opik_dashboard.dart';
 
 /// Helper class for grouping tool messages
 class _ToolGroup {
@@ -153,6 +156,69 @@ class _ExpandableToolGroupState extends State<_ExpandableToolGroup> {
                       ),
                     ),
                     const Spacer(),
+
+                    // Opik Dashboard button
+                    IconButton(
+                      onPressed: () {
+                        final editorController = Get.find<EditorController>();
+                        final currentProjectId =
+                            editorController.currentProject.value?.id;
+
+                        WoltModalSheet.show(
+                          context: context,
+                          pageListBuilder: (modalContext) {
+                            return [
+                              WoltModalSheetPage(
+                                backgroundColor:
+                                    Get.theme.scaffoldBackgroundColor,
+                                hasTopBarLayer: false,
+                                topBarTitle: Row(
+                                  children: [
+                                    Icon(
+                                      LucideIcons.activity,
+                                      size: 22.sp,
+                                      color: AppColors.primary,
+                                    ),
+                                    SizedBox(width: 10.w),
+                                    Text(
+                                      'Opik Dashboard',
+                                      style:
+                                          Get.textTheme.headlineSmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                trailingNavBarWidget: IconButton(
+                                  icon: const Icon(LucideIcons.x),
+                                  onPressed: () =>
+                                      Navigator.of(modalContext).pop(),
+                                ),
+                                child: SizedBox(
+                                  height: Get.height * 0.85,
+                                  child: OpikDashboard(
+                                    projectId: currentProjectId,
+                                    initialFilteredSessionId: Get.find<AgentChatController>()
+                                        .currentSessionId
+                                        .value,
+                                  ),
+                                ),
+                              ),
+                            ];
+                          },
+                        );
+                      },
+                      icon: const Icon(LucideIcons.chartBar),
+                      iconSize: 20.sp,
+                      tooltip: 'Opik Dashboard',
+                      style: IconButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                      ),
+                    ),
+
+                    SizedBox(width: 4.w),
+
+                    // New chat button
                     AnimatedRotation(
                       turns: _isExpanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 200),
@@ -318,11 +384,43 @@ class _ExpandableToolGroupState extends State<_ExpandableToolGroup> {
                                                           ),
                                                         ),
                                                         if (hasResult)
-                                                          Icon(
-                                                            LucideIcons.check,
-                                                            size: 8.r,
-                                                            color: Colors
-                                                                .green[400],
+                                                          IconButton(
+                                                            icon: Icon(
+                                                              LucideIcons.check,
+                                                              size: 8.r,
+                                                              color: Colors
+                                                                  .green[400],
+                                                            ),
+                                                            onPressed: () {
+                                                              final project =
+                                                                  Get.find<
+                                                                          EditorController>()
+                                                                      .currentProject
+                                                                      .value;
+                                                              if (project !=
+                                                                  null) {
+                                                                // Pass current session ID for deep-linking
+                                                                final sessionId =
+                                                                    Get.find<
+                                                                            AgentChatController>()
+                                                                        .currentSessionId
+                                                                        .value;
+                                                                Get.dialog(
+                                                                  Dialog(
+                                                                    child:
+                                                                        OpikDashboard(
+                                                                      projectId:
+                                                                          project
+                                                                              .id,
+                                                                      initialFilteredSessionId:
+                                                                          sessionId,
+                                                                    ),
+                                                                  ),
+                                                                  barrierDismissible:
+                                                                      true,
+                                                                );
+                                                              }
+                                                            },
                                                           ),
                                                       ],
                                                     ),
