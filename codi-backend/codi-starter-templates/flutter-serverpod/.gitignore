@@ -1,0 +1,21 @@
+# Generated files
+.dart_tool/
+build/
+.pub/
+.pub-cache/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Logs
+*.log
+
+# Environment files (except example)
+.env
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,29 @@
+# Development configuration for Serverpod
+#
+# This file is used when running with SERVERPOD_ENV=development
+# All values are overridden by environment variables in Docker
+
+apiServer:
+  port: 8080
+  publicHost: localhost
+  publicPort: 8080
+  publicScheme: http
+
+insightsServer:
+  port: 8081
+  publicHost: localhost
+  publicPort: 8081
+  publicScheme: http
+
+database:
+  host: ${DATABASE_HOST:localhost}
+  port: ${DATABASE_PORT:5432}
+  name: ${DATABASE_NAME:{{PROJECT_NAME}}}
+  user: ${DATABASE_USER:postgres}
+  password: ${DATABASE_PASSWORD:postgres}
+  requireSsl: false
+
+redis:
+  enabled: true
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}

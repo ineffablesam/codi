@@ -1,0 +1,29 @@
+# Production configuration for Serverpod
+#
+# This file is used when running with SERVERPOD_ENV=production
+# All sensitive values should come from environment variables
+
+apiServer:
+  port: 8080
+  publicHost: ${PUBLIC_HOST}
+  publicPort: 443
+  publicScheme: https
+
+insightsServer:
+  port: 8081
+  publicHost: ${PUBLIC_HOST}
+  publicPort: 8082
+  publicScheme: https
+
+database:
+  host: ${DATABASE_HOST}
+  port: ${DATABASE_PORT:5432}
+  name: ${DATABASE_NAME}
+  user: ${DATABASE_USER}
+  password: ${DATABASE_PASSWORD}
+  requireSsl: true
+
+redis:
+  enabled: true
+  host: ${REDIS_HOST}
+  port: ${REDIS_PORT:6379}

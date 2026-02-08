@@ -1,0 +1,22 @@
+version: '3.8'
+
+# Development overrides for hot reload and debugging
+services:
+  serverpod:
+    volumes:
+      - ./${PROJECT_NAME}_server:/app
+      - /app/.dart_tool
+      - /app/build
+    command: dart run bin/main.dart --mode=development --logging=debug
+    environment:
+      - SERVERPOD_HOT_RELOAD=true
+      - SERVERPOD_ENV=development
+
+  flutter:
+    volumes:
+      - ./${PROJECT_NAME}_flutter:/app
+      - /app/.dart_tool
+      - /app/build
+    command: flutter run -d web-server --web-port=80 --web-hostname=0.0.0.0
+    environment:
+      - FLUTTER_WEB_USE_SKIA=true

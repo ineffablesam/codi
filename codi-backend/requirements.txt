@@ -1,0 +1,75 @@
+# Codi Backend Requirements
+# Core Framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.19
+python-dotenv==1.0.1
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+greenlet==3.1.1
+
+# Redis & Caching
+redis==5.2.1
+aioredis==2.0.1
+
+# Celery
+celery[redis]==5.4.0
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==44.0.0
+httpx==0.28.1
+
+# AI/ML - LangChain & LangGraph (Latest with Gemini 3 support)
+langchain>=1.0.0
+langchain-core>=1.0.0
+langchain-google-genai>=4.0.0  # Full Gemini 3 thought signature support
+langchain-openai>=1.0.0
+langchain-anthropic>=1.0.0
+langgraph>=1.0.0
+google-generativeai>=0.8.6
+
+# Gemini 2.5 Computer Use
+google-genai>=1.0.0
+playwright>=1.40.0
+mem0ai>=1.0.1
+chromadb>=0.4.0
+opik>=0.2.0  # Opik SDK for AI operation tracking
+
+# GitHub Integration
+PyGithub==2.5.0
+gitpython==3.1.43
+
+# Docker
+docker>=7.0.0
+pyyaml>=6.0
+
+# WebSocket
+websockets==14.1
+
+# Validation & Serialization
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# Utilities
+orjson==3.10.12
+python-dateutil==2.9.0.post0
+tenacity==9.0.0
+structlog==24.4.0
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.0
+pytest-cov==6.0.0
+httpx==0.28.1
+pytest-mock==3.14.0
+
+# Development
+ruff==0.8.4
+black==24.10.0
+mypy==1.14.1

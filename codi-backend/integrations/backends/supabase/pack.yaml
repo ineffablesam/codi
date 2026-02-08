@@ -1,0 +1,15 @@
+name: supabase
+version: 1.0.0
+pack_type: backend
+description: "Supabase is an open-source Firebase alternative with PostgreSQL, Auth, Storage, and Realtime"
+
+compatibility:
+  javascript: ">=16.0.0"
+  typescript: ">=4.0.0"
+
+tags:
+  - postgres
+  - backend
+  - auth
+  - storage
+  - realtime
