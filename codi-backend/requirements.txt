@@ -38,7 +38,7 @@ google-genai>=1.0.0
 playwright>=1.40.0
 mem0ai>=1.0.1
 chromadb>=0.4.0
-opik>=0.2.0  # Opik SDK for AI operation tracking
+opik>=1.10.6  # Opik SDK for AI operation tracking
 
 # GitHub Integration
 PyGithub==2.5.0

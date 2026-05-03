@@ -1,8 +1,10 @@
 # CODI — Build While You Talk, with Production-Grade AI Observability from Comet Opik
 
+https://drive.google.com/file/d/1EGGPeBKR4bV0hIRyHthDjM42n7wfHqeL/view?usp=sharing
+
 **Hackathon Submission**  
 **Team**: Samuel Philip
-
+**One-Liner**: CODI is a mobile-first AI coding platform that brings full-stack development to smartphones. Unlike traditional AI coding tools that assume users have laptops and desktop IDEs, CODI targets the **6 billion people** who access the internet primarily through mobile devices.
 ---
 
 ## Executive Summary
